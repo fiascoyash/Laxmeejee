@@ -1,0 +1,783 @@
+import { useState, useEffect } from 'react';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate } from './types';
+import { storage, generateId, generateQuotationNumber, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns } from './utils/storage';
+import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
+import { CustomerDetails } from './components/CustomerDetails';
+import { ProductTable } from './components/ProductTable';
+import { QuotationList } from './components/QuotationList';
+import { ProductCatalog } from './components/ProductCatalog';
+import { TemplateBuilder } from './components/TemplateBuilder';
+import { TemplateLibrary } from './components/TemplateLibrary';
+import { TemplatePreview } from './components/TemplatePreview';
+import { TemplateSelection } from './components/TemplateSelection';
+import { exportTemplatePDF } from './utils/templatePdfExport';
+import {
+  Sun, FileText, Package, Settings, FileDown, Save, List,
+  Building2, Menu, X, Home, ChevronRight, Layout, Eye, LucideIcon
+} from 'lucide-react';
+
+type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates';
+
+function App() {
+  const [view, setView] = useState<View>('home');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Company Profile State
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(storage.getCompanyProfile);
+  const [showCompanyProfile, setShowCompanyProfile] = useState(false);
+
+  // Product Catalog State
+  const [catalog, setCatalog] = useState<ProductCatalogItem[]>(storage.getProductCatalog);
+
+  // Quotation Form State
+  const [editingQuotationId, setEditingQuotationId] = useState<string | null>(null);
+  const [quotationNumber, setQuotationNumber] = useState('');
+  const [quotationDate, setQuotationDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customer, setCustomer] = useState<Customer>({
+    name: '',
+    billingAddress: '',
+    mobile: '',
+    district: '',
+    village: '',
+  });
+  const [products, setProducts] = useState<Product[]>([]);
+
+  // Selected Template State
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
+  // Quotation List State
+  const [quotations, setQuotations] = useState<Quotation[]>(storage.getQuotations);
+
+  // Template State
+  const [templates, setTemplates] = useState<QuotationTemplate[]>(storage.getTemplates);
+  const [editingTemplate, setEditingTemplate] = useState<QuotationTemplate | null>(null);
+  const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
+  const [previewingTemplate, setPreviewingTemplate] = useState<QuotationTemplate | null>(null);
+
+  // Load data on mount
+  useEffect(() => {
+    setQuotations(storage.getQuotations);
+    setCatalog(storage.getProductCatalog);
+    setTemplates(storage.getTemplates);
+    // Set default template as selected
+    const defaultTemplate = storage.getDefaultTemplate();
+    if (defaultTemplate) {
+      setSelectedTemplateId(defaultTemplate.id);
+    }
+  }, []);
+
+  // Save company profile
+  const handleSaveCompanyProfile = (profile: CompanyProfile) => {
+    storage.saveCompanyProfile(profile);
+    setCompanyProfile(profile);
+  };
+
+  // Save catalog
+  const handleSaveCatalog = (catalogItems: ProductCatalogItem[]) => {
+    storage.saveProductCatalog(catalogItems);
+    setCatalog(catalogItems);
+  };
+
+  // Reset quotation form
+  const resetForm = () => {
+    setEditingQuotationId(null);
+    setQuotationNumber(generateQuotationNumber());
+    setQuotationDate(new Date().toISOString().split('T')[0]);
+    setCustomer({ name: '', billingAddress: '', mobile: '', district: '', village: '' });
+    setProducts([]);
+  };
+
+  // Start new quotation - go to template selection first
+  const startNewQuotation = () => {
+    resetForm();
+    setView('selectTemplate');
+  };
+
+  // Edit existing quotation
+  const editQuotation = (quotation: Quotation) => {
+    setEditingQuotationId(quotation.id);
+    setQuotationNumber(quotation.quotationNumber);
+    setQuotationDate(quotation.date);
+    setCustomer(quotation.customer);
+    setProducts(quotation.products);
+    // Restore the template used for this quotation
+    if (quotation.selectedTemplateId) {
+      setSelectedTemplateId(quotation.selectedTemplateId);
+    }
+    setView('new');
+  };
+
+  // Save quotation
+  const saveQuotation = () => {
+    if (!customer.name) {
+      alert('Please enter customer name');
+      return;
+    }
+    if (products.length === 0) {
+      alert('Please add at least one product');
+      return;
+    }
+
+    const taxSummary = calculateTaxSummary(products);
+    const totalAmount = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
+    const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
+    const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
+    const grandTotal = totalAmount + totalCgst + totalSgst;
+
+    const quotation: Quotation = {
+      id: editingQuotationId || generateId(),
+      quotationNumber: editingQuotationId ? quotationNumber : generateQuotationNumber(),
+      date: quotationDate,
+      customer,
+      products,
+      totalAmount,
+      totalCgst,
+      totalSgst,
+      grandTotal,
+      createdAt: editingQuotationId ? quotations.find(q => q.id === editingQuotationId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
+      selectedTemplateId: selectedTemplateId || undefined,
+    };
+
+    storage.saveQuotation(quotation);
+    setQuotations(storage.getQuotations());
+    alert(editingQuotationId ? 'Quotation updated successfully!' : 'Quotation saved successfully!');
+    resetForm();
+    setView('list');
+  };
+
+  // Delete quotation
+  const deleteQuotation = (id: string) => {
+    if (confirm('Are you sure you want to delete this quotation?')) {
+      storage.deleteQuotation(id);
+      setQuotations(storage.getQuotations());
+    }
+  };
+
+  // Duplicate quotation
+  const duplicateQuotation = (id: string) => {
+    const newQuotation = storage.duplicateQuotation(id);
+    if (newQuotation) {
+      setQuotations(storage.getQuotations());
+      alert(`Quotation duplicated as ${newQuotation.quotationNumber}`);
+    }
+  };
+
+  // Get sample data for template preview
+  const getSampleData = () => ({
+    customer: customer.name ? customer : {
+      name: 'Sample Customer',
+      billingAddress: '123 Main Street',
+      mobile: '9876543210',
+      district: 'Sample District',
+      village: 'Sample Village',
+    },
+    quotation: {
+      id: 'sample',
+      quotationNumber: quotationNumber || 'QT-2024-0001',
+      date: quotationDate || new Date().toISOString().split('T')[0],
+      customer: customer.name ? customer : {
+        name: 'Sample Customer',
+        billingAddress: '123 Main Street',
+        mobile: '9876543210',
+        district: 'Sample District',
+        village: 'Sample Village',
+      },
+      products: products.length > 0 ? products : [
+        { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 12, quantity: 10, unitPrice: 12000 },
+        { id: '2', name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
+      ],
+      totalAmount: 155000,
+      totalCgst: 11100,
+      totalSgst: 11100,
+      grandTotal: 177200,
+      createdAt: new Date().toISOString(),
+      selectedTemplateId: selectedTemplateId || undefined,
+    } as Quotation,
+    products: products.length > 0 ? products : [
+      { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 12, quantity: 10, unitPrice: 12000 },
+      { id: '2', name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
+    ],
+  });
+
+  // Get current template
+  const getCurrentTemplate = (): QuotationTemplate | undefined => {
+    if (selectedTemplateId) {
+      return storage.getTemplateById(selectedTemplateId);
+    }
+    return storage.getDefaultTemplate();
+  };
+
+  // Export PDF - always uses selected template
+  const exportPDF = () => {
+    if (products.length === 0) {
+      alert('Please add products before exporting');
+      return;
+    }
+
+    const template = getCurrentTemplate();
+    if (!template) {
+      alert('No template selected. Please select a template first.');
+      return;
+    }
+
+    const taxSummary = calculateTaxSummary(products);
+    const totalAmount = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
+    const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
+    const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
+    const grandTotal = totalAmount + totalCgst + totalSgst;
+
+    const quotation: Quotation = {
+      id: editingQuotationId || 'temp',
+      quotationNumber: quotationNumber || 'QT-PREVIEW',
+      date: quotationDate,
+      customer,
+      products,
+      totalAmount,
+      totalCgst,
+      totalSgst,
+      grandTotal,
+      createdAt: new Date().toISOString(),
+      selectedTemplateId: selectedTemplateId || undefined,
+    };
+
+    exportTemplatePDF(template, companyProfile, customer, quotation, products);
+  };
+
+  // Template handlers
+  const handleSaveTemplate = (template: QuotationTemplate) => {
+    storage.saveTemplate(template);
+    setTemplates(storage.getTemplates());
+    setShowTemplateBuilder(false);
+    setEditingTemplate(null);
+    alert('Template saved successfully!');
+  };
+
+  const handleDeleteTemplate = (id: string) => {
+    if (confirm('Are you sure you want to delete this template?')) {
+      storage.deleteTemplate(id);
+      setTemplates(storage.getTemplates());
+      // If deleted template was selected, reset selection
+      if (selectedTemplateId === id) {
+        const defaultTemplate = storage.getDefaultTemplate();
+        setSelectedTemplateId(defaultTemplate?.id || null);
+      }
+    }
+  };
+
+  const handleDuplicateTemplate = (id: string) => {
+    const newTemplate = storage.duplicateTemplate(id);
+    if (newTemplate) {
+      setTemplates(storage.getTemplates());
+      alert('Template duplicated successfully!');
+    }
+  };
+
+  const handleSetDefaultTemplate = (id: string) => {
+    const updatedTemplates = templates.map(t => ({
+      ...t,
+      isDefault: t.id === id,
+    }));
+    storage.saveTemplates(updatedTemplates);
+    setTemplates(updatedTemplates);
+  };
+
+  const handleEditTemplate = (template: QuotationTemplate) => {
+    setEditingTemplate(template);
+    setShowTemplateBuilder(true);
+  };
+
+  const handlePreviewTemplate = (template: QuotationTemplate) => {
+    setPreviewingTemplate(template);
+  };
+
+  const handleCreateNewTemplate = () => {
+    setEditingTemplate(null);
+    setShowTemplateBuilder(true);
+  };
+
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+  };
+
+  const handleTemplateContinue = () => {
+    if (!selectedTemplateId) {
+      alert('Please select a template to continue');
+      return;
+    }
+    setView('new');
+  };
+
+  // Preview current quotation with selected template
+  const handlePreviewCurrentQuotation = () => {
+    const template = getCurrentTemplate();
+    if (template) {
+      setPreviewingTemplate(template);
+    }
+  };
+
+  const NavItem = ({ icon: Icon, label, currentView, targetView }: {
+    icon: LucideIcon;
+    label: string;
+    currentView: View;
+    targetView: View;
+  }) => (
+    <button
+      onClick={() => { setView(targetView); setSidebarOpen(false); }}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+        currentView === targetView
+          ? 'bg-blue-600 text-white'
+          : 'text-gray-600 hover:bg-gray-100'
+      }`}
+    >
+      <Icon className="w-5 h-5" />
+      {label}
+    </button>
+  );
+
+  const selectedTemplate = getCurrentTemplate();
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-gray-100"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="flex items-center gap-2">
+            <Sun className="w-6 h-6 text-amber-500" />
+            <span className="font-bold text-gray-800">Solar Quotation</span>
+          </div>
+          <button
+            onClick={() => setShowCompanyProfile(true)}
+            className="p-2 rounded-lg hover:bg-gray-100"
+          >
+            <Settings className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-50"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 z-50 transform transition-transform lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Sun className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="font-bold text-gray-800">GST Quotation</h1>
+                <p className="text-xs text-gray-500">for Solar Business</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-1 rounded hover:bg-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <nav className="p-4 space-y-1">
+          <NavItem icon={Home} label="Dashboard" currentView={view} targetView="home" />
+          <NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" />
+          <NavItem icon={List} label="Quotation History" currentView={view} targetView="list" />
+          <NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" />
+          <NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" />
+          <NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" />
+        </nav>
+
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+          {companyProfile.companyName && (
+            <div className="text-center text-xs text-gray-500 mb-2">{companyProfile.companyName}</div>
+          )}
+          <div className="text-center text-xs text-gray-400">
+            All data stored locally
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="lg:ml-64 min-h-screen">
+        {/* Desktop Header */}
+        <header className="hidden lg:block bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <button
+                onClick={() => setView('home')}
+                className="hover:text-blue-600 transition-colors"
+              >
+                Dashboard
+              </button>
+              {view !== 'home' && (
+                <>
+                  <ChevronRight className="w-4 h-4" />
+                  <span className="text-gray-800 font-medium capitalize">
+                    {view === 'selectTemplate' ? 'Select Template' : view}
+                  </span>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowCompanyProfile(true)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
+              >
+                <Building2 className="w-4 h-4" />
+                Company Profile
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <div className="p-4 lg:p-6">
+          {/* Home Dashboard */}
+          {view === 'home' && (
+            <div className="max-w-6xl mx-auto space-y-6">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-2">Welcome to GST Quotation Maker</h2>
+                <p className="text-gray-500">Create professional GST-compliant quotations for your solar business</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button
+                  onClick={startNewQuotation}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-blue-400 hover:shadow-lg transition-all group"
+                >
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500 transition-colors">
+                    <FileText className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-1">New Quotation</h3>
+                  <p className="text-sm text-gray-500">Create a new quotation</p>
+                </button>
+
+                <button
+                  onClick={() => setView('list')}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-400 hover:shadow-lg transition-all group"
+                >
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-500 transition-colors">
+                    <List className="w-6 h-6 text-green-600 group-hover:text-white transition-colors" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-1">Quotation History</h3>
+                  <p className="text-sm text-gray-500">{quotations.length} quotations saved</p>
+                </button>
+
+                <button
+                  onClick={() => setView('templates')}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-purple-400 hover:shadow-lg transition-all group"
+                >
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-500 transition-colors">
+                    <Layout className="w-6 h-6 text-purple-600 group-hover:text-white transition-colors" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-1">Templates</h3>
+                  <p className="text-sm text-gray-500">{templates.length} templates</p>
+                </button>
+
+                <button
+                  onClick={() => setView('catalog')}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-amber-400 hover:shadow-lg transition-all group"
+                >
+                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-500 transition-colors">
+                    <Package className="w-6 h-6 text-amber-600 group-hover:text-white transition-colors" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-1">Product Catalog</h3>
+                  <p className="text-sm text-gray-500">{catalog.length} products</p>
+                </button>
+              </div>
+
+              {/* Recent Quotations */}
+              {quotations.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Quotations</h3>
+                  <div className="space-y-3">
+                    {quotations.slice(0, 3).map(q => (
+                      <div
+                        key={q.id}
+                        className="bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer"
+                        onClick={() => editQuotation(q)}
+                      >
+                        <div>
+                          <span className="font-medium text-blue-600">{q.quotationNumber}</span>
+                          <span className="text-gray-400 mx-2">|</span>
+                          <span className="text-gray-600">{q.customer.name}</span>
+                        </div>
+                        <span className="font-medium text-gray-800">Rs. {q.grandTotal.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Setup */}
+              {!companyProfile.companyName && (
+                <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-2">Get Started</h3>
+                  <p className="text-blue-600 mb-4">Complete your company profile to create professional quotations.</p>
+                  <button
+                    onClick={() => setShowCompanyProfile(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Setup Company Profile
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Template Selection */}
+          {view === 'selectTemplate' && (
+            <TemplateSelection
+              templates={templates}
+              selectedTemplateId={selectedTemplateId}
+              onSelect={handleSelectTemplate}
+              onContinue={handleTemplateContinue}
+              onManageTemplates={() => setView('templates')}
+              companyProfile={companyProfile}
+            />
+          )}
+
+          {/* New Quotation Form */}
+          {view === 'new' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">
+                    {editingQuotationId ? 'Edit Quotation' : 'New Quotation'}
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    {quotationNumber || 'Quotation number will be generated on save'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto items-center">
+                  {/* Template indicator */}
+                  {selectedTemplate && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-md text-sm">
+                      <Layout className="w-4 h-4 text-purple-600" />
+                      <span className="text-purple-700 font-medium">{selectedTemplate.name}</span>
+                      <button
+                        onClick={() => setView('selectTemplate')}
+                        className="text-purple-600 hover:text-purple-800 text-xs underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    type="date"
+                    value={quotationDate}
+                    onChange={(e) => setQuotationDate(e.target.value)}
+                    className="flex-1 sm:flex-none px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+              </div>
+
+              <CustomerDetails customer={customer} onChange={setCustomer} />
+              <ProductTable products={products} onChange={setProducts} catalog={catalog} />
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-end bg-white rounded-lg border border-gray-200 p-4 sticky bottom-4">
+                <button
+                  onClick={() => { resetForm(); setView('home'); }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors order-2 sm:order-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePreviewCurrentQuotation}
+                  className="px-4 py-2 border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50 transition-colors flex items-center justify-center gap-2 order-3 sm:order-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  Preview
+                </button>
+                <button
+                  onClick={exportPDF}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2 order-1 sm:order-3"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export PDF
+                </button>
+                <button
+                  onClick={saveQuotation}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 order-4"
+                >
+                  <Save className="w-4 h-4" />
+                  {editingQuotationId ? 'Update' : 'Save'} Quotation
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Quotation History */}
+          {view === 'list' && (
+            <div className="max-w-4xl mx-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Quotation History</h2>
+                <button
+                  onClick={startNewQuotation}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                >
+                  <FileText className="w-4 h-4" />
+                  New Quotation
+                </button>
+              </div>
+              <QuotationList
+                quotations={quotations}
+                onEdit={editQuotation}
+                onDelete={deleteQuotation}
+                onDuplicate={duplicateQuotation}
+              />
+            </div>
+          )}
+
+          {/* Templates */}
+          {view === 'templates' && (
+            <div className="max-w-5xl mx-auto">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Quotation Templates</h2>
+                <p className="text-sm text-gray-500">Create custom quotation layouts with drag-and-drop editor</p>
+              </div>
+              <TemplateLibrary
+                templates={templates}
+                onEdit={handleEditTemplate}
+                onDelete={handleDeleteTemplate}
+                onDuplicate={handleDuplicateTemplate}
+                onSetDefault={handleSetDefaultTemplate}
+                onPreview={handlePreviewTemplate}
+                onCreateNew={handleCreateNewTemplate}
+              />
+            </div>
+          )}
+
+          {/* Product Catalog */}
+          {view === 'catalog' && (
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-xl font-bold text-gray-800 mb-6">Product Catalog</h2>
+              <ProductCatalog catalog={catalog} onSave={handleSaveCatalog} />
+            </div>
+          )}
+
+          {/* Settings */}
+          {view === 'settings' && (
+            <div className="max-w-2xl mx-auto">
+              <h2 className="text-xl font-bold text-gray-800 mb-6">Settings</h2>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div className="p-6 space-y-4">
+                  <button
+                    onClick={() => setShowCompanyProfile(true)}
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Building2 className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <div className="font-medium text-gray-800">Company Profile</div>
+                        <div className="text-sm text-gray-500">Edit company details, logo, and bank information</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  </button>
+
+                  <button
+                    onClick={() => setView('templates')}
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Layout className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <div className="font-medium text-gray-800">Quotation Templates</div>
+                        <div className="text-sm text-gray-500">Design custom quotation layouts</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  </button>
+
+                  <button
+                    onClick={() => setView('catalog')}
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Package className="w-5 h-5 text-amber-600" />
+                      <div>
+                        <div className="font-medium text-gray-800">Product Catalog</div>
+                        <div className="text-sm text-gray-500">Manage default products and prices</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h3 className="font-medium text-amber-800 mb-2">Data Storage</h3>
+                <p className="text-sm text-amber-700">
+                  All your data is stored locally in your browser. Clearing browser data will remove all quotations and settings.
+                  Consider exporting important quotations to PDF for backup.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Company Profile Modal */}
+      {showCompanyProfile && (
+        <CompanyProfileModal
+          profile={companyProfile}
+          onSave={handleSaveCompanyProfile}
+          onClose={() => setShowCompanyProfile(false)}
+        />
+      )}
+
+      {/* Template Builder Modal */}
+      {showTemplateBuilder && (
+        <TemplateBuilder
+          template={editingTemplate || {
+            id: '',
+            name: 'New Template',
+            description: '',
+            blocks: [],
+            productColumns: getDefaultProductColumns(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }}
+          companyProfile={companyProfile}
+          sampleData={getSampleData()}
+          onSave={handleSaveTemplate}
+          onClose={() => {
+            setShowTemplateBuilder(false);
+            setEditingTemplate(null);
+          }}
+        />
+      )}
+
+      {/* Template Preview Modal */}
+      {previewingTemplate && (
+        <TemplatePreview
+          template={previewingTemplate}
+          company={companyProfile}
+          customer={customer.name ? customer : getSampleData().customer}
+          quotation={getSampleData().quotation}
+          products={products.length > 0 ? products : getSampleData().products}
+          onClose={() => setPreviewingTemplate(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+export default App;
