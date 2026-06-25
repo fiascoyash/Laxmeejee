@@ -52,6 +52,19 @@ export interface Quotation {
   selectedTemplateId?: string; // Link to template
 }
 
+export interface NumberingSettings {
+  quotationPrefix: string;
+  quotationIncludeYear: boolean;
+  quotationStartNumber: number;
+  quotationAutoIncrement: boolean;
+  quotationNextNumber: number;
+  invoicePrefix: string;
+  invoiceIncludeYear: boolean;
+  invoiceStartNumber: number;
+  invoiceAutoIncrement: boolean;
+  invoiceNextNumber: number;
+}
+
 export type InvoiceStatus = 'Draft' | 'Unpaid' | 'Partial Payment' | 'Paid';
 
 export interface Invoice {

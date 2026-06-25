@@ -1,4 +1,4 @@
-import { CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn, BlockType, Invoice } from '../types';
+import { CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn, BlockType, Invoice, NumberingSettings } from '../types';
 
 const STORAGE_KEYS = {
   COMPANY_PROFILE: 'solar_company_profile',
@@ -6,7 +6,21 @@ const STORAGE_KEYS = {
   PRODUCT_CATALOG: 'solar_product_catalog',
   TEMPLATES: 'solar_quotation_templates',
   INVOICES: 'solar_invoices',
+  NUMBERING: 'solar_numbering_settings',
 };
+
+const getDefaultNumberingSettings = (): NumberingSettings => ({
+  quotationPrefix: 'QT',
+  quotationIncludeYear: true,
+  quotationStartNumber: 1,
+  quotationAutoIncrement: true,
+  quotationNextNumber: 1,
+  invoicePrefix: 'INV',
+  invoiceIncludeYear: true,
+  invoiceStartNumber: 1,
+  invoiceAutoIncrement: true,
+  invoiceNextNumber: 1,
+});
 
 export const storage = {
   // Company Profile
@@ -154,6 +168,16 @@ export const storage = {
     return templates.find(t => t.id === id);
   },
 
+  // Numbering Settings
+  getNumberingSettings: (): NumberingSettings => {
+    const data = localStorage.getItem(STORAGE_KEYS.NUMBERING);
+    return data ? { ...getDefaultNumberingSettings(), ...JSON.parse(data) } : getDefaultNumberingSettings();
+  },
+
+  saveNumberingSettings: (settings: NumberingSettings): void => {
+    localStorage.setItem(STORAGE_KEYS.NUMBERING, JSON.stringify(settings));
+  },
+
   // Invoices
   getInvoices: (): Invoice[] => {
     const data = localStorage.getItem(STORAGE_KEYS.INVOICES);
@@ -184,7 +208,7 @@ export const storage = {
     const newInvoice: Invoice = {
       ...original,
       id: generateId(),
-      invoiceNumber: generateInvoiceNumber(),
+      invoiceNumber: (() => { const n = generateInvoiceNumber(); incrementInvoiceNumber(); return n; })(),
       date: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -207,23 +231,47 @@ export const generateId = (): string => {
 };
 
 export const generateQuotationNumber = (): string => {
-  const quotations = storage.getQuotations();
+  const settings = storage.getNumberingSettings();
   const year = new Date().getFullYear();
-  const count = quotations.filter(q => q.quotationNumber.startsWith(`QT-${year}`)).length + 1;
-  return `QT-${year}-${count.toString().padStart(4, '0')}`;
+  const num = settings.quotationNextNumber;
+  const parts = [settings.quotationPrefix];
+  if (settings.quotationIncludeYear) parts.push(String(year));
+  parts.push(num.toString().padStart(3, '0'));
+  return parts.join('-');
 };
 
 export const generateInvoiceNumber = (): string => {
-  const invoices = storage.getInvoices();
+  const settings = storage.getNumberingSettings();
   const year = new Date().getFullYear();
-  const count = invoices.filter(i => i.invoiceNumber.startsWith(`INV-${year}`)).length + 1;
-  return `INV-${year}-${count.toString().padStart(4, '0')}`;
+  const num = settings.invoiceNextNumber;
+  const parts = [settings.invoicePrefix];
+  if (settings.invoiceIncludeYear) parts.push(String(year));
+  parts.push(num.toString().padStart(3, '0'));
+  return parts.join('-');
+};
+
+export const incrementQuotationNumber = (): void => {
+  const settings = storage.getNumberingSettings();
+  if (settings.quotationAutoIncrement) {
+    settings.quotationNextNumber = settings.quotationNextNumber + 1;
+    storage.saveNumberingSettings(settings);
+  }
+};
+
+export const incrementInvoiceNumber = (): void => {
+  const settings = storage.getNumberingSettings();
+  if (settings.invoiceAutoIncrement) {
+    settings.invoiceNextNumber = settings.invoiceNextNumber + 1;
+    storage.saveNumberingSettings(settings);
+  }
 };
 
 export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
+  const invoiceNumber = generateInvoiceNumber();
+  incrementInvoiceNumber();
   return {
     id: generateId(),
-    invoiceNumber: generateInvoiceNumber(),
+    invoiceNumber,
     date: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     customer: { ...quotation.customer },

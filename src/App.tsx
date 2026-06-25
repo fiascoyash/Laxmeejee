@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice } from './types';
-import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns } from './utils/storage';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings } from './types';
+import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
 import { ProductTable } from './components/ProductTable';
@@ -12,6 +12,7 @@ import { TemplatePreview } from './components/TemplatePreview';
 import { TemplateSelection } from './components/TemplateSelection';
 import { InvoiceForm } from './components/InvoiceForm';
 import { InvoiceList } from './components/InvoiceList';
+import { NumberingSettingsPanel } from './components/NumberingSettings';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Video as LucideIcon, Receipt } from 'lucide-react';
 
@@ -50,6 +51,9 @@ function App() {
   // Invoice State
   const [invoices, setInvoices] = useState<Invoice[]>(storage.getInvoices);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+
+  // Numbering Settings State
+  const [numberingSettings, setNumberingSettings] = useState<NumberingSettings>(storage.getNumberingSettings);
 
   // Template State
   const [templates, setTemplates] = useState<QuotationTemplate[]>(storage.getTemplates);
@@ -143,6 +147,7 @@ function App() {
     };
 
     storage.saveQuotation(quotation);
+    if (!editingQuotationId) incrementQuotationNumber();
     setQuotations(storage.getQuotations());
     alert(editingQuotationId ? 'Quotation updated successfully!' : 'Quotation saved successfully!');
     resetForm();
@@ -204,6 +209,7 @@ function App() {
     };
 
     storage.saveInvoice(toSave);
+    if (!invoices.find(i => i.id === toSave.id)) incrementInvoiceNumber();
     setInvoices(storage.getInvoices());
     alert('Invoice saved successfully!');
     setEditingInvoice(null);
@@ -708,9 +714,16 @@ function App() {
                   <h2 className="text-xl font-bold text-gray-800">
                     {editingQuotationId ? 'Edit Quotation' : 'New Quotation'}
                   </h2>
-                  <p className="text-sm text-gray-500">
-                    {quotationNumber || 'Quotation number will be generated on save'}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={quotationNumber}
+                      onChange={(e) => setQuotationNumber(e.target.value)}
+                      placeholder="Auto-generated on save"
+                      className="px-2 py-1 text-sm text-gray-600 border border-gray-200 rounded font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
+                    />
+                    <span className="text-xs text-gray-400">editable</span>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto items-center">
                   {/* Template indicator */}
@@ -929,6 +942,16 @@ function App() {
                     <ChevronRight className="w-5 h-5 text-gray-400" />
                   </button>
                 </div>
+              </div>
+
+              <div className="mt-6">
+                <NumberingSettingsPanel
+                  settings={numberingSettings}
+                  onSave={(s) => {
+                    storage.saveNumberingSettings(s);
+                    setNumberingSettings(s);
+                  }}
+                />
               </div>
 
               <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
