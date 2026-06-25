@@ -50,6 +50,7 @@ export interface Quotation {
   grandTotal: number;
   createdAt: string;
   selectedTemplateId?: string; // Link to template
+  productColumns?: TableColumn[]; // Per-quotation column visibility
 }
 
 export interface NumberingSettings {
@@ -85,6 +86,7 @@ export interface Invoice {
   selectedTemplateId?: string;
   createdAt: string;
   updatedAt: string;
+  productColumns?: TableColumn[]; // Per-invoice column visibility
 }
 
 export interface TaxSummary {

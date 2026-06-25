@@ -128,7 +128,7 @@ export const exportTemplatePDF = (
         break;
 
       case 'gst_summary':
-        renderGstSummary(doc, block, taxSummary, x, y);
+        renderGstSummary(doc, block, taxSummary, x, y, template.productColumns || []);
         break;
 
       case 'bank_details':
@@ -179,14 +179,20 @@ export const exportTemplatePDF = (
       case 'totals': {
         doc.setFontSize(8);
         const totalsX = x + width;
-        doc.text(`Taxable: Rs. ${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, y + 5, { align: 'right' });
-        doc.text(`CGST: Rs. ${totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, y + 10, { align: 'right' });
-        doc.text(`SGST: Rs. ${totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, y + 15, { align: 'right' });
+        const gstColVisible = (template.productColumns || []).some(c => c.key === 'gstPercent' && c.visible);
+        let totalsY = y + 5;
+        doc.text(`Taxable: Rs. ${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, totalsY, { align: 'right' });
+        if (gstColVisible) {
+          totalsY += 5;
+          doc.text(`CGST: Rs. ${totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, totalsY, { align: 'right' });
+          totalsY += 5;
+          doc.text(`SGST: Rs. ${totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, totalsY, { align: 'right' });
+        }
         doc.setFont('helvetica', 'bold');
         doc.setDrawColor(180);
-        doc.line(totalsX - 45, y + 17, totalsX, y + 17);
+        doc.line(totalsX - 45, totalsY + 2, totalsX, totalsY + 2);
         doc.setFontSize(9);
-        doc.text(`Grand Total: Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, y + 22, { align: 'right' });
+        doc.text(`Grand Total: Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, totalsY + 7, { align: 'right' });
         break;
       }
 
@@ -303,23 +309,41 @@ const renderGstSummary = (
   _block: TemplateBlock,
   taxSummary: Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }>,
   x: number,
-  y: number
+  y: number,
+  columns: TableColumn[]
 ) => {
+  const hsnVisible = columns.some(c => c.key === 'hsnCode' && c.visible);
+  const gstVisible = columns.some(c => c.key === 'gstPercent' && c.visible);
+
   const tableData = Array.from(taxSummary.entries()).map(([key, data]) => {
     const hsnCode = key.split('_')[0];
-    return [
-      hsnCode,
-      data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-      `${data.cgstRate}%`,
-      data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-      `${data.sgstRate}%`,
-      data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-    ];
+    const row: (string | number)[] = [];
+    if (hsnVisible) row.push(hsnCode);
+    row.push(data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }));
+    if (gstVisible) {
+      row.push(`${data.cgstRate}%`);
+      row.push(data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }));
+      row.push(`${data.sgstRate}%`);
+      row.push(data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }));
+    }
+    row.push((data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 }));
+    return row;
   });
+
+  const head: string[] = [];
+  if (hsnVisible) head.push('HSN');
+  head.push('Taxable');
+  if (gstVisible) {
+    head.push('CGST%');
+    head.push('CGST Amt');
+    head.push('SGST%');
+    head.push('SGST Amt');
+  }
+  head.push('Total');
 
   autoTable(doc, {
     startY: y,
-    head: [['HSN', 'Taxable', 'CGST%', 'CGST Amt', 'SGST%', 'SGST Amt']],
+    head: [head],
     body: tableData,
     theme: 'grid',
     margin: { left: x },

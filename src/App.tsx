@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings } from './types';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn } from './types';
 import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
@@ -41,6 +41,7 @@ function App() {
     village: '',
   });
   const [products, setProducts] = useState<Product[]>([]);
+  const [productColumns, setProductColumns] = useState<TableColumn[]>(getDefaultProductColumns());
 
   // Selected Template State
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -93,6 +94,7 @@ function App() {
     setQuotationDate(new Date().toISOString().split('T')[0]);
     setCustomer({ name: '', billingAddress: '', mobile: '', district: '', village: '' });
     setProducts([]);
+    setProductColumns(getDefaultProductColumns());
   };
 
   // Start new quotation - go to template selection first
@@ -108,6 +110,7 @@ function App() {
     setQuotationDate(quotation.date);
     setCustomer(quotation.customer);
     setProducts(quotation.products);
+    setProductColumns(quotation.productColumns || getDefaultProductColumns());
     // Restore the template used for this quotation
     if (quotation.selectedTemplateId) {
       setSelectedTemplateId(quotation.selectedTemplateId);
@@ -144,6 +147,7 @@ function App() {
       grandTotal,
       createdAt: editingQuotationId ? quotations.find(q => q.id === editingQuotationId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
+      productColumns,
     };
 
     storage.saveQuotation(quotation);
@@ -255,6 +259,10 @@ function App() {
       return;
     }
 
+    const templateWithColumns = editingInvoice.productColumns
+      ? { ...template, productColumns: editingInvoice.productColumns }
+      : template;
+
     const quotationProxy = {
       id: editingInvoice.id,
       quotationNumber: editingInvoice.invoiceNumber,
@@ -269,7 +277,7 @@ function App() {
       selectedTemplateId: editingInvoice.selectedTemplateId,
     } as Quotation;
 
-    exportTemplatePDF(template, companyProfile, editingInvoice.customer, quotationProxy, editingInvoice.products, 'invoice', editingInvoice);
+    exportTemplatePDF(templateWithColumns, companyProfile, editingInvoice.customer, quotationProxy, editingInvoice.products, 'invoice', editingInvoice);
   };
 
   // Preview invoice
@@ -381,9 +389,11 @@ function App() {
       grandTotal,
       createdAt: new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
+      productColumns,
     };
 
-    exportTemplatePDF(template, companyProfile, customer, quotation, products);
+    const templateWithColumns = { ...template, productColumns };
+    exportTemplatePDF(templateWithColumns, companyProfile, customer, quotation, products);
   };
 
   // Template handlers
@@ -749,7 +759,7 @@ function App() {
               </div>
 
               <CustomerDetails customer={customer} onChange={setCustomer} />
-              <ProductTable products={products} onChange={setProducts} catalog={catalog} />
+              <ProductTable products={products} onChange={setProducts} catalog={catalog} columns={productColumns} onColumnsChange={setProductColumns} />
 
               <div className="flex flex-col sm:flex-row gap-3 justify-end bg-white rounded-lg border border-gray-200 p-4 sticky bottom-4">
                 <button

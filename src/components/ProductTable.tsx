@@ -1,16 +1,27 @@
-import { Product, ProductCatalogItem } from '../types';
-import { generateId, calculateProductAmount, calculateTaxSummary } from '../utils/storage';
-import { Plus, Trash2, Package, ChevronDown } from 'lucide-react';
+import { Product, ProductCatalogItem, TableColumn } from '../types';
+import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns } from '../utils/storage';
+import { Plus, Trash2, Package, ChevronDown, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {
   products: Product[];
   onChange: (products: Product[]) => void;
   catalog: ProductCatalogItem[];
+  columns?: TableColumn[];
+  onColumnsChange?: (columns: TableColumn[]) => void;
 }
 
-export function ProductTable({ products, onChange, catalog }: Props) {
+export function ProductTable({ products, onChange, catalog, columns, onColumnsChange }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+
+  const activeColumns = columns && columns.length > 0 ? columns : getDefaultProductColumns();
+  const visibleColumns = activeColumns.filter(c => c.visible).sort((a, b) => a.order - b.order);
+
+  const toggleColumn = (colId: string) => {
+    if (!onColumnsChange) return;
+    onColumnsChange(activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } : c));
+  };
 
   const addProduct = () => {
     const newProduct: Product = {
@@ -47,11 +58,99 @@ export function ProductTable({ products, onChange, catalog }: Props) {
     ));
   };
 
+  const isColumnVisible = (key: string) => visibleColumns.some(c => c.key === key);
+
   const taxSummary = calculateTaxSummary(products);
   const totalTaxable = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
   const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
   const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
   const grandTotal = totalTaxable + totalCgst + totalSgst;
+
+  const renderCell = (product: Product, colKey: string) => {
+    switch (colKey) {
+      case 'sno': return null;
+      case 'name':
+        return (
+          <input
+            type="text"
+            value={product.name}
+            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Product/Service name"
+          />
+        );
+      case 'hsnCode':
+        return (
+          <input
+            type="text"
+            value={product.hsnCode}
+            onChange={(e) => updateProduct(product.id, 'hsnCode', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center font-mono"
+            placeholder="HSN"
+          />
+        );
+      case 'gstPercent':
+        return (
+          <select
+            value={product.gstPercent}
+            onChange={(e) => updateProduct(product.id, 'gstPercent', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
+          >
+            <option value={0}>0%</option>
+            <option value={5}>5%</option>
+            <option value={12}>12%</option>
+            <option value={18}>18%</option>
+            <option value={28}>28%</option>
+          </select>
+        );
+      case 'quantity':
+        return (
+          <input
+            type="number"
+            min="1"
+            value={product.quantity}
+            onChange={(e) => updateProduct(product.id, 'quantity', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
+          />
+        );
+      case 'unitPrice':
+        return (
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={product.unitPrice}
+            onChange={(e) => updateProduct(product.id, 'unitPrice', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-right"
+          />
+        );
+      case 'amount':
+        return (
+          <span className="text-right font-medium text-gray-800 block">
+            Rs. {calculateProductAmount(product).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        );
+      default: return null;
+    }
+  };
+
+  const getCellClass = (colKey: string) => {
+    if (colKey === 'name') return 'px-3 py-2 min-w-64';
+    if (colKey === 'sno') return 'px-3 py-2 text-gray-500 w-8';
+    if (colKey === 'amount') return 'px-3 py-2 text-right font-medium text-gray-800';
+    if (colKey === 'quantity' || colKey === 'gstPercent') return 'px-3 py-2 text-center';
+    return 'px-3 py-2';
+  };
+
+  const getHeaderClass = (colKey: string) => {
+    if (colKey === 'name') return 'px-3 py-3 text-left font-semibold text-gray-700 min-w-64';
+    if (colKey === 'sno') return 'px-3 py-3 text-left font-semibold text-gray-700 w-8';
+    if (colKey === 'amount') return 'px-3 py-3 text-right font-semibold text-gray-700 w-32';
+    if (colKey === 'quantity' || colKey === 'gstPercent') return 'px-3 py-3 text-center font-semibold text-gray-700 w-24';
+    if (colKey === 'hsnCode') return 'px-3 py-3 text-left font-semibold text-gray-700 w-24';
+    if (colKey === 'unitPrice') return 'px-3 py-3 text-right font-semibold text-gray-700 w-32';
+    return 'px-3 py-3 text-left font-semibold text-gray-700';
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -61,6 +160,36 @@ export function ProductTable({ products, onChange, catalog }: Props) {
           Products / Services
         </h3>
         <div className="flex gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setShowColumnSettings(!showColumnSettings)}
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2 text-sm"
+              title="Toggle column visibility"
+            >
+              <Settings2 className="w-4 h-4" />
+              Columns
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {showColumnSettings && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-3">
+                <div className="text-xs font-semibold text-gray-600 mb-2">Toggle Columns</div>
+                {activeColumns.filter(c => c.key !== 'sno' && c.key !== 'amount').map(col => (
+                  <label key={col.id} className="flex items-center gap-2 py-1.5 text-sm cursor-pointer hover:bg-gray-50 rounded px-1">
+                    <input
+                      type="checkbox"
+                      checked={col.visible}
+                      onChange={() => toggleColumn(col.id)}
+                      className="rounded"
+                    />
+                    <span className="text-gray-700">{col.label}</span>
+                  </label>
+                ))}
+                <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
+                  # and Amount columns are always visible.
+                </div>
+              </div>
+            )}
+          </div>
           <div className="relative">
             <button
               onClick={() => setShowCatalog(!showCatalog)}
@@ -106,72 +235,20 @@ export function ProductTable({ products, onChange, catalog }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-y border-gray-200">
             <tr>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700 w-8">#</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700 min-w-64">Product Name</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700 w-24">HSN Code</th>
-              <th className="px-3 py-3 text-center font-semibold text-gray-700 w-20">GST %</th>
-              <th className="px-3 py-3 text-center font-semibold text-gray-700 w-24">Qty</th>
-              <th className="px-3 py-3 text-right font-semibold text-gray-700 w-32">Unit Price</th>
-              <th className="px-3 py-3 text-right font-semibold text-gray-700 w-32">Amount</th>
+              {visibleColumns.map(col => (
+                <th key={col.id} className={getHeaderClass(col.key)}>{col.label}</th>
+              ))}
               <th className="px-3 py-3 text-center font-semibold text-gray-700 w-12"></th>
             </tr>
           </thead>
           <tbody>
             {products.map((product, index) => (
               <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-2 text-gray-500">{index + 1}</td>
-                <td className="px-3 py-2">
-                  <input
-                    type="text"
-                    value={product.name}
-                    onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Product/Service name"
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="text"
-                    value={product.hsnCode}
-                    onChange={(e) => updateProduct(product.id, 'hsnCode', e.target.value)}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center font-mono"
-                    placeholder="HSN"
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <select
-                    value={product.gstPercent}
-                    onChange={(e) => updateProduct(product.id, 'gstPercent', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
-                  >
-                    <option value={5}>5%</option>
-                    <option value={12}>12%</option>
-                    <option value={18}>18%</option>
-                    <option value={28}>28%</option>
-                  </select>
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="number"
-                    min="1"
-                    value={product.quantity}
-                    onChange={(e) => updateProduct(product.id, 'quantity', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={product.unitPrice}
-                    onChange={(e) => updateProduct(product.id, 'unitPrice', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-right"
-                  />
-                </td>
-                <td className="px-3 py-2 text-right font-medium text-gray-800">
-                  Rs. {calculateProductAmount(product).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
+                {visibleColumns.map(col => (
+                  <td key={col.id} className={getCellClass(col.key)}>
+                    {col.key === 'sno' ? index + 1 : renderCell(product, col.key)}
+                  </td>
+                ))}
                 <td className="px-3 py-2 text-center">
                   <button
                     onClick={() => removeProduct(product.id)}
@@ -184,7 +261,7 @@ export function ProductTable({ products, onChange, catalog }: Props) {
             ))}
             {products.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={visibleColumns.length + 1} className="px-3 py-8 text-center text-gray-500">
                   No products added. Click "Add Row" or "From Catalog" to add products.
                 </td>
               </tr>
@@ -200,12 +277,18 @@ export function ProductTable({ products, onChange, catalog }: Props) {
           <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
             <thead className="bg-gray-100">
               <tr>
-                <th className="px-3 py-2 text-left font-semibold text-gray-700">HSN Code</th>
+                {isColumnVisible('hsnCode') && (
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700">HSN Code</th>
+                )}
                 <th className="px-3 py-2 text-right font-semibold text-gray-700">Taxable Amount</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-700">CGST %</th>
-                <th className="px-3 py-2 text-right font-semibold text-gray-700">CGST Amt</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-700">SGST %</th>
-                <th className="px-3 py-2 text-right font-semibold text-gray-700">SGST Amt</th>
+                {isColumnVisible('gstPercent') && (
+                  <>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700">CGST %</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-700">CGST Amt</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700">SGST %</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-700">SGST Amt</th>
+                  </>
+                )}
                 <th className="px-3 py-2 text-right font-semibold text-gray-700">Total Amt</th>
               </tr>
             </thead>
@@ -214,12 +297,18 @@ export function ProductTable({ products, onChange, catalog }: Props) {
                 const hsnCode = key.split('_')[0];
                 return (
                   <tr key={key} className="border-b border-gray-100">
-                    <td className="px-3 py-2 font-mono">{hsnCode}</td>
+                    {isColumnVisible('hsnCode') && (
+                      <td className="px-3 py-2 font-mono">{hsnCode}</td>
+                    )}
                     <td className="px-3 py-2 text-right">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td className="px-3 py-2 text-center">{data.cgstRate}%</td>
-                    <td className="px-3 py-2 text-right">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td className="px-3 py-2 text-center">{data.sgstRate}%</td>
-                    <td className="px-3 py-2 text-right">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    {isColumnVisible('gstPercent') && (
+                      <>
+                        <td className="px-3 py-2 text-center">{data.cgstRate}%</td>
+                        <td className="px-3 py-2 text-right">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2 text-center">{data.sgstRate}%</td>
+                        <td className="px-3 py-2 text-right">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      </>
+                    )}
                     <td className="px-3 py-2 text-right font-medium">
                       {(data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
@@ -239,14 +328,18 @@ export function ProductTable({ products, onChange, catalog }: Props) {
               <span className="text-gray-600">Taxable Amount:</span>
               <span className="font-medium">Rs. {totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between py-1">
-              <span className="text-gray-600">CGST:</span>
-              <span className="font-medium">Rs. {totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-gray-600">SGST:</span>
-              <span className="font-medium">Rs. {totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
+            {isColumnVisible('gstPercent') && (
+              <>
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-600">CGST:</span>
+                  <span className="font-medium">Rs. {totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-600">SGST:</span>
+                  <span className="font-medium">Rs. {totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
               <span className="text-gray-800 font-bold text-lg">Grand Total:</span>
               <span className="font-bold text-lg text-blue-600">Rs. {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
