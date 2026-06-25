@@ -111,7 +111,11 @@ export type BlockType =
   | 'footer_notes'
   | 'terms_conditions'
   | 'text_block'
-  | 'totals';
+  | 'totals'
+  | 'rectangle'
+  | 'horizontal_line'
+  | 'vertical_line'
+  | 'divider';
 
 export interface TemplateBlock {
   id: string;
@@ -123,6 +127,8 @@ export interface TemplateBlock {
   content?: string; // for text blocks
   style?: BlockStyle;
   visible: boolean;
+  locked?: boolean; // locked blocks cannot be dragged accidentally
+  zIndex?: number; // layer order
   columns?: TableColumn[]; // for product table
 }
 
@@ -136,6 +142,8 @@ export interface BlockStyle {
   borderWidth?: number;
   borderRadius?: number;
   padding?: number;
+  filled?: boolean; // rectangle: filled background vs border-only
+  thickness?: number; // line blocks: line thickness in mm
 }
 
 export interface TableColumn {

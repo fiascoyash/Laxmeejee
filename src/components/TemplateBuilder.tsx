@@ -1,13 +1,14 @@
 import { useState, useRef, useCallback } from 'react';
 import {
-  QuotationTemplate, TemplateBlock, BlockType, TableColumn,
+  QuotationTemplate, TemplateBlock, BlockType, BlockStyle, TableColumn,
   CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT
 } from '../types';
 import { generateId, getDefaultProductColumns, calculateProductAmount, calculateTaxSummary } from '../utils/storage';
 import {
   Trash2, Plus, Save, Settings, Type, Image,
   Building2, User, FileText, Calendar, Table, CreditCard, PenTool, FileWarning,
-  ChevronDown, GripVertical, LucideIcon
+  ChevronDown, GripVertical, LucideIcon, Square, Minus, MoveVertical, AlignJustify,
+  Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
 } from 'lucide-react';
 
 interface Props {
@@ -36,6 +37,10 @@ const BLOCK_ICONS: Record<BlockType, LucideIcon> = {
   terms_conditions: FileWarning,
   totals: FileText,
   text_block: Type,
+  rectangle: Square,
+  horizontal_line: Minus,
+  vertical_line: MoveVertical,
+  divider: AlignJustify,
 };
 
 const BLOCK_LABELS: Record<BlockType, string> = {
@@ -52,6 +57,10 @@ const BLOCK_LABELS: Record<BlockType, string> = {
   terms_conditions: 'Terms & Conditions',
   totals: 'Totals',
   text_block: 'Custom Text',
+  rectangle: 'Rectangle',
+  horizontal_line: 'Horizontal Line',
+  vertical_line: 'Vertical Line',
+  divider: 'Divider',
 };
 
 const MM_TO_PX = 3.7795275591; // 1mm = 3.78px at 96 DPI
@@ -84,6 +93,10 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
     const block = blocks.find(b => b.id === blockId);
     if (!block) return;
+    if (block.locked) {
+      setSelectedBlock(blockId);
+      return;
+    }
 
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -133,15 +146,27 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   }, []);
 
   const addBlock = (type: BlockType) => {
+    const maxZ = blocks.reduce((max, b) => Math.max(max, b.zIndex || 0), 0);
+    const defaults: Record<string, { width: number; height: number; content?: string; style?: BlockStyle }> = {
+      product_table: { width: 190, height: 60 },
+      text_block: { width: 80, height: 20, content: 'Double-click to edit' },
+      rectangle: { width: 60, height: 40, style: { filled: false, borderWidth: 1, borderColor: '#000000', backgroundColor: '#ffffff', borderRadius: 0 } },
+      horizontal_line: { width: 100, height: 2, style: { thickness: 1, color: '#000000' } },
+      vertical_line: { width: 2, height: 60, style: { thickness: 1, color: '#000000' } },
+      divider: { width: 190, height: 4, style: { thickness: 1, color: '#cccccc' } },
+    };
+    const d = defaults[type] || { width: 60, height: 30 };
     const newBlock: TemplateBlock = {
       id: generateId(),
       type,
       x: 50,
       y: 50,
-      width: type === 'product_table' ? 190 : type === 'text_block' ? 80 : 60,
-      height: type === 'product_table' ? 60 : type === 'text_block' ? 20 : 30,
+      width: d.width,
+      height: d.height,
       visible: true,
-      content: type === 'text_block' ? 'Double-click to edit' : undefined,
+      content: d.content,
+      style: d.style,
+      zIndex: maxZ + 1,
     };
     setBlocks([...blocks, newBlock]);
     setShowAddBlock(false);
@@ -378,6 +403,59 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           </div>
         );
 
+      case 'rectangle': {
+        const s = block.style || {};
+        return (
+          <div
+            className="w-full h-full pointer-events-none"
+            style={{
+              border: s.filled ? 'none' : `${s.borderWidth || 1}px solid ${s.borderColor || '#000000'}`,
+              backgroundColor: s.filled ? (s.backgroundColor || '#ffffff') : 'transparent',
+              borderRadius: `${s.borderRadius || 0}px`,
+            }}
+          />
+        );
+      }
+
+      case 'horizontal_line':
+        return (
+          <div
+            className="w-full pointer-events-none flex items-center"
+            style={{ height: '100%' }}
+          >
+            <div
+              style={{
+                width: '100%',
+                height: `${block.style?.thickness || 1}px`,
+                backgroundColor: block.style?.color || '#000000',
+              }}
+            />
+          </div>
+        );
+
+      case 'vertical_line':
+        return (
+          <div
+            className="h-full pointer-events-none flex items-center justify-center"
+            style={{ width: '100%' }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${block.style?.thickness || 1}px`,
+                backgroundColor: block.style?.color || '#000000',
+              }}
+            />
+          </div>
+        );
+
+      case 'divider':
+        return (
+          <div className="w-full h-full pointer-events-none flex items-center">
+            <div style={{ width: '100%', height: `${block.style?.thickness || 1}px`, backgroundColor: block.style?.color || '#cccccc' }} />
+          </div>
+        );
+
       default:
         return null;
     }
@@ -546,10 +624,10 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           </div>
 
           {/* Blocks */}
-          {blocks.filter(b => b.visible).map(block => (
+          {blocks.filter(b => b.visible).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map(block => (
             <div
               key={block.id}
-              className={`absolute cursor-move overflow-hidden ${
+              className={`absolute ${block.locked ? 'cursor-default' : 'cursor-move'} overflow-hidden ${
                 selectedBlock === block.id ? 'ring-2 ring-blue-500' : ''
               } ${draggingBlock === block.id ? 'opacity-80' : ''}`}
               style={{
@@ -562,14 +640,23 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             >
               {renderBlockContent(block)}
 
+              {/* Lock indicator */}
+              {block.locked && (
+                <div className="absolute top-0 right-0 p-0.5 bg-amber-100 rounded-bl">
+                  <Lock className="w-3 h-3 text-amber-600" />
+                </div>
+              )}
+
               {/* Resize Handle */}
-              <div
-                className="resize-handle absolute bottom-0 right-0 w-3 h-3 bg-blue-500 cursor-se-resize opacity-0 hover:opacity-100"
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  setResizingBlock(block.id);
-                }}
-              />
+              {!block.locked && (
+                <div
+                  className="resize-handle absolute bottom-0 right-0 w-3 h-3 bg-blue-500 cursor-se-resize opacity-0 hover:opacity-100"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setResizingBlock(block.id);
+                  }}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -670,6 +757,175 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                       />
                     </div>
                   )}
+
+                  {/* Rectangle properties */}
+                  {block.type === 'rectangle' && (
+                    <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
+                      <h4 className="text-xs font-semibold text-gray-700">Rectangle Style</h4>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={block.style?.filled || false}
+                          onChange={(e) => setBlocks(prev => prev.map(b =>
+                            b.id === selectedBlock ? { ...b, style: { ...b.style, filled: e.target.checked } } : b
+                          ))}
+                        />
+                        Filled background
+                      </label>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Border thickness (px)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={20}
+                          value={block.style?.borderWidth ?? 1}
+                          onChange={(e) => setBlocks(prev => prev.map(b =>
+                            b.id === selectedBlock ? { ...b, style: { ...b.style, borderWidth: Number(e.target.value) } } : b
+                          ))}
+                          className="w-full px-2 py-1 border rounded text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Border color</label>
+                        <input
+                          type="color"
+                          value={block.style?.borderColor || '#000000'}
+                          onChange={(e) => setBlocks(prev => prev.map(b =>
+                            b.id === selectedBlock ? { ...b, style: { ...b.style, borderColor: e.target.value } } : b
+                          ))}
+                          className="w-full h-8 border rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Background color</label>
+                        <input
+                          type="color"
+                          value={block.style?.backgroundColor || '#ffffff'}
+                          onChange={(e) => setBlocks(prev => prev.map(b =>
+                            b.id === selectedBlock ? { ...b, style: { ...b.style, backgroundColor: e.target.value } } : b
+                          ))}
+                          className="w-full h-8 border rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Corner radius (px)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={50}
+                          value={block.style?.borderRadius ?? 0}
+                          onChange={(e) => setBlocks(prev => prev.map(b =>
+                            b.id === selectedBlock ? { ...b, style: { ...b.style, borderRadius: Number(e.target.value) } } : b
+                          ))}
+                          className="w-full px-2 py-1 border rounded text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Line properties */}
+                  {(block.type === 'horizontal_line' || block.type === 'vertical_line' || block.type === 'divider') && (
+                    <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
+                      <h4 className="text-xs font-semibold text-gray-700">Line Style</h4>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Thickness (px)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={block.style?.thickness ?? 1}
+                          onChange={(e) => setBlocks(prev => prev.map(b =>
+                            b.id === selectedBlock ? { ...b, style: { ...b.style, thickness: Number(e.target.value) } } : b
+                          ))}
+                          className="w-full px-2 py-1 border rounded text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Color</label>
+                        <input
+                          type="color"
+                          value={block.style?.color || '#000000'}
+                          onChange={(e) => setBlocks(prev => prev.map(b =>
+                            b.id === selectedBlock ? { ...b, style: { ...b.style, color: e.target.value } } : b
+                          ))}
+                          className="w-full h-8 border rounded"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lock / Unlock */}
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <button
+                      onClick={() => setBlocks(prev => prev.map(b =>
+                        b.id === selectedBlock ? { ...b, locked: !b.locked } : b
+                      ))}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors"
+                      style={{
+                        backgroundColor: block.locked ? '#fef3c7' : '#f3f4f6',
+                        color: block.locked ? '#92400e' : '#374151',
+                      }}
+                    >
+                      {block.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                      {block.locked ? 'Locked' : 'Unlocked'}
+                    </button>
+                    <span className="text-xs text-gray-500">
+                      {block.locked ? 'Cannot drag accidentally' : 'Free to drag'}
+                    </span>
+                  </div>
+
+                  {/* Layer Controls */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Layer Order</label>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        onClick={() => setBlocks(prev => {
+                          const sorted = [...prev].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+                          const idx = sorted.findIndex(b => b.id === selectedBlock);
+                          if (idx < sorted.length - 1) {
+                            [sorted[idx], sorted[idx + 1]] = [sorted[idx + 1], sorted[idx]];
+                            return sorted.map((b, i) => ({ ...b, zIndex: i }));
+                          }
+                          return prev;
+                        })}
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        <ArrowUp className="w-3 h-3" /> Forward
+                      </button>
+                      <button
+                        onClick={() => setBlocks(prev => {
+                          const sorted = [...prev].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+                          const idx = sorted.findIndex(b => b.id === selectedBlock);
+                          if (idx > 0) {
+                            [sorted[idx], sorted[idx - 1]] = [sorted[idx - 1], sorted[idx]];
+                            return sorted.map((b, i) => ({ ...b, zIndex: i }));
+                          }
+                          return prev;
+                        })}
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        <ArrowDown className="w-3 h-3" /> Backward
+                      </button>
+                      <button
+                        onClick={() => setBlocks(prev => {
+                          const maxZ = prev.reduce((max, b) => Math.max(max, b.zIndex || 0), 0);
+                          return prev.map(b => b.id === selectedBlock ? { ...b, zIndex: maxZ + 1 } : b);
+                        })}
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        <ChevronsUp className="w-3 h-3" /> To Front
+                      </button>
+                      <button
+                        onClick={() => setBlocks(prev => {
+                          const minZ = prev.reduce((min, b) => Math.min(min, b.zIndex || 0), 0);
+                          return prev.map(b => b.id === selectedBlock ? { ...b, zIndex: minZ - 1 } : b);
+                        })}
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        <ChevronsDown className="w-3 h-3" /> To Back
+                      </button>
+                    </div>
+                  </div>
 
                   <button
                     onClick={() => removeBlock(selectedBlock)}

@@ -37,7 +37,7 @@ export const exportTemplatePDF = (
   doc.setFont('helvetica', 'normal');
 
   // Sort blocks by Y position to handle overlapping properly
-  const sortedBlocks = [...template.blocks.filter(b => b.visible)].sort((a, b) => a.y - b.y);
+  const sortedBlocks = [...template.blocks.filter(b => b.visible)].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
   for (const block of sortedBlocks) {
     const { type, x, y, width, height, content } = block;
@@ -195,6 +195,44 @@ export const exportTemplatePDF = (
         const resolvedContent = resolvePlaceholders(content || '', context);
         const lines = doc.splitTextToSize(resolvedContent, width);
         doc.text(lines, x, y + 5);
+        break;
+      }
+
+      case 'rectangle': {
+        const s = block.style || {};
+        const radius = (s.borderRadius || 0) / 3;
+        if (s.filled) {
+          doc.setFillColor(s.backgroundColor || '#ffffff');
+          doc.roundedRect(x, y, width, height, radius, radius, 'F');
+        } else {
+          doc.setDrawColor(s.borderColor || '#000000');
+          doc.setLineWidth(s.borderWidth || 1);
+          doc.roundedRect(x, y, width, height, radius, radius, 'S');
+        }
+        break;
+      }
+
+      case 'horizontal_line': {
+        const thickness = block.style?.thickness || 1;
+        doc.setDrawColor(block.style?.color || '#000000');
+        doc.setLineWidth(thickness / 3);
+        doc.line(x, y + height / 2, x + width, y + height / 2);
+        break;
+      }
+
+      case 'vertical_line': {
+        const thickness = block.style?.thickness || 1;
+        doc.setDrawColor(block.style?.color || '#000000');
+        doc.setLineWidth(thickness / 3);
+        doc.line(x + width / 2, y, x + width / 2, y + height);
+        break;
+      }
+
+      case 'divider': {
+        const thickness = block.style?.thickness || 1;
+        doc.setDrawColor(block.style?.color || '#cccccc');
+        doc.setLineWidth(thickness / 3);
+        doc.line(x, y + height / 2, x + width, y + height / 2);
         break;
       }
     }
