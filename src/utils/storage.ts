@@ -1,10 +1,11 @@
-import { CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn, BlockType } from '../types';
+import { CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn, BlockType, Invoice } from '../types';
 
 const STORAGE_KEYS = {
   COMPANY_PROFILE: 'solar_company_profile',
   QUOTATIONS: 'solar_quotations',
   PRODUCT_CATALOG: 'solar_product_catalog',
   TEMPLATES: 'solar_quotation_templates',
+  INVOICES: 'solar_invoices',
 };
 
 export const storage = {
@@ -152,6 +153,53 @@ export const storage = {
     const templates = storage.getTemplates();
     return templates.find(t => t.id === id);
   },
+
+  // Invoices
+  getInvoices: (): Invoice[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.INVOICES);
+    return data ? JSON.parse(data) : [];
+  },
+
+  saveInvoice: (invoice: Invoice): void => {
+    const invoices = storage.getInvoices();
+    const existingIndex = invoices.findIndex(i => i.id === invoice.id);
+    if (existingIndex >= 0) {
+      invoices[existingIndex] = { ...invoice, updatedAt: new Date().toISOString() };
+    } else {
+      invoices.unshift(invoice);
+    }
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  },
+
+  deleteInvoice: (id: string): void => {
+    const invoices = storage.getInvoices().filter(i => i.id !== id);
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  },
+
+  duplicateInvoice: (id: string): Invoice | null => {
+    const invoices = storage.getInvoices();
+    const original = invoices.find(i => i.id === id);
+    if (!original) return null;
+
+    const newInvoice: Invoice = {
+      ...original,
+      id: generateId(),
+      invoiceNumber: generateInvoiceNumber(),
+      date: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'Draft',
+      sourceQuotationId: undefined,
+      sourceQuotationNumber: undefined,
+    };
+
+    storage.saveInvoice(newInvoice);
+    return newInvoice;
+  },
+
+  getInvoiceById: (id: string): Invoice | undefined => {
+    return storage.getInvoices().find(i => i.id === id);
+  },
 };
 
 export const generateId = (): string => {
@@ -163,6 +211,34 @@ export const generateQuotationNumber = (): string => {
   const year = new Date().getFullYear();
   const count = quotations.filter(q => q.quotationNumber.startsWith(`QT-${year}`)).length + 1;
   return `QT-${year}-${count.toString().padStart(4, '0')}`;
+};
+
+export const generateInvoiceNumber = (): string => {
+  const invoices = storage.getInvoices();
+  const year = new Date().getFullYear();
+  const count = invoices.filter(i => i.invoiceNumber.startsWith(`INV-${year}`)).length + 1;
+  return `INV-${year}-${count.toString().padStart(4, '0')}`;
+};
+
+export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
+  return {
+    id: generateId(),
+    invoiceNumber: generateInvoiceNumber(),
+    date: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    customer: { ...quotation.customer },
+    products: quotation.products.map(p => ({ ...p })),
+    totalAmount: quotation.totalAmount,
+    totalCgst: quotation.totalCgst,
+    totalSgst: quotation.totalSgst,
+    grandTotal: quotation.grandTotal,
+    status: 'Unpaid',
+    sourceQuotationId: quotation.id,
+    sourceQuotationNumber: quotation.quotationNumber,
+    selectedTemplateId: quotation.selectedTemplateId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 };
 
 const getDefaultProducts = (): ProductCatalogItem[] => {

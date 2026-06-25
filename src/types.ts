@@ -52,6 +52,28 @@ export interface Quotation {
   selectedTemplateId?: string; // Link to template
 }
 
+export type InvoiceStatus = 'Draft' | 'Unpaid' | 'Partial Payment' | 'Paid';
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  date: string;
+  dueDate: string;
+  customer: Customer;
+  products: Product[];
+  totalAmount: number;
+  totalCgst: number;
+  totalSgst: number;
+  grandTotal: number;
+  status: InvoiceStatus;
+  notes?: string;
+  sourceQuotationId?: string;
+  sourceQuotationNumber?: string;
+  selectedTemplateId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TaxSummary {
   hsnCode: string;
   taxableAmount: number;

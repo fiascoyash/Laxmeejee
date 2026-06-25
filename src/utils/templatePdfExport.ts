@@ -1,15 +1,19 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, TemplateBlock, TableColumn } from '../types';
+import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, TemplateBlock, TableColumn, Invoice } from '../types';
 import { calculateProductAmount, calculateTaxSummary } from './storage';
 import { resolvePlaceholders } from './placeholders';
+
+export type DocumentType = 'quotation' | 'invoice';
 
 export const exportTemplatePDF = (
   template: QuotationTemplate,
   company: CompanyProfile,
   customer: Customer,
   quotation: Quotation,
-  products: Product[]
+  products: Product[],
+  documentType: DocumentType = 'quotation',
+  invoice?: Invoice
 ) => {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -24,6 +28,13 @@ export const exportTemplatePDF = (
   const grandTotal = totalAmount + totalCgst + totalSgst;
 
   const context = { company, customer, quotation, products };
+
+  // Document title header
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(documentType === 'invoice' ? 'TAX INVOICE' : 'QUOTATION', 105, 10, { align: 'center' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
 
   // Sort blocks by Y position to handle overlapping properly
   const sortedBlocks = [...template.blocks.filter(b => b.visible)].sort((a, b) => a.y - b.y);
@@ -93,12 +104,23 @@ export const exportTemplatePDF = (
       case 'quotation_number':
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        doc.text(`Quotation No: ${quotation.quotationNumber}`, x, y + 5);
+        if (documentType === 'invoice' && invoice) {
+          doc.text(`Invoice No: ${invoice.invoiceNumber}`, x, y + 5);
+        } else {
+          doc.text(`Quotation No: ${quotation.quotationNumber}`, x, y + 5);
+        }
         break;
 
       case 'quotation_date':
         doc.setFontSize(9);
-        doc.text(`Date: ${quotation.date}`, x, y + 5);
+        if (documentType === 'invoice' && invoice) {
+          doc.text(`Date: ${invoice.date}`, x, y + 5);
+          if (invoice.dueDate) {
+            doc.text(`Due: ${invoice.dueDate}`, x, y + 10);
+          }
+        } else {
+          doc.text(`Date: ${quotation.date}`, x, y + 5);
+        }
         break;
 
       case 'product_table':
@@ -178,7 +200,8 @@ export const exportTemplatePDF = (
     }
   }
 
-  doc.save(`${quotation.quotationNumber}.pdf`);
+  const fileName = documentType === 'invoice' && invoice ? invoice.invoiceNumber : quotation.quotationNumber;
+  doc.save(`${fileName}.pdf`);
 };
 
 const renderProductTable = (

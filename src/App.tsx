@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate } from './types';
-import { storage, generateId, generateQuotationNumber, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns } from './utils/storage';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice } from './types';
+import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
 import { ProductTable } from './components/ProductTable';
@@ -10,13 +10,12 @@ import { TemplateBuilder } from './components/TemplateBuilder';
 import { TemplateLibrary } from './components/TemplateLibrary';
 import { TemplatePreview } from './components/TemplatePreview';
 import { TemplateSelection } from './components/TemplateSelection';
+import { InvoiceForm } from './components/InvoiceForm';
+import { InvoiceList } from './components/InvoiceList';
 import { exportTemplatePDF } from './utils/templatePdfExport';
-import {
-  Sun, FileText, Package, Settings, FileDown, Save, List,
-  Building2, Menu, X, Home, ChevronRight, Layout, Eye, LucideIcon
-} from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Video as LucideIcon, Receipt } from 'lucide-react';
 
-type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates';
+type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice';
 
 function App() {
   const [view, setView] = useState<View>('home');
@@ -48,6 +47,10 @@ function App() {
   // Quotation List State
   const [quotations, setQuotations] = useState<Quotation[]>(storage.getQuotations);
 
+  // Invoice State
+  const [invoices, setInvoices] = useState<Invoice[]>(storage.getInvoices);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+
   // Template State
   const [templates, setTemplates] = useState<QuotationTemplate[]>(storage.getTemplates);
   const [editingTemplate, setEditingTemplate] = useState<QuotationTemplate | null>(null);
@@ -59,6 +62,7 @@ function App() {
     setQuotations(storage.getQuotations);
     setCatalog(storage.getProductCatalog);
     setTemplates(storage.getTemplates);
+    setInvoices(storage.getInvoices);
     // Set default template as selected
     const defaultTemplate = storage.getDefaultTemplate();
     if (defaultTemplate) {
@@ -160,6 +164,139 @@ function App() {
       setQuotations(storage.getQuotations());
       alert(`Quotation duplicated as ${newQuotation.quotationNumber}`);
     }
+  };
+
+  // Convert quotation to invoice
+  const convertToInvoice = (quotation: Quotation) => {
+    const invoice = convertQuotationToInvoice(quotation);
+    storage.saveInvoice(invoice);
+    setInvoices(storage.getInvoices());
+    alert(`Invoice ${invoice.invoiceNumber} created from ${quotation.quotationNumber}`);
+    setEditingInvoice(invoice);
+    setView('editInvoice');
+  };
+
+  // Save invoice
+  const saveInvoice = () => {
+    if (!editingInvoice) return;
+    if (!editingInvoice.customer.name) {
+      alert('Please enter customer name');
+      return;
+    }
+    if (editingInvoice.products.length === 0) {
+      alert('Please add at least one product');
+      return;
+    }
+
+    const taxSummary = calculateTaxSummary(editingInvoice.products);
+    const totalAmount = editingInvoice.products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
+    const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
+    const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
+    const grandTotal = totalAmount + totalCgst + totalSgst;
+
+    const toSave: Invoice = {
+      ...editingInvoice,
+      totalAmount,
+      totalCgst,
+      totalSgst,
+      grandTotal,
+      updatedAt: new Date().toISOString(),
+    };
+
+    storage.saveInvoice(toSave);
+    setInvoices(storage.getInvoices());
+    alert('Invoice saved successfully!');
+    setEditingInvoice(null);
+    setView('invoiceList');
+  };
+
+  // Delete invoice
+  const deleteInvoice = (id: string) => {
+    if (confirm('Are you sure you want to delete this invoice?')) {
+      storage.deleteInvoice(id);
+      setInvoices(storage.getInvoices());
+    }
+  };
+
+  // Duplicate invoice
+  const duplicateInvoice = (id: string) => {
+    const newInvoice = storage.duplicateInvoice(id);
+    if (newInvoice) {
+      setInvoices(storage.getInvoices());
+      alert(`Invoice duplicated as ${newInvoice.invoiceNumber}`);
+    }
+  };
+
+  // Edit invoice
+  const editInvoice = (invoice: Invoice) => {
+    setEditingInvoice(invoice);
+    setView('editInvoice');
+  };
+
+  // Export invoice PDF
+  const exportInvoicePDF = () => {
+    if (!editingInvoice) return;
+    if (editingInvoice.products.length === 0) {
+      alert('Please add products before exporting');
+      return;
+    }
+
+    const template = editingInvoice.selectedTemplateId
+      ? storage.getTemplateById(editingInvoice.selectedTemplateId)
+      : storage.getDefaultTemplate();
+    if (!template) {
+      alert('No template available');
+      return;
+    }
+
+    const quotationProxy = {
+      id: editingInvoice.id,
+      quotationNumber: editingInvoice.invoiceNumber,
+      date: editingInvoice.date,
+      customer: editingInvoice.customer,
+      products: editingInvoice.products,
+      totalAmount: editingInvoice.totalAmount,
+      totalCgst: editingInvoice.totalCgst,
+      totalSgst: editingInvoice.totalSgst,
+      grandTotal: editingInvoice.grandTotal,
+      createdAt: editingInvoice.createdAt,
+      selectedTemplateId: editingInvoice.selectedTemplateId,
+    } as Quotation;
+
+    exportTemplatePDF(template, companyProfile, editingInvoice.customer, quotationProxy, editingInvoice.products, 'invoice', editingInvoice);
+  };
+
+  // Preview invoice
+  const previewInvoice = () => {
+    if (!editingInvoice) return;
+    const template = editingInvoice.selectedTemplateId
+      ? storage.getTemplateById(editingInvoice.selectedTemplateId)
+      : storage.getDefaultTemplate();
+    if (template) {
+      setPreviewingTemplate(template);
+    }
+  };
+
+  // Start new invoice
+  const startNewInvoice = () => {
+    const newInvoice: Invoice = {
+      id: generateId(),
+      invoiceNumber: generateInvoiceNumber(),
+      date: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      customer: { name: '', billingAddress: '', mobile: '', district: '', village: '' },
+      products: [],
+      totalAmount: 0,
+      totalCgst: 0,
+      totalSgst: 0,
+      grandTotal: 0,
+      status: 'Draft',
+      selectedTemplateId: selectedTemplateId || undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setEditingInvoice(newInvoice);
+    setView('editInvoice');
   };
 
   // Get sample data for template preview
@@ -335,6 +472,9 @@ function App() {
   );
 
   const selectedTemplate = getCurrentTemplate();
+  const invoiceTemplate = editingInvoice?.selectedTemplateId
+    ? storage.getTemplateById(editingInvoice.selectedTemplateId)
+    : storage.getDefaultTemplate();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -398,9 +538,16 @@ function App() {
           <NavItem icon={Home} label="Dashboard" currentView={view} targetView="home" />
           <NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" />
           <NavItem icon={List} label="Quotation History" currentView={view} targetView="list" />
-          <NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" />
-          <NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" />
-          <NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" />
+          <div className="pt-2 mt-2 border-t border-gray-100">
+            <p className="px-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Invoices</p>
+            <NavItem icon={Receipt} label="New Invoice" currentView={view} targetView="newInvoice" />
+            <NavItem icon={Receipt} label="Invoice History" currentView={view} targetView="invoiceList" />
+          </div>
+          <div className="pt-2 mt-2 border-t border-gray-100">
+            <NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" />
+            <NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" />
+            <NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" />
+          </div>
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
@@ -429,7 +576,7 @@ function App() {
                 <>
                   <ChevronRight className="w-4 h-4" />
                   <span className="text-gray-800 font-medium capitalize">
-                    {view === 'selectTemplate' ? 'Select Template' : view}
+                    {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view}
                   </span>
                 </>
               )}
@@ -480,6 +627,17 @@ function App() {
                 </button>
 
                 <button
+                  onClick={() => setView('invoiceList')}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-amber-400 hover:shadow-lg transition-all group"
+                >
+                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-500 transition-colors">
+                    <Receipt className="w-6 h-6 text-amber-600 group-hover:text-white transition-colors" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-1">Invoice History</h3>
+                  <p className="text-sm text-gray-500">{invoices.length} invoices</p>
+                </button>
+
+                <button
                   onClick={() => setView('templates')}
                   className="bg-white rounded-xl border border-gray-200 p-6 hover:border-purple-400 hover:shadow-lg transition-all group"
                 >
@@ -488,17 +646,6 @@ function App() {
                   </div>
                   <h3 className="font-semibold text-gray-800 mb-1">Templates</h3>
                   <p className="text-sm text-gray-500">{templates.length} templates</p>
-                </button>
-
-                <button
-                  onClick={() => setView('catalog')}
-                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-amber-400 hover:shadow-lg transition-all group"
-                >
-                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-500 transition-colors">
-                    <Package className="w-6 h-6 text-amber-600 group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-semibold text-gray-800 mb-1">Product Catalog</h3>
-                  <p className="text-sm text-gray-500">{catalog.length} products</p>
                 </button>
               </div>
 
@@ -641,6 +788,68 @@ function App() {
                 onEdit={editQuotation}
                 onDelete={deleteQuotation}
                 onDuplicate={duplicateQuotation}
+                onConvertToInvoice={convertToInvoice}
+              />
+            </div>
+          )}
+
+          {/* New Invoice */}
+          {view === 'newInvoice' && (
+            <div className="max-w-4xl mx-auto text-center py-16">
+              <Receipt className="w-16 h-16 mx-auto text-amber-400 mb-4" />
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Create New Invoice</h2>
+              <p className="text-gray-500 mb-6">Start a blank invoice or convert from a quotation.</p>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={startNewInvoice}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <Receipt className="w-5 h-5" />
+                  Blank Invoice
+                </button>
+                <button
+                  onClick={() => setView('list')}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  From Quotation
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Invoice */}
+          {view === 'editInvoice' && editingInvoice && (
+            <InvoiceForm
+              invoice={editingInvoice}
+              catalog={catalog}
+              companyProfile={companyProfile}
+              selectedTemplate={invoiceTemplate}
+              onChange={setEditingInvoice}
+              onSave={saveInvoice}
+              onExportPDF={exportInvoicePDF}
+              onPreview={previewInvoice}
+              onCancel={() => { setEditingInvoice(null); setView('invoiceList'); }}
+            />
+          )}
+
+          {/* Invoice History */}
+          {view === 'invoiceList' && (
+            <div className="max-w-4xl mx-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Invoice History</h2>
+                <button
+                  onClick={startNewInvoice}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                >
+                  <Receipt className="w-4 h-4" />
+                  New Invoice
+                </button>
+              </div>
+              <InvoiceList
+                invoices={invoices}
+                onEdit={editInvoice}
+                onDelete={deleteInvoice}
+                onDuplicate={duplicateInvoice}
               />
             </div>
           )}
