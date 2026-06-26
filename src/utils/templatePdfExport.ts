@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, TemplateBlock, TableColumn, Invoice } from '../types';
-import { calculateProductAmount, calculateTaxSummary } from './storage';
+import { calculateProductAmount, calculateTaxSummary, calculateRoundOff, numberToWords, roundTo2 } from './storage';
 import { resolvePlaceholders } from './placeholders';
 
 export type DocumentType = 'quotation' | 'invoice';
@@ -21,11 +21,13 @@ export const exportTemplatePDF = (
     format: 'a4',
   });
 
-  const totalAmount = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
+  const totalAmount = roundTo2(Array.from(calculateTaxSummary(products).values()).reduce((sum, t) => sum + t.taxableAmount, 0));
   const taxSummary = calculateTaxSummary(products);
-  const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
-  const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
-  const grandTotal = totalAmount + totalCgst + totalSgst;
+  const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+  const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+  // Grand total is sum of inclusive product amounts
+  const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+  const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
   const context = { company, customer, quotation, products };
 
@@ -188,11 +190,21 @@ export const exportTemplatePDF = (
           totalsY += 5;
           doc.text(`SGST: Rs. ${totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, totalsY, { align: 'right' });
         }
+        totalsY += 5;
+        const roundOffText = roundOff >= 0
+          ? `Rs. ${roundOff.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+          : `(Rs. ${Math.abs(roundOff).toLocaleString('en-IN', { minimumFractionDigits: 2 })})`;
+        doc.text(`Round Off: ${roundOffText}`, totalsX, totalsY, { align: 'right' });
         doc.setFont('helvetica', 'bold');
         doc.setDrawColor(180);
         doc.line(totalsX - 45, totalsY + 2, totalsX, totalsY + 2);
         doc.setFontSize(9);
-        doc.text(`Grand Total: Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, totalsY + 7, { align: 'right' });
+        doc.text(`Grand Total: Rs. ${roundedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, totalsY + 7, { align: 'right' });
+        totalsY += 12;
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'italic');
+        const amountInWords = numberToWords(roundedGrandTotal);
+        doc.text(`(${amountInWords})`, totalsX, totalsY, { align: 'right' });
         break;
       }
 

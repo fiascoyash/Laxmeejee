@@ -152,6 +152,7 @@ function QuotationPreview({ quotation, onClose }: { quotation: Quotation; onClos
                 <div className="flex justify-between py-1"><span>Taxable Amount:</span><span>Rs. {quotation.totalAmount.toLocaleString('en-IN')}</span></div>
                 <div className="flex justify-between py-1"><span>CGST:</span><span>Rs. {quotation.totalCgst.toLocaleString('en-IN')}</span></div>
                 <div className="flex justify-between py-1"><span>SGST:</span><span>Rs. {quotation.totalSgst.toLocaleString('en-IN')}</span></div>
+                <div className="flex justify-between py-1"><span>Round Off:</span><span>Rs. {(quotation.roundOff || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
                 <div className="flex justify-between py-2 border-t font-bold"><span>Grand Total:</span><span>Rs. {quotation.grandTotal.toLocaleString('en-IN')}</span></div>
               </div>
             </div>

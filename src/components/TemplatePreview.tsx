@@ -1,5 +1,5 @@
 import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, BlockType } from '../types';
-import { calculateProductAmount, calculateTaxSummary } from '../utils/storage';
+import { calculateProductAmount, calculateTaxSummary, calculateRoundOff, numberToWords, roundTo2 } from '../utils/storage';
 import { resolvePlaceholders } from '../utils/placeholders';
 import { X, FileDown } from 'lucide-react';
 import { exportTemplatePDF } from '../utils/templatePdfExport';
@@ -16,11 +16,14 @@ interface Props {
 const MM_TO_PX = 3.7795275591;
 
 export function TemplatePreview({ template, company, customer, quotation, products, onClose }: Props) {
-  const totalAmount = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
   const taxSummary = calculateTaxSummary(products);
-  const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
-  const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
-  const grandTotal = totalAmount + totalCgst + totalSgst;
+  // Taxable amount is extracted from inclusive prices
+  const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+  const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+  const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+  // Grand total is sum of inclusive product amounts
+  const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+  const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
   const context = { company, customer, quotation, products };
 
@@ -168,8 +171,12 @@ export function TemplatePreview({ template, company, customer, quotation, produc
             <div>Taxable: Rs. {totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
             <div>CGST: Rs. {totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
             <div>SGST: Rs. {totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+            <div>Round Off: Rs. {roundOff.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
             <div className="font-bold text-sm border-t mt-1 pt-1">
-              Grand Total: Rs. {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              Grand Total: Rs. {roundedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </div>
+            <div className="text-xs italic">
+              ({numberToWords(roundedGrandTotal)})
             </div>
           </div>
         );

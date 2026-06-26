@@ -47,6 +47,7 @@ export interface Quotation {
   totalAmount: number;
   totalCgst: number;
   totalSgst: number;
+  roundOff: number;
   grandTotal: number;
   createdAt: string;
   selectedTemplateId?: string; // Link to template
@@ -78,6 +79,7 @@ export interface Invoice {
   totalAmount: number;
   totalCgst: number;
   totalSgst: number;
+  roundOff: number;
   grandTotal: number;
   status: InvoiceStatus;
   notes?: string;
@@ -191,7 +193,9 @@ export const PLACEHOLDERS = {
   '{{taxable_amount}}': 'Rs. 0.00',
   '{{cgst_amount}}': 'Rs. 0.00',
   '{{sgst_amount}}': 'Rs. 0.00',
+  '{{round_off}}': 'Rs. 0.00',
   '{{grand_total}}': 'Rs. 0.00',
+  '{{amount_in_words}}': 'Zero Rupees Only',
   '{{customer_address}}': 'Customer Address',
   '{{customer_mobile}}': 'Mobile',
   '{{customer_district}}': 'District',

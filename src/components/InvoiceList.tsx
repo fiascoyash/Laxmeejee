@@ -159,6 +159,7 @@ function InvoicePreview({ invoice, onClose }: { invoice: Invoice; onClose: () =>
                 <div className="flex justify-between py-1"><span>Taxable Amount:</span><span>Rs. {invoice.totalAmount.toLocaleString('en-IN')}</span></div>
                 <div className="flex justify-between py-1"><span>CGST:</span><span>Rs. {invoice.totalCgst.toLocaleString('en-IN')}</span></div>
                 <div className="flex justify-between py-1"><span>SGST:</span><span>Rs. {invoice.totalSgst.toLocaleString('en-IN')}</span></div>
+                <div className="flex justify-between py-1"><span>Round Off:</span><span>Rs. {(invoice.roundOff || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
                 <div className="flex justify-between py-2 border-t font-bold"><span>Grand Total:</span><span>Rs. {invoice.grandTotal.toLocaleString('en-IN')}</span></div>
               </div>
             </div>

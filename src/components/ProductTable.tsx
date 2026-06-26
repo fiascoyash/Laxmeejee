@@ -1,5 +1,5 @@
 import { Product, ProductCatalogItem, TableColumn } from '../types';
-import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns } from '../utils/storage';
+import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, numberToWords, roundTo2 } from '../utils/storage';
 import { Plus, Trash2, Package, ChevronDown, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -61,10 +61,13 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
   const isColumnVisible = (key: string) => visibleColumns.some(c => c.key === key);
 
   const taxSummary = calculateTaxSummary(products);
-  const totalTaxable = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
-  const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
-  const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
-  const grandTotal = totalTaxable + totalCgst + totalSgst;
+  // Grand total is sum of all product amounts (inclusive prices)
+  const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+  // Tax values are extracted from inclusive prices
+  const totalTaxable = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+  const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+  const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+  const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
   const renderCell = (product: Product, colKey: string) => {
     switch (colKey) {
@@ -340,9 +343,13 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                 </div>
               </>
             )}
+            <div className="flex justify-between py-1">
+              <span className="text-gray-600">Round Off:</span>
+              <span className="font-medium">Rs. {roundOff >= 0 ? roundOff.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '(' + Math.abs(roundOff).toLocaleString('en-IN', { minimumFractionDigits: 2 }) + ')'}</span>
+            </div>
             <div className="flex justify-between py-2 border-t-2 border-gray-300 mt-2">
               <span className="text-gray-800 font-bold text-lg">Grand Total:</span>
-              <span className="font-bold text-lg text-blue-600">Rs. {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-lg text-blue-600">Rs. {roundedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
         </div>

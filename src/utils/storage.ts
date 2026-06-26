@@ -289,6 +289,7 @@ export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
     totalAmount: quotation.totalAmount,
     totalCgst: quotation.totalCgst,
     totalSgst: quotation.totalSgst,
+    roundOff: quotation.roundOff || 0,
     grandTotal: quotation.grandTotal,
     status: 'Unpaid',
     sourceQuotationId: quotation.id,
@@ -549,29 +550,56 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
   ];
 };
 
-export const calculateProductAmount = (product: Product): number => {
-  return product.quantity * product.unitPrice;
+// Round to 2 decimal places - fixes floating point precision issues
+export const roundTo2 = (value: number): number => {
+  return Math.round(value * 100) / 100;
 };
 
+// Calculate inclusive amount (quantity * unitPrice) - this is the final price including GST
+export const calculateProductAmount = (product: Product): number => {
+  return roundTo2(product.quantity * product.unitPrice);
+};
+
+// Calculate taxable amount by extracting GST from inclusive price
+// Formula: Taxable = Inclusive / (1 + GST/100)
+export const calculateTaxableAmount = (inclusiveAmount: number, gstPercent: number): number => {
+  if (gstPercent === 0) return inclusiveAmount;
+  return roundTo2(inclusiveAmount / (1 + gstPercent / 100));
+};
+
+// Calculate GST amount from inclusive price
+// Formula: GST = Inclusive - Taxable
+export const calculateGstAmount = (inclusiveAmount: number, gstPercent: number): number => {
+  if (gstPercent === 0) return 0;
+  const taxableAmount = calculateTaxableAmount(inclusiveAmount, gstPercent);
+  return roundTo2(inclusiveAmount - taxableAmount);
+};
+
+// Tax summary with GST Inclusive calculation
+// The taxableAmount and tax amounts are extracted from inclusive prices
 export const calculateTaxSummary = (products: Product[]): Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }> => {
   const summary = new Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }>();
 
   products.forEach(product => {
     const key = `${product.hsnCode}_${product.gstPercent}`;
-    const amount = calculateProductAmount(product);
+    const inclusiveAmount = calculateProductAmount(product);
     const cgstRate = product.gstPercent / 2;
     const sgstRate = product.gstPercent / 2;
-    const cgstAmount = (amount * cgstRate) / 100;
-    const sgstAmount = (amount * sgstRate) / 100;
+
+    // Extract GST from inclusive price
+    const taxableAmount = calculateTaxableAmount(inclusiveAmount, product.gstPercent);
+    const gstAmount = roundTo2(inclusiveAmount - taxableAmount);
+    const cgstAmount = roundTo2(gstAmount / 2);
+    const sgstAmount = roundTo2(gstAmount / 2);
 
     if (summary.has(key)) {
       const existing = summary.get(key)!;
-      existing.taxableAmount += amount;
-      existing.cgstAmount += cgstAmount;
-      existing.sgstAmount += sgstAmount;
+      existing.taxableAmount = roundTo2(existing.taxableAmount + taxableAmount);
+      existing.cgstAmount = roundTo2(existing.cgstAmount + cgstAmount);
+      existing.sgstAmount = roundTo2(existing.sgstAmount + sgstAmount);
     } else {
       summary.set(key, {
-        taxableAmount: amount,
+        taxableAmount,
         cgstRate,
         sgstRate,
         cgstAmount,
@@ -581,4 +609,47 @@ export const calculateTaxSummary = (products: Product[]): Map<string, { taxableA
   });
 
   return summary;
+};
+
+export const calculateRoundOff = (rawTotal: number): { roundOff: number; roundedGrandTotal: number } => {
+  const roundedGrandTotal = Math.round(rawTotal);
+  const roundOff = roundTo2(roundedGrandTotal - rawTotal);
+  return { roundOff, roundedGrandTotal };
+};
+
+export const numberToWords = (num: number): string => {
+  if (num === 0) return 'Zero Rupees Only';
+
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const convertHundreds = (n: number): string => {
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+    return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convertHundreds(n % 100) : '');
+  };
+
+  const convertThousand = (n: number): string => {
+    if (n < 1000) return convertHundreds(n);
+    if (n < 100000) {
+      const thousand = Math.floor(n / 1000);
+      const remainder = n % 1000;
+      return (thousand < 20 ? ones[thousand] : convertHundreds(thousand)) + ' Thousand' +
+        (remainder !== 0 ? ' ' + convertHundreds(remainder) : '');
+    }
+    if (n < 10000000) {
+      const lakh = Math.floor(n / 100000);
+      const remainder = n % 100000;
+      return (lakh < 20 ? ones[lakh] : convertHundreds(lakh)) + ' Lakh' +
+        (remainder !== 0 ? ' ' + convertThousand(remainder) : '');
+    }
+    const crore = Math.floor(n / 10000000);
+    const remainder = n % 10000000;
+    return (crore < 20 ? ones[crore] : convertHundreds(crore)) + ' Crore' +
+      (remainder !== 0 ? ' ' + convertThousand(remainder) : '');
+  };
+
+  const roundedNum = Math.round(num);
+  return convertThousand(roundedNum) + ' Rupees Only';
 };

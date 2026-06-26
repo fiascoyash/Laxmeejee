@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn } from './types';
-import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber } from './utils/storage';
+import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, numberToWords, roundTo2 } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
 import { ProductTable } from './components/ProductTable';
@@ -130,10 +130,13 @@ function App() {
     }
 
     const taxSummary = calculateTaxSummary(products);
-    const totalAmount = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
-    const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
-    const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
-    const grandTotal = totalAmount + totalCgst + totalSgst;
+    // Taxable amount is extracted from inclusive prices
+    const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+    const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+    const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+    // Grand total is sum of inclusive product amounts
+    const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+    const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
     const quotation: Quotation = {
       id: editingQuotationId || generateId(),
@@ -144,7 +147,8 @@ function App() {
       totalAmount,
       totalCgst,
       totalSgst,
-      grandTotal,
+      roundOff,
+      grandTotal: roundedGrandTotal,
       createdAt: editingQuotationId ? quotations.find(q => q.id === editingQuotationId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
       productColumns,
@@ -198,17 +202,21 @@ function App() {
     }
 
     const taxSummary = calculateTaxSummary(editingInvoice.products);
-    const totalAmount = editingInvoice.products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
-    const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
-    const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
-    const grandTotal = totalAmount + totalCgst + totalSgst;
+    // Taxable amount is extracted from inclusive prices
+    const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+    const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+    const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+    // Grand total is sum of inclusive product amounts
+    const grandTotalAmount = roundTo2(editingInvoice.products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+    const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
     const toSave: Invoice = {
       ...editingInvoice,
       totalAmount,
       totalCgst,
       totalSgst,
-      grandTotal,
+      roundOff,
+      grandTotal: roundedGrandTotal,
       updatedAt: new Date().toISOString(),
     };
 
@@ -306,6 +314,7 @@ function App() {
       totalAmount: 0,
       totalCgst: 0,
       totalSgst: 0,
+      roundOff: 0,
       grandTotal: 0,
       status: 'Draft',
       selectedTemplateId: selectedTemplateId || undefined,
@@ -344,6 +353,7 @@ function App() {
       totalAmount: 155000,
       totalCgst: 11100,
       totalSgst: 11100,
+      roundOff: 0,
       grandTotal: 177200,
       createdAt: new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
@@ -376,10 +386,13 @@ function App() {
     }
 
     const taxSummary = calculateTaxSummary(products);
-    const totalAmount = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
-    const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
-    const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
-    const grandTotal = totalAmount + totalCgst + totalSgst;
+    // Taxable amount is extracted from inclusive prices
+    const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+    const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+    const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+    // Grand total is sum of inclusive product amounts
+    const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+    const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
     const quotation: Quotation = {
       id: editingQuotationId || 'temp',
@@ -390,7 +403,8 @@ function App() {
       totalAmount,
       totalCgst,
       totalSgst,
-      grandTotal,
+      roundOff,
+      grandTotal: roundedGrandTotal,
       createdAt: new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
       productColumns,

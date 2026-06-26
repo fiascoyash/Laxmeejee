@@ -1,5 +1,5 @@
 import { CompanyProfile, Customer, Quotation, Product } from '../types';
-import { calculateProductAmount, calculateTaxSummary } from './storage';
+import { calculateProductAmount, calculateTaxSummary, calculateRoundOff, numberToWords, roundTo2 } from './storage';
 
 export interface PlaceholderContext {
   company: CompanyProfile;
@@ -11,12 +11,15 @@ export interface PlaceholderContext {
 export const resolvePlaceholders = (text: string, context: PlaceholderContext): string => {
   const { company, customer, quotation, products } = context;
 
-  // Calculate totals
-  const totalAmount = products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
+  // Calculate totals - GST Inclusive logic
   const taxSummary = calculateTaxSummary(products);
-  const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
-  const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
-  const grandTotal = totalAmount + totalCgst + totalSgst;
+  // Taxable amount is extracted from inclusive prices
+  const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+  const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+  const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+  // Grand total is sum of inclusive product amounts
+  const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+  const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
   // Create replacement map
   const replacements: Record<string, string> = {
@@ -35,7 +38,9 @@ export const resolvePlaceholders = (text: string, context: PlaceholderContext): 
     '{{taxable_amount}}': `Rs. ${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
     '{{cgst_amount}}': `Rs. ${totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
     '{{sgst_amount}}': `Rs. ${totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-    '{{grand_total}}': `Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+    '{{round_off}}': `Rs. ${roundOff.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+    '{{grand_total}}': `Rs. ${roundedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+    '{{amount_in_words}}': numberToWords(roundedGrandTotal),
     '{{customer_address}}': customer.billingAddress || '',
     '{{customer_mobile}}': customer.mobile || '',
     '{{customer_district}}': customer.district || '',
@@ -68,7 +73,9 @@ export const getPlaceholderList = (): { key: string; description: string }[] => 
     { key: '{{taxable_amount}}', description: 'Subtotal before tax' },
     { key: '{{cgst_amount}}', description: 'Total CGST' },
     { key: '{{sgst_amount}}', description: 'Total SGST' },
-    { key: '{{grand_total}}', description: 'Grand total with GST' },
+    { key: '{{round_off}}', description: 'Round off adjustment' },
+    { key: '{{grand_total}}', description: 'Grand total with GST (rounded)' },
+    { key: '{{amount_in_words}}', description: 'Grand total in words (Rupees Only)' },
     { key: '{{customer_address}}', description: 'Customer billing address' },
     { key: '{{customer_mobile}}', description: 'Customer mobile number' },
     { key: '{{customer_district}}', description: 'Customer district' },
