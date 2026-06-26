@@ -17,7 +17,7 @@ export function ProductCatalog({ catalog, onSave }: Props) {
       id: '',
       name: '',
       hsnCode: '',
-      gstPercent: 12,
+      gstPercent: 18,
       defaultPrice: 0,
       createdAt: new Date().toISOString(),
     });
@@ -156,10 +156,10 @@ export function ProductCatalog({ catalog, onSave }: Props) {
                   onChange={(e) => setEditing({ ...editing, gstPercent: Number(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
+                  <option value={0}>0%</option>
                   <option value={5}>5%</option>
-                  <option value={12}>12%</option>
                   <option value={18}>18%</option>
-                  <option value={28}>28%</option>
+                  <option value={40}>40%</option>
                 </select>
               </div>
               <div>

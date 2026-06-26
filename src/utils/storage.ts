@@ -1,4 +1,4 @@
-import { CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn, BlockType, Invoice, NumberingSettings, TemplateBlock } from '../types';
+import { CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn, BlockType, Invoice, NumberingSettings, TemplateBlock, GstMode } from '../types';
 
 const STORAGE_KEYS = {
   COMPANY_PROFILE: 'solar_company_profile',
@@ -285,6 +285,7 @@ export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
     date: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     customer: { ...quotation.customer },
+    shipTo: quotation.shipTo ? { ...quotation.shipTo } : undefined,
     products: quotation.products.map(p => ({ ...p })),
     totalAmount: quotation.totalAmount,
     totalCgst: quotation.totalCgst,
@@ -296,6 +297,7 @@ export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
     sourceQuotationNumber: quotation.quotationNumber,
     selectedTemplateId: quotation.selectedTemplateId,
     productColumns: quotation.productColumns,
+    gstMode: quotation.gstMode || 'inclusive',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -303,8 +305,8 @@ export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
 
 const getDefaultProducts = (): ProductCatalogItem[] => {
   return [
-    { id: generateId(), name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 12, defaultPrice: 12000, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'Solar Panel 550W', hsnCode: '8541', gstPercent: 12, defaultPrice: 18000, createdAt: new Date().toISOString() },
+    { id: generateId(), name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, defaultPrice: 12000, createdAt: new Date().toISOString() },
+    { id: generateId(), name: 'Solar Panel 550W', hsnCode: '8541', gstPercent: 18, defaultPrice: 18000, createdAt: new Date().toISOString() },
     { id: generateId(), name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, defaultPrice: 35000, createdAt: new Date().toISOString() },
     { id: generateId(), name: 'Solar Inverter 5kW', hsnCode: '8504', gstPercent: 18, defaultPrice: 55000, createdAt: new Date().toISOString() },
     { id: generateId(), name: 'Solar Battery 150Ah', hsnCode: '8507', gstPercent: 18, defaultPrice: 22000, createdAt: new Date().toISOString() },
@@ -479,6 +481,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
         { id: 'block_qtn_no', type: 'quotation_number' as BlockType, x: 160, y: 10, width: 40, height: 12, visible: true },
         { id: 'block_qtn_date', type: 'quotation_date' as BlockType, x: 160, y: 24, width: 40, height: 12, visible: true },
         { id: 'block_customer', type: 'customer_details' as BlockType, x: 10, y: 45, width: 90, height: 35, visible: true },
+        { id: 'block_ship_to', type: 'ship_to_details' as BlockType, x: 110, y: 45, width: 90, height: 35, visible: true },
         { id: 'block_products', type: 'product_table' as BlockType, x: 10, y: 85, width: 190, height: 80, visible: true },
         { id: 'block_gst', type: 'gst_summary' as BlockType, x: 10, y: 170, width: 110, height: 30, visible: true },
         { id: 'block_totals', type: 'totals' as BlockType, x: 130, y: 170, width: 70, height: 30, visible: true },
@@ -555,40 +558,62 @@ export const roundTo2 = (value: number): number => {
   return Math.round(value * 100) / 100;
 };
 
-// Calculate inclusive amount (quantity * unitPrice) - this is the final price including GST
+// Calculate base amount (quantity * unitPrice)
 export const calculateProductAmount = (product: Product): number => {
   return roundTo2(product.quantity * product.unitPrice);
 };
 
-// Calculate taxable amount by extracting GST from inclusive price
-// Formula: Taxable = Inclusive / (1 + GST/100)
-export const calculateTaxableAmount = (inclusiveAmount: number, gstPercent: number): number => {
-  if (gstPercent === 0) return inclusiveAmount;
-  return roundTo2(inclusiveAmount / (1 + gstPercent / 100));
+// Calculate grand total amount based on GST mode
+// Inclusive: base amount is the final total (GST already included)
+// Exclusive: base amount + GST = final total
+export const calculateGrandTotalAmount = (products: Product[], gstMode: GstMode): number => {
+  return roundTo2(products.reduce((sum, p) => {
+    const baseAmount = calculateProductAmount(p);
+    if (gstMode === 'inclusive' || p.gstPercent === 0) {
+      return sum + baseAmount;
+    } else {
+      // Exclusive: add GST on top
+      const gstAmount = roundTo2(baseAmount * (p.gstPercent / 100));
+      return sum + baseAmount + gstAmount;
+    }
+  }, 0));
 };
 
-// Calculate GST amount from inclusive price
-// Formula: GST = Inclusive - Taxable
-export const calculateGstAmount = (inclusiveAmount: number, gstPercent: number): number => {
+// Calculate taxable amount based on GST mode
+// Inclusive: extract GST from price (Taxable = Amount / (1 + GST/100))
+// Exclusive: the base amount IS the taxable amount
+export const calculateTaxableAmount = (amount: number, gstPercent: number, gstMode: GstMode): number => {
+  if (gstPercent === 0) return amount;
+  if (gstMode === 'exclusive') return amount;
+  // Inclusive mode: extract GST
+  return roundTo2(amount / (1 + gstPercent / 100));
+};
+
+// Calculate GST amount based on mode
+// Inclusive: GST = Amount - Taxable (extract from included)
+// Exclusive: GST = Taxable * (GST/100) (add on top)
+export const calculateGstAmount = (amount: number, gstPercent: number, gstMode: GstMode): number => {
   if (gstPercent === 0) return 0;
-  const taxableAmount = calculateTaxableAmount(inclusiveAmount, gstPercent);
-  return roundTo2(inclusiveAmount - taxableAmount);
+  if (gstMode === 'exclusive') {
+    return roundTo2(amount * (gstPercent / 100));
+  }
+  // Inclusive mode: extract GST from amount
+  const taxableAmount = calculateTaxableAmount(amount, gstPercent, gstMode);
+  return roundTo2(amount - taxableAmount);
 };
 
-// Tax summary with GST Inclusive calculation
-// The taxableAmount and tax amounts are extracted from inclusive prices
-export const calculateTaxSummary = (products: Product[]): Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }> => {
+// Tax summary calculation - now supports both GST modes
+export const calculateTaxSummary = (products: Product[], gstMode: GstMode = 'inclusive'): Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }> => {
   const summary = new Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }>();
 
   products.forEach(product => {
     const key = `${product.hsnCode}_${product.gstPercent}`;
-    const inclusiveAmount = calculateProductAmount(product);
+    const baseAmount = calculateProductAmount(product);
     const cgstRate = product.gstPercent / 2;
     const sgstRate = product.gstPercent / 2;
 
-    // Extract GST from inclusive price
-    const taxableAmount = calculateTaxableAmount(inclusiveAmount, product.gstPercent);
-    const gstAmount = roundTo2(inclusiveAmount - taxableAmount);
+    const taxableAmount = calculateTaxableAmount(baseAmount, product.gstPercent, gstMode);
+    const gstAmount = calculateGstAmount(baseAmount, product.gstPercent, gstMode);
     const cgstAmount = roundTo2(gstAmount / 2);
     const sgstAmount = roundTo2(gstAmount / 2);
 

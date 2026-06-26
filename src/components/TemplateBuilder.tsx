@@ -6,7 +6,7 @@ import {
 import { generateId, getDefaultProductColumns, calculateProductAmount, calculateTaxSummary } from '../utils/storage';
 import {
   Trash2, Plus, Save, Settings, Type, Image,
-  Building2, User, FileText, Calendar, Table, CreditCard, PenTool, FileWarning,
+  Building2, User, FileText, Calendar, Table, CreditCard, PenTool, FileWarning, Truck,
   ChevronDown, GripVertical, LucideIcon, Square, Minus, MoveVertical, AlignJustify,
   Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
 } from 'lucide-react';
@@ -27,6 +27,7 @@ const BLOCK_ICONS: Record<BlockType, LucideIcon> = {
   company_logo: Image,
   company_details: Building2,
   customer_details: User,
+  ship_to_details: Truck,
   quotation_number: FileText,
   quotation_date: Calendar,
   product_table: Table,
@@ -46,7 +47,8 @@ const BLOCK_ICONS: Record<BlockType, LucideIcon> = {
 const BLOCK_LABELS: Record<BlockType, string> = {
   company_logo: 'Company Logo',
   company_details: 'Company Details',
-  customer_details: 'Customer Details',
+  customer_details: 'Customer Details (Bill To)',
+  ship_to_details: 'Ship To Details',
   quotation_number: 'Quotation Number',
   quotation_date: 'Quotation Date',
   product_table: 'Product Table',
@@ -264,6 +266,16 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             {sampleData.customer.billingAddress && <div className="text-xs">{sampleData.customer.billingAddress}</div>}
             <div className="text-xs">{sampleData.customer.village} {sampleData.customer.district}</div>
             {sampleData.customer.mobile && <div className="text-xs">Mobile: {sampleData.customer.mobile}</div>}
+          </div>
+        );
+
+      case 'ship_to_details':
+        return (
+          <div className="text-sm">
+            <div className="font-semibold mb-1">Ship To:</div>
+            <div className="font-medium">{sampleData.quotation.shipTo?.name || '{{ship_name}}'}</div>
+            {sampleData.quotation.shipTo?.address && <div className="text-xs">{sampleData.quotation.shipTo.address}</div>}
+            {sampleData.quotation.shipTo?.mobile && <div className="text-xs">Mobile: {sampleData.quotation.shipTo.mobile}</div>}
           </div>
         );
 

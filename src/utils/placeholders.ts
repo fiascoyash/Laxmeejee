@@ -45,6 +45,10 @@ export const resolvePlaceholders = (text: string, context: PlaceholderContext): 
     '{{customer_mobile}}': customer.mobile || '',
     '{{customer_district}}': customer.district || '',
     '{{customer_village}}': customer.village || '',
+    '{{ship_name}}': quotation.shipTo?.name || customer.name || '',
+    '{{ship_address}}': quotation.shipTo?.address || '',
+    '{{ship_phone}}': quotation.shipTo?.mobile || customer.mobile || '',
+    '{{ship_gst}}': quotation.shipTo?.gstNumber || '',
   };
 
   // Replace all placeholders
@@ -80,5 +84,9 @@ export const getPlaceholderList = (): { key: string; description: string }[] => 
     { key: '{{customer_mobile}}', description: 'Customer mobile number' },
     { key: '{{customer_district}}', description: 'Customer district' },
     { key: '{{customer_village}}', description: 'Customer village' },
+    { key: '{{ship_name}}', description: 'Ship to receiver name' },
+    { key: '{{ship_address}}', description: 'Ship to delivery address' },
+    { key: '{{ship_phone}}', description: 'Ship to phone number' },
+    { key: '{{ship_gst}}', description: 'Ship to GST number' },
   ];
 };

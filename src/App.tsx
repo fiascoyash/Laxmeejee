@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn } from './types';
-import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, numberToWords, roundTo2 } from './utils/storage';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo } from './types';
+import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, numberToWords, roundTo2, calculateGrandTotalAmount } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
 import { ProductTable } from './components/ProductTable';
@@ -39,9 +39,12 @@ function App() {
     mobile: '',
     district: '',
     village: '',
+    gstNumber: '',
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [productColumns, setProductColumns] = useState<TableColumn[]>(getDefaultProductColumns());
+  const [gstMode, setGstMode] = useState<GstMode>('inclusive');
+  const [shipTo, setShipTo] = useState<ShipTo>({ name: '', address: '', mobile: '', gstNumber: '' });
 
   // Selected Template State
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -92,9 +95,11 @@ function App() {
     setEditingQuotationId(null);
     setQuotationNumber(generateQuotationNumber());
     setQuotationDate(new Date().toISOString().split('T')[0]);
-    setCustomer({ name: '', billingAddress: '', mobile: '', district: '', village: '' });
+    setCustomer({ name: '', billingAddress: '', mobile: '', district: '', village: '', gstNumber: '' });
     setProducts([]);
     setProductColumns(getDefaultProductColumns());
+    setGstMode('inclusive');
+    setShipTo({ name: '', address: '', mobile: '', gstNumber: '' });
   };
 
   // Start new quotation - go to template selection first
@@ -111,6 +116,8 @@ function App() {
     setCustomer(quotation.customer);
     setProducts(quotation.products);
     setProductColumns(quotation.productColumns || getDefaultProductColumns());
+    setGstMode(quotation.gstMode || 'inclusive');
+    setShipTo(quotation.shipTo || { name: '', address: '', mobile: '', gstNumber: '' });
     // Restore the template used for this quotation
     if (quotation.selectedTemplateId) {
       setSelectedTemplateId(quotation.selectedTemplateId);
@@ -129,13 +136,11 @@ function App() {
       return;
     }
 
-    const taxSummary = calculateTaxSummary(products);
-    // Taxable amount is extracted from inclusive prices
+    const taxSummary = calculateTaxSummary(products, gstMode);
     const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
     const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
     const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
-    // Grand total is sum of inclusive product amounts
-    const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+    const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
     const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
     const quotation: Quotation = {
@@ -143,6 +148,7 @@ function App() {
       quotationNumber: editingQuotationId ? quotationNumber : generateQuotationNumber(),
       date: quotationDate,
       customer,
+      shipTo,
       products,
       totalAmount,
       totalCgst,
@@ -152,6 +158,7 @@ function App() {
       createdAt: editingQuotationId ? quotations.find(q => q.id === editingQuotationId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
       productColumns,
+      gstMode,
     };
 
     storage.saveQuotation(quotation);
@@ -201,13 +208,12 @@ function App() {
       return;
     }
 
-    const taxSummary = calculateTaxSummary(editingInvoice.products);
-    // Taxable amount is extracted from inclusive prices
+    const invoiceGstMode = editingInvoice.gstMode || 'inclusive';
+    const taxSummary = calculateTaxSummary(editingInvoice.products, invoiceGstMode);
     const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
     const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
     const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
-    // Grand total is sum of inclusive product amounts
-    const grandTotalAmount = roundTo2(editingInvoice.products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+    const grandTotalAmount = calculateGrandTotalAmount(editingInvoice.products, invoiceGstMode);
     const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
     const toSave: Invoice = {
@@ -276,6 +282,7 @@ function App() {
       quotationNumber: editingInvoice.invoiceNumber,
       date: editingInvoice.date,
       customer: editingInvoice.customer,
+      shipTo: editingInvoice.shipTo,
       products: editingInvoice.products,
       totalAmount: editingInvoice.totalAmount,
       totalCgst: editingInvoice.totalCgst,
@@ -283,9 +290,10 @@ function App() {
       grandTotal: editingInvoice.grandTotal,
       createdAt: editingInvoice.createdAt,
       selectedTemplateId: editingInvoice.selectedTemplateId,
+      gstMode: editingInvoice.gstMode,
     } as Quotation;
 
-    exportTemplatePDF(templateWithColumns, companyProfile, editingInvoice.customer, quotationProxy, editingInvoice.products, 'invoice', editingInvoice);
+    exportTemplatePDF(templateWithColumns, companyProfile, editingInvoice.customer, quotationProxy, editingInvoice.products, 'invoice', editingInvoice, editingInvoice.gstMode || 'inclusive');
   };
 
   // Preview invoice
@@ -309,7 +317,8 @@ function App() {
       invoiceNumber: generateInvoiceNumber(),
       date: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      customer: { name: '', billingAddress: '', mobile: '', district: '', village: '' },
+      customer: { name: '', billingAddress: '', mobile: '', district: '', village: '', gstNumber: '' },
+      shipTo: { name: '', address: '', mobile: '', gstNumber: '' },
       products: [],
       totalAmount: 0,
       totalCgst: 0,
@@ -319,6 +328,7 @@ function App() {
       status: 'Draft',
       selectedTemplateId: selectedTemplateId || undefined,
       productColumns: getDefaultProductColumns(),
+      gstMode: 'inclusive',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -334,6 +344,7 @@ function App() {
       mobile: '9876543210',
       district: 'Sample District',
       village: 'Sample Village',
+      gstNumber: '',
     },
     quotation: {
       id: 'sample',
@@ -345,9 +356,16 @@ function App() {
         mobile: '9876543210',
         district: 'Sample District',
         village: 'Sample Village',
+        gstNumber: '',
+      },
+      shipTo: shipTo.name ? shipTo : {
+        name: 'Sample Ship To',
+        address: '456 Delivery Road',
+        mobile: '9876543210',
+        gstNumber: '',
       },
       products: products.length > 0 ? products : [
-        { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 12, quantity: 10, unitPrice: 12000 },
+        { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
         { id: '2', name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
       ],
       totalAmount: 155000,
@@ -359,7 +377,7 @@ function App() {
       selectedTemplateId: selectedTemplateId || undefined,
     } as Quotation,
     products: products.length > 0 ? products : [
-      { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 12, quantity: 10, unitPrice: 12000 },
+      { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
       { id: '2', name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
     ],
   });
@@ -385,13 +403,11 @@ function App() {
       return;
     }
 
-    const taxSummary = calculateTaxSummary(products);
-    // Taxable amount is extracted from inclusive prices
+    const taxSummary = calculateTaxSummary(products, gstMode);
     const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
     const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
     const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
-    // Grand total is sum of inclusive product amounts
-    const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+    const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
     const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
     const quotation: Quotation = {
@@ -399,6 +415,7 @@ function App() {
       quotationNumber: quotationNumber || 'QT-PREVIEW',
       date: quotationDate,
       customer,
+      shipTo,
       products,
       totalAmount,
       totalCgst,
@@ -408,10 +425,11 @@ function App() {
       createdAt: new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
       productColumns,
+      gstMode,
     };
 
     const templateWithColumns = { ...template, productColumns };
-    exportTemplatePDF(templateWithColumns, companyProfile, customer, quotation, products);
+    exportTemplatePDF(templateWithColumns, companyProfile, customer, quotation, products, 'quotation', undefined, gstMode);
   };
 
   // Template handlers
@@ -776,8 +794,8 @@ function App() {
                 </div>
               </div>
 
-              <CustomerDetails customer={customer} onChange={setCustomer} />
-              <ProductTable products={products} onChange={setProducts} catalog={catalog} columns={productColumns} onColumnsChange={setProductColumns} />
+              <CustomerDetails customer={customer} onChange={setCustomer} shipTo={shipTo} onShipToChange={setShipTo} />
+              <ProductTable products={products} onChange={setProducts} catalog={catalog} columns={productColumns} onColumnsChange={setProductColumns} gstMode={gstMode} onGstModeChange={setGstMode} />
 
               <div className="flex flex-col sm:flex-row gap-3 justify-end bg-white rounded-lg border border-gray-200 p-4 sticky bottom-4">
                 <button

@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, TemplateBlock, TableColumn, Invoice } from '../types';
-import { calculateProductAmount, calculateTaxSummary, calculateRoundOff, numberToWords, roundTo2 } from './storage';
+import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, TemplateBlock, TableColumn, Invoice, GstMode } from '../types';
+import { calculateProductAmount, calculateTaxSummary, calculateRoundOff, numberToWords, roundTo2, calculateGrandTotalAmount } from './storage';
 import { resolvePlaceholders } from './placeholders';
 
 export type DocumentType = 'quotation' | 'invoice';
@@ -13,7 +13,8 @@ export const exportTemplatePDF = (
   quotation: Quotation,
   products: Product[],
   documentType: DocumentType = 'quotation',
-  invoice?: Invoice
+  invoice?: Invoice,
+  gstMode: GstMode = 'inclusive'
 ) => {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -21,12 +22,11 @@ export const exportTemplatePDF = (
     format: 'a4',
   });
 
-  const totalAmount = roundTo2(Array.from(calculateTaxSummary(products).values()).reduce((sum, t) => sum + t.taxableAmount, 0));
-  const taxSummary = calculateTaxSummary(products);
+  const taxSummary = calculateTaxSummary(products, gstMode);
+  const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
   const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
   const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
-  // Grand total is sum of inclusive product amounts
-  const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
+  const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
   const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
   const context = { company, customer, quotation, products };
@@ -99,6 +99,39 @@ export const exportTemplatePDF = (
         }
         if (customer.mobile) {
           doc.text(`Mobile: ${customer.mobile}`, x, custY);
+          custY += 4;
+        }
+        if (customer.gstNumber) {
+          doc.text(`GSTIN: ${customer.gstNumber}`, x, custY);
+        }
+        break;
+      }
+
+      case 'ship_to_details': {
+        const shipTo = quotation.shipTo;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Ship To:', x, y + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        let shipY = y + 10;
+        if (shipTo?.name) {
+          doc.setFont('helvetica', 'bold');
+          doc.text(shipTo.name, x, shipY);
+          doc.setFont('helvetica', 'normal');
+          shipY += 4;
+        }
+        if (shipTo?.address) {
+          const addressLines = doc.splitTextToSize(shipTo.address, width);
+          doc.text(addressLines, x, shipY);
+          shipY += addressLines.length * 4;
+        }
+        if (shipTo?.mobile) {
+          doc.text(`Mobile: ${shipTo.mobile}`, x, shipY);
+          shipY += 4;
+        }
+        if (shipTo?.gstNumber) {
+          doc.text(`GSTIN: ${shipTo.gstNumber}`, x, shipY);
         }
         break;
       }

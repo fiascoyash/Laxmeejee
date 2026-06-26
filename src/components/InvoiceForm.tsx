@@ -1,4 +1,4 @@
-import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn } from '../types';
+import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn, GstMode, ShipTo } from '../types';
 import { CustomerDetails } from './CustomerDetails';
 import { ProductTable } from './ProductTable';
 import { Save, FileDown, Eye, Calendar, AlertCircle, Package } from 'lucide-react';
@@ -36,8 +36,10 @@ export function InvoiceForm({
 }: Props) {
   const update = (patch: Partial<Invoice>) => onChange({ ...invoice, ...patch });
   const updateCustomer = (customer: Customer) => update({ customer });
+  const updateShipTo = (shipTo: ShipTo) => update({ shipTo });
   const updateProducts = (products: Product[]) => update({ products });
   const updateProductColumns = (productColumns: TableColumn[]) => update({ productColumns });
+  const updateGstMode = (gstMode: GstMode) => update({ gstMode });
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -110,10 +112,18 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <CustomerDetails customer={invoice.customer} onChange={updateCustomer} />
+      <CustomerDetails customer={invoice.customer} onChange={updateCustomer} shipTo={invoice.shipTo} onShipToChange={updateShipTo} />
 
       {/* Product table (reusing ProductTable component) */}
-      <ProductTable products={invoice.products} onChange={updateProducts} catalog={catalog} columns={invoice.productColumns} onColumnsChange={updateProductColumns} />
+      <ProductTable
+        products={invoice.products}
+        onChange={updateProducts}
+        catalog={catalog}
+        columns={invoice.productColumns}
+        onColumnsChange={updateProductColumns}
+        gstMode={invoice.gstMode || 'inclusive'}
+        onGstModeChange={updateGstMode}
+      />
 
       {/* Notes */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

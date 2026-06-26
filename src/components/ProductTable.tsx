@@ -1,5 +1,5 @@
-import { Product, ProductCatalogItem, TableColumn } from '../types';
-import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, numberToWords, roundTo2 } from '../utils/storage';
+import { Product, ProductCatalogItem, TableColumn, GstMode } from '../types';
+import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, calculateGrandTotalAmount, roundTo2 } from '../utils/storage';
 import { Plus, Trash2, Package, ChevronDown, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -9,9 +9,11 @@ interface Props {
   catalog: ProductCatalogItem[];
   columns?: TableColumn[];
   onColumnsChange?: (columns: TableColumn[]) => void;
+  gstMode?: GstMode;
+  onGstModeChange?: (mode: GstMode) => void;
 }
 
-export function ProductTable({ products, onChange, catalog, columns, onColumnsChange }: Props) {
+export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
@@ -28,7 +30,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       id: generateId(),
       name: '',
       hsnCode: '',
-      gstPercent: 12,
+      gstPercent: 18,
       quantity: 1,
       unitPrice: 0,
     };
@@ -60,10 +62,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
 
   const isColumnVisible = (key: string) => visibleColumns.some(c => c.key === key);
 
-  const taxSummary = calculateTaxSummary(products);
-  // Grand total is sum of all product amounts (inclusive prices)
-  const grandTotalAmount = roundTo2(products.reduce((sum, p) => sum + calculateProductAmount(p), 0));
-  // Tax values are extracted from inclusive prices
+  const taxSummary = calculateTaxSummary(products, gstMode);
+  const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
   const totalTaxable = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
   const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
   const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
@@ -101,9 +101,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
           >
             <option value={0}>0%</option>
             <option value={5}>5%</option>
-            <option value={12}>12%</option>
             <option value={18}>18%</option>
-            <option value={28}>28%</option>
+            <option value={40}>40%</option>
           </select>
         );
       case 'quantity':
@@ -325,7 +324,35 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
 
       {/* Totals */}
       {products.length > 0 && (
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex flex-col sm:flex-row justify-between gap-4">
+          {/* GST Mode Toggle */}
+          {onGstModeChange && (
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">GST Mode</label>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="gstMode"
+                    checked={gstMode === 'inclusive'}
+                    onChange={() => onGstModeChange('inclusive')}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">Inclusive GST (price includes GST)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="gstMode"
+                    checked={gstMode === 'exclusive'}
+                    onChange={() => onGstModeChange('exclusive')}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">Exclusive GST (add GST on top)</span>
+                </label>
+              </div>
+            </div>
+          )}
           <div className="w-80 bg-gray-50 rounded-lg p-4 border border-gray-200">
             <div className="flex justify-between py-1">
               <span className="text-gray-600">Taxable Amount:</span>

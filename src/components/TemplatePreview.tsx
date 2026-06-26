@@ -61,6 +61,16 @@ export function TemplatePreview({ template, company, customer, quotation, produc
           </div>
         );
 
+      case 'ship_to_details':
+        return (
+          <div>
+            <div className="font-semibold text-sm mb-1">Ship To:</div>
+            {quotation.shipTo?.name && <div className="font-medium text-sm">{quotation.shipTo.name}</div>}
+            {quotation.shipTo?.address && <div className="text-xs">{quotation.shipTo.address}</div>}
+            {quotation.shipTo?.mobile && <div className="text-xs">Mobile: {quotation.shipTo.mobile}</div>}
+          </div>
+        );
+
       case 'quotation_number':
         return (
           <div className="font-semibold">

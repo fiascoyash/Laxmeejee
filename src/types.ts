@@ -18,7 +18,17 @@ export interface Customer {
   mobile: string;
   district: string;
   village: string;
+  gstNumber?: string;
 }
+
+export interface ShipTo {
+  name: string;
+  address: string;
+  mobile: string;
+  gstNumber?: string;
+}
+
+export type GstMode = 'inclusive' | 'exclusive';
 
 export interface Product {
   id: string;
@@ -43,6 +53,7 @@ export interface Quotation {
   quotationNumber: string;
   date: string;
   customer: Customer;
+  shipTo?: ShipTo;
   products: Product[];
   totalAmount: number;
   totalCgst: number;
@@ -52,6 +63,7 @@ export interface Quotation {
   createdAt: string;
   selectedTemplateId?: string; // Link to template
   productColumns?: TableColumn[]; // Per-quotation column visibility
+  gstMode?: GstMode; // GST calculation mode
 }
 
 export interface NumberingSettings {
@@ -75,6 +87,7 @@ export interface Invoice {
   date: string;
   dueDate: string;
   customer: Customer;
+  shipTo?: ShipTo;
   products: Product[];
   totalAmount: number;
   totalCgst: number;
@@ -89,6 +102,7 @@ export interface Invoice {
   createdAt: string;
   updatedAt: string;
   productColumns?: TableColumn[]; // Per-invoice column visibility
+  gstMode?: GstMode; // GST calculation mode
 }
 
 export interface TaxSummary {
@@ -106,6 +120,7 @@ export type BlockType =
   | 'company_logo'
   | 'company_details'
   | 'customer_details'
+  | 'ship_to_details'
   | 'quotation_number'
   | 'quotation_date'
   | 'product_table'
@@ -200,6 +215,10 @@ export const PLACEHOLDERS = {
   '{{customer_mobile}}': 'Mobile',
   '{{customer_district}}': 'District',
   '{{customer_village}}': 'Village',
+  '{{ship_name}}': 'Ship To Name',
+  '{{ship_address}}': 'Ship To Address',
+  '{{ship_phone}}': 'Ship To Phone',
+  '{{ship_gst}}': 'Ship To GST',
 } as const;
 
 export type PlaceholderKey = keyof typeof PLACEHOLDERS;
