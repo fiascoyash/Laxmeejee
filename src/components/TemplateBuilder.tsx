@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   QuotationTemplate, TemplateBlock, BlockType, BlockStyle, TableColumn,
   CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT
@@ -8,8 +8,9 @@ import {
   Trash2, Plus, Save, Settings, Type, Image,
   Building2, User, FileText, Calendar, Table, CreditCard, PenTool, FileWarning, Truck,
   ChevronDown, GripVertical, LucideIcon, Square, Minus, MoveVertical, AlignJustify,
-  Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
+  Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Undo2, Redo2, Copy, Keyboard, X
 } from 'lucide-react';
+import { useTemplateHistory } from '../hooks/useTemplateHistory';
 
 interface Props {
   template: QuotationTemplate;
@@ -81,7 +82,37 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   const [editTextContent, setEditTextContent] = useState('');
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const dragStartRef = useRef<{ blocks: TemplateBlock[]; blockId: string } | null>(null);
+  const resizeStartRef = useRef<{ blocks: TemplateBlock[]; blockId: string } | null>(null);
+  const isUndoRedoRef = useRef(false);
+  const clipboardRef = useRef<TemplateBlock | null>(null);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+
+  const {
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    pushState,
+    getCurrentState,
+  } = useTemplateHistory({ maxHistorySize: 50 });
+
+  // Push initial state to history
+  useEffect(() => {
+    pushState({ blocks: template.blocks, productColumns: template.productColumns || getDefaultProductColumns() });
+  }, []);
+
+  // Apply undo/redo state
+  useEffect(() => {
+    const state = getCurrentState();
+    if (state && isUndoRedoRef.current) {
+      setBlocks(state.blocks);
+      setProductColumns(state.productColumns);
+      isUndoRedoRef.current = false;
+    }
+  }, [getCurrentState]);
 
   // Calculate totals for preview
   const totalAmount = sampleData.products.reduce((sum, p) => sum + calculateProductAmount(p), 0);
@@ -89,6 +120,203 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   const totalCgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0);
   const totalSgst = Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0);
   const grandTotal = totalAmount + totalCgst + totalSgst;
+
+  // Function definitions (needed before keyboard shortcuts)
+  const removeBlock = useCallback((id: string) => {
+    const newBlocks = blocks.filter(b => b.id !== id);
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
+    setSelectedBlock(null);
+  }, [blocks, productColumns, pushState]);
+
+  const duplicateBlock = useCallback((id: string) => {
+    const block = blocks.find(b => b.id === id);
+    if (!block) return;
+
+    const offsetMM = 20 / MM_TO_PX;
+    const newX = Math.min(block.x + offsetMM, A4_WIDTH - block.width - 5);
+    const newY = Math.min(block.y + offsetMM, A4_HEIGHT - block.height - 5);
+
+    const duplicatedBlock: TemplateBlock = {
+      ...block,
+      id: generateId(),
+      x: newX,
+      y: newY,
+      content: block.content,
+      style: block.style ? { ...block.style } : undefined,
+    };
+
+    const maxZ = blocks.reduce((max, b) => Math.max(max, b.zIndex || 0), 0);
+    duplicatedBlock.zIndex = maxZ + 1;
+
+    const newBlocks = [...blocks, duplicatedBlock];
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
+    setSelectedBlock(duplicatedBlock.id);
+  }, [blocks, productColumns, pushState]);
+
+  const handleSave = useCallback(() => {
+    const updatedTemplate: QuotationTemplate = {
+      ...template,
+      id: template.id || generateId(),
+      name: templateName,
+      description: templateDescription,
+      blocks,
+      productColumns,
+      updatedAt: new Date().toISOString(),
+    };
+    onSave(updatedTemplate);
+  }, [template, templateName, templateDescription, blocks, productColumns, onSave]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in input/textarea
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (isInput && editingText) return;
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Undo: Ctrl+Z
+      if (ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          isUndoRedoRef.current = true;
+          undo();
+        }
+        return;
+      }
+
+      // Redo: Ctrl+Y or Ctrl+Shift+Z
+      if ((ctrlKey && e.key === 'y') || (ctrlKey && e.shiftKey && e.key === 'z')) {
+        e.preventDefault();
+        if (canRedo) {
+          isUndoRedoRef.current = true;
+          redo();
+        }
+        return;
+      }
+
+      // Save: Ctrl+S
+      if (ctrlKey && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+
+      // Duplicate: Ctrl+D
+      if (ctrlKey && e.key === 'd') {
+        e.preventDefault();
+        if (selectedBlock) {
+          duplicateBlock(selectedBlock);
+        }
+        return;
+      }
+
+      // Copy: Ctrl+C
+      if (ctrlKey && e.key === 'c' && selectedBlock) {
+        e.preventDefault();
+        const block = blocks.find(b => b.id === selectedBlock);
+        if (block) {
+          clipboardRef.current = { ...block };
+        }
+        return;
+      }
+
+      // Paste: Ctrl+V
+      if (ctrlKey && e.key === 'v' && clipboardRef.current) {
+        e.preventDefault();
+        const offsetMM = 20 / MM_TO_PX;
+        const newX = Math.min(clipboardRef.current.x + offsetMM, A4_WIDTH - clipboardRef.current.width - 5);
+        const newY = Math.min(clipboardRef.current.y + offsetMM, A4_HEIGHT - clipboardRef.current.height - 5);
+        const maxZ = blocks.reduce((max, b) => Math.max(max, b.zIndex || 0), 0);
+
+        const pastedBlock: TemplateBlock = {
+          ...clipboardRef.current,
+          id: generateId(),
+          x: newX,
+          y: newY,
+          zIndex: maxZ + 1,
+        };
+
+        const newBlocks = [...blocks, pastedBlock];
+        setBlocks(newBlocks);
+        pushState({ blocks: newBlocks, productColumns });
+        setSelectedBlock(pastedBlock.id);
+        return;
+      }
+
+      // Select All: Ctrl+A
+      if (ctrlKey && e.key === 'a') {
+        e.preventDefault();
+        // Select first block if none selected, or keep current selection
+        if (blocks.length > 0 && !selectedBlock) {
+          setSelectedBlock(blocks[0].id);
+        }
+        return;
+      }
+
+      // Delete: Delete or Backspace
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlock && !isInput) {
+        e.preventDefault();
+        removeBlock(selectedBlock);
+        return;
+      }
+
+      // Escape: Unselect block
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSelectedBlock(null);
+        setShowShortcutsHelp(false);
+        return;
+      }
+
+      // Arrow keys: Move selected block
+      if (selectedBlock && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        const block = blocks.find(b => b.id === selectedBlock);
+        if (!block) return;
+
+        const step = e.shiftKey ? 10 / MM_TO_PX : 1 / MM_TO_PX;
+        let newX = block.x;
+        let newY = block.y;
+
+        switch (e.key) {
+          case 'ArrowUp':
+            newY = Math.max(0, block.y - step);
+            break;
+          case 'ArrowDown':
+            newY = Math.min(A4_HEIGHT - block.height, block.y + step);
+            break;
+          case 'ArrowLeft':
+            newX = Math.max(0, block.x - step);
+            break;
+          case 'ArrowRight':
+            newX = Math.min(A4_WIDTH - block.width, block.x + step);
+            break;
+        }
+
+        const newBlocks = blocks.map(b =>
+          b.id === selectedBlock ? { ...b, x: Math.round(newX), y: Math.round(newY) } : b
+        );
+        setBlocks(newBlocks);
+        pushState({ blocks: newBlocks, productColumns });
+        return;
+      }
+
+      // Spacebar: Focus canvas
+      if (e.key === ' ' && !isInput && document.activeElement !== canvasRef.current) {
+        e.preventDefault();
+        canvasRef.current?.focus();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, canUndo, canRedo, editingText, selectedBlock, blocks, productColumns, removeBlock, duplicateBlock, handleSave]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, blockId: string) => {
     if ((e.target as HTMLElement).closest('.resize-handle') || editingText) return;
@@ -108,6 +336,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
       y: e.clientY - (rect.top + block.y * MM_TO_PX),
     };
 
+    dragStartRef.current = { blocks: [...blocks], blockId };
     setDraggingBlock(blockId);
     setSelectedBlock(blockId);
   }, [blocks, editingText]);
@@ -131,6 +360,10 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
       const block = blocks.find(b => b.id === resizingBlock);
       if (!block) return;
 
+      if (!resizeStartRef.current) {
+        resizeStartRef.current = { blocks: [...blocks], blockId: resizingBlock };
+      }
+
       const newWidth = Math.max(20, (e.clientX - rect.left) / MM_TO_PX - block.x);
       const newHeight = Math.max(10, (e.clientY - rect.top) / MM_TO_PX - block.y);
 
@@ -143,9 +376,31 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   }, [draggingBlock, resizingBlock, blocks]);
 
   const handleMouseUp = useCallback(() => {
+    if (draggingBlock && dragStartRef.current) {
+      const changed = blocks.some(b => {
+        const orig = dragStartRef.current!.blocks.find(ob => ob.id === b.id);
+        return !orig || b.x !== orig.x || b.y !== orig.y;
+      });
+      if (changed) {
+        pushState({ blocks, productColumns });
+      }
+      dragStartRef.current = null;
+    }
+
+    if (resizingBlock && resizeStartRef.current) {
+      const changed = blocks.some(b => {
+        const orig = resizeStartRef.current!.blocks.find(ob => ob.id === b.id);
+        return !orig || b.width !== orig.width || b.height !== orig.height;
+      });
+      if (changed) {
+        pushState({ blocks, productColumns });
+      }
+      resizeStartRef.current = null;
+    }
+
     setDraggingBlock(null);
     setResizingBlock(null);
-  }, []);
+  }, [blocks, productColumns, draggingBlock, resizingBlock, pushState]);
 
   const addBlock = (type: BlockType) => {
     const maxZ = blocks.reduce((max, b) => Math.max(max, b.zIndex || 0), 0);
@@ -170,17 +425,16 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
       style: d.style,
       zIndex: maxZ + 1,
     };
-    setBlocks([...blocks, newBlock]);
+    const newBlocks = [...blocks, newBlock];
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
     setShowAddBlock(false);
   };
 
-  const removeBlock = (id: string) => {
-    setBlocks(blocks.filter(b => b.id !== id));
-    setSelectedBlock(null);
-  };
-
   const updateBlockContent = (id: string, content: string) => {
-    setBlocks(blocks.map(b => b.id === id ? { ...b, content } : b));
+    const newBlocks = blocks.map(b => b.id === id ? { ...b, content } : b);
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
     setEditingText(null);
   };
 
@@ -193,15 +447,21 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
       visible: true,
       order: productColumns.length,
     };
-    setProductColumns([...productColumns, newColumn]);
+    const newColumns = [...productColumns, newColumn];
+    setProductColumns(newColumns);
+    pushState({ blocks, productColumns: newColumns });
   };
 
   const updateColumn = (id: string, field: keyof TableColumn, value: string | number | boolean) => {
-    setProductColumns(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
+    const newColumns = productColumns.map(c => c.id === id ? { ...c, [field]: value } : c);
+    setProductColumns(newColumns);
+    pushState({ blocks, productColumns: newColumns });
   };
 
   const removeColumn = (id: string) => {
-    setProductColumns(productColumns.filter(c => c.id !== id));
+    const newColumns = productColumns.filter(c => c.id !== id);
+    setProductColumns(newColumns);
+    pushState({ blocks, productColumns: newColumns });
   };
 
   const moveColumn = (id: string, direction: 'up' | 'down') => {
@@ -215,19 +475,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
       [sorted[index + 1].order, sorted[index].order] = [sorted[index].order, sorted[index + 1].order];
     }
     setProductColumns(sorted);
-  };
-
-  const handleSave = () => {
-    const updatedTemplate: QuotationTemplate = {
-      ...template,
-      id: template.id || generateId(),
-      name: templateName,
-      description: templateDescription,
-      blocks,
-      productColumns,
-      updatedAt: new Date().toISOString(),
-    };
-    onSave(updatedTemplate);
+    pushState({ blocks, productColumns: sorted });
   };
 
   const startTextEdit = (block: TemplateBlock) => {
@@ -371,15 +619,12 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
         return (
           <div className="text-xs">
             <div className="font-semibold mb-1">Terms & Conditions:</div>
-            <ol className="list-decimal list-inside space-y-0.5">
-              <li>Quotation valid for 30 days</li>
-              <li>50% advance, balance before delivery</li>
-            </ol>
+            <div className="whitespace-pre-wrap">{content || '1. Quotation valid for 30 days\n2. 50% advance, balance before delivery'}</div>
           </div>
         );
 
       case 'footer_notes':
-        return <div className="text-xs text-center text-gray-600">Thank you for your business!</div>;
+        return <div className="text-xs text-center text-gray-600 whitespace-pre-wrap">{content || 'Thank you for your business!'}</div>;
 
       case 'totals':
         return (
@@ -492,6 +737,71 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             rows={2}
             placeholder="Template description..."
           />
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => {
+                isUndoRedoRef.current = true;
+                undo();
+              }}
+              disabled={!canUndo}
+              className={`flex-1 px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${
+                canUndo
+                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
+                  : 'bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-200'
+              }`}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" /> Undo
+            </button>
+            <button
+              onClick={() => {
+                isUndoRedoRef.current = true;
+                redo();
+              }}
+              disabled={!canRedo}
+              className={`flex-1 px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${
+                canRedo
+                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
+                  : 'bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-200'
+              }`}
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 className="w-4 h-4" /> Redo
+            </button>
+            <button
+              onClick={() => setShowShortcutsHelp(!showShortcutsHelp)}
+              className={`px-2 py-1.5 rounded-md text-sm transition-colors ${
+                showShortcutsHelp
+                  ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
+              }`}
+              title="Keyboard Shortcuts"
+            >
+              <Keyboard className="w-4 h-4" />
+            </button>
+          </div>
+          {showShortcutsHelp && (
+            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold text-gray-700">Keyboard Shortcuts</span>
+                <button onClick={() => setShowShortcutsHelp(false)} className="p-0.5 hover:bg-gray-200 rounded">
+                  <X className="w-3 h-3 text-gray-500" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-gray-600">
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+Z</kbd> Undo</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+D</kbd> Duplicate</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+Y</kbd> Redo</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Del</kbd> Delete</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+C</kbd> Copy</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+S</kbd> Save</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+V</kbd> Paste</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Esc</kbd> Unselect</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">↑↓←→</kbd> Move 1px</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Shift+↑↓←→</kbd> Move 10px</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-b">
@@ -615,8 +925,12 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
       {/* Main Canvas Area */}
       <div className="flex-1 overflow-auto p-8 bg-gray-200 flex items-start justify-center">
         <div
-          ref={containerRef}
-          className="bg-white shadow-2xl relative"
+          ref={(node) => {
+            containerRef.current = node;
+            canvasRef.current = node;
+          }}
+          tabIndex={0}
+          className="bg-white shadow-2xl relative outline-none"
           style={{
             width: A4_WIDTH * MM_TO_PX,
             height: A4_HEIGHT * MM_TO_PX,
@@ -639,7 +953,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           {blocks.filter(b => b.visible).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map(block => (
             <div
               key={block.id}
-              className={`absolute ${block.locked ? 'cursor-default' : 'cursor-move'} overflow-hidden ${
+              className={`absolute ${block.locked ? 'cursor-default' : 'cursor-move'} overflow-visible ${
                 selectedBlock === block.id ? 'ring-2 ring-blue-500' : ''
               } ${draggingBlock === block.id ? 'opacity-80' : ''}`}
               style={{
@@ -650,12 +964,43 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               }}
               onMouseDown={(e) => handleMouseDown(e, block.id)}
             >
-              {renderBlockContent(block)}
+              <div className="w-full h-full overflow-hidden">
+                {renderBlockContent(block)}
+              </div>
 
               {/* Lock indicator */}
               {block.locked && (
                 <div className="absolute top-0 right-0 p-0.5 bg-amber-100 rounded-bl">
                   <Lock className="w-3 h-3 text-amber-600" />
+                </div>
+              )}
+
+              {/* Floating Action Toolbar */}
+              {selectedBlock === block.id && !draggingBlock && !resizingBlock && (
+                <div
+                  className="absolute -top-10 left-0 flex gap-1 bg-white shadow-lg rounded-md p-1 border border-gray-200 z-50"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      duplicateBlock(block.id);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                    title="Duplicate Block"
+                  >
+                    <Copy className="w-3 h-3" /> Duplicate
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeBlock(block.id);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors"
+                    title="Delete Block"
+                  >
+                    <Trash2 className="w-3 h-3" /> Delete
+                  </button>
                 </div>
               )}
 
@@ -699,6 +1044,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         onChange={(e) => setBlocks(prev => prev.map(b =>
                           b.id === selectedBlock ? { ...b, x: Number(e.target.value) } : b
                         ))}
+                        onBlur={() => pushState({ blocks, productColumns })}
                         className="w-full px-2 py-1 border rounded text-sm"
                       />
                     </div>
@@ -710,6 +1056,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         onChange={(e) => setBlocks(prev => prev.map(b =>
                           b.id === selectedBlock ? { ...b, y: Number(e.target.value) } : b
                         ))}
+                        onBlur={() => pushState({ blocks, productColumns })}
                         className="w-full px-2 py-1 border rounded text-sm"
                       />
                     </div>
@@ -726,6 +1073,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         onChange={(e) => setBlocks(prev => prev.map(b =>
                           b.id === selectedBlock ? { ...b, width: Number(e.target.value) } : b
                         ))}
+                        onBlur={() => pushState({ blocks, productColumns })}
                         className="w-full px-2 py-1 border rounded text-sm"
                       />
                     </div>
@@ -739,6 +1087,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         onChange={(e) => setBlocks(prev => prev.map(b =>
                           b.id === selectedBlock ? { ...b, height: Number(e.target.value) } : b
                         ))}
+                        onBlur={() => pushState({ blocks, productColumns })}
                         className="w-full px-2 py-1 border rounded text-sm"
                       />
                     </div>
@@ -749,9 +1098,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                       type="checkbox"
                       id="visible"
                       checked={block.visible}
-                      onChange={(e) => setBlocks(prev => prev.map(b =>
-                        b.id === selectedBlock ? { ...b, visible: e.target.checked } : b
-                      ))}
+                      onChange={(e) => {
+                        const newBlocks = blocks.map(b =>
+                          b.id === selectedBlock ? { ...b, visible: e.target.checked } : b
+                        );
+                        setBlocks(newBlocks);
+                        pushState({ blocks: newBlocks, productColumns });
+                      }}
                     />
                     <label htmlFor="visible" className="text-sm">Visible</label>
                   </div>
@@ -764,6 +1117,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         onChange={(e) => setBlocks(prev => prev.map(b =>
                           b.id === selectedBlock ? { ...b, content: e.target.value } : b
                         ))}
+                        onBlur={() => pushState({ blocks, productColumns })}
                         className="w-full px-2 py-1 border rounded text-sm resize-none"
                         rows={3}
                       />
@@ -778,9 +1132,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         <input
                           type="checkbox"
                           checked={block.style?.filled || false}
-                          onChange={(e) => setBlocks(prev => prev.map(b =>
-                            b.id === selectedBlock ? { ...b, style: { ...b.style, filled: e.target.checked } } : b
-                          ))}
+                          onChange={(e) => {
+                            const newBlocks = blocks.map(b =>
+                              b.id === selectedBlock ? { ...b, style: { ...b.style, filled: e.target.checked } } : b
+                            );
+                            setBlocks(newBlocks);
+                            pushState({ blocks: newBlocks, productColumns });
+                          }}
                         />
                         Filled background
                       </label>
@@ -794,6 +1152,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                           onChange={(e) => setBlocks(prev => prev.map(b =>
                             b.id === selectedBlock ? { ...b, style: { ...b.style, borderWidth: Number(e.target.value) } } : b
                           ))}
+                          onBlur={() => pushState({ blocks, productColumns })}
                           className="w-full px-2 py-1 border rounded text-sm"
                         />
                       </div>
@@ -802,9 +1161,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         <input
                           type="color"
                           value={block.style?.borderColor || '#000000'}
-                          onChange={(e) => setBlocks(prev => prev.map(b =>
-                            b.id === selectedBlock ? { ...b, style: { ...b.style, borderColor: e.target.value } } : b
-                          ))}
+                          onChange={(e) => {
+                            const newBlocks = blocks.map(b =>
+                              b.id === selectedBlock ? { ...b, style: { ...b.style, borderColor: e.target.value } } : b
+                            );
+                            setBlocks(newBlocks);
+                            pushState({ blocks: newBlocks, productColumns });
+                          }}
                           className="w-full h-8 border rounded"
                         />
                       </div>
@@ -813,9 +1176,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         <input
                           type="color"
                           value={block.style?.backgroundColor || '#ffffff'}
-                          onChange={(e) => setBlocks(prev => prev.map(b =>
-                            b.id === selectedBlock ? { ...b, style: { ...b.style, backgroundColor: e.target.value } } : b
-                          ))}
+                          onChange={(e) => {
+                            const newBlocks = blocks.map(b =>
+                              b.id === selectedBlock ? { ...b, style: { ...b.style, backgroundColor: e.target.value } } : b
+                            );
+                            setBlocks(newBlocks);
+                            pushState({ blocks: newBlocks, productColumns });
+                          }}
                           className="w-full h-8 border rounded"
                         />
                       </div>
@@ -829,6 +1196,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                           onChange={(e) => setBlocks(prev => prev.map(b =>
                             b.id === selectedBlock ? { ...b, style: { ...b.style, borderRadius: Number(e.target.value) } } : b
                           ))}
+                          onBlur={() => pushState({ blocks, productColumns })}
                           className="w-full px-2 py-1 border rounded text-sm"
                         />
                       </div>
@@ -849,6 +1217,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                           onChange={(e) => setBlocks(prev => prev.map(b =>
                             b.id === selectedBlock ? { ...b, style: { ...b.style, thickness: Number(e.target.value) } } : b
                           ))}
+                          onBlur={() => pushState({ blocks, productColumns })}
                           className="w-full px-2 py-1 border rounded text-sm"
                         />
                       </div>
@@ -857,9 +1226,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         <input
                           type="color"
                           value={block.style?.color || '#000000'}
-                          onChange={(e) => setBlocks(prev => prev.map(b =>
-                            b.id === selectedBlock ? { ...b, style: { ...b.style, color: e.target.value } } : b
-                          ))}
+                          onChange={(e) => {
+                            const newBlocks = blocks.map(b =>
+                              b.id === selectedBlock ? { ...b, style: { ...b.style, color: e.target.value } } : b
+                            );
+                            setBlocks(newBlocks);
+                            pushState({ blocks: newBlocks, productColumns });
+                          }}
                           className="w-full h-8 border rounded"
                         />
                       </div>
@@ -869,9 +1242,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                   {/* Lock / Unlock */}
                   <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
                     <button
-                      onClick={() => setBlocks(prev => prev.map(b =>
-                        b.id === selectedBlock ? { ...b, locked: !b.locked } : b
-                      ))}
+                      onClick={() => {
+                        const newBlocks = blocks.map(b =>
+                          b.id === selectedBlock ? { ...b, locked: !b.locked } : b
+                        );
+                        setBlocks(newBlocks);
+                        pushState({ blocks: newBlocks, productColumns });
+                      }}
                       className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors"
                       style={{
                         backgroundColor: block.locked ? '#fef3c7' : '#f3f4f6',
@@ -891,47 +1268,53 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                     <label className="block text-xs font-medium text-gray-600 mb-1">Layer Order</label>
                     <div className="grid grid-cols-2 gap-1">
                       <button
-                        onClick={() => setBlocks(prev => {
-                          const sorted = [...prev].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+                        onClick={() => {
+                          const sorted = [...blocks].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
                           const idx = sorted.findIndex(b => b.id === selectedBlock);
                           if (idx < sorted.length - 1) {
                             [sorted[idx], sorted[idx + 1]] = [sorted[idx + 1], sorted[idx]];
-                            return sorted.map((b, i) => ({ ...b, zIndex: i }));
+                            const newBlocks = sorted.map((b, i) => ({ ...b, zIndex: i }));
+                            setBlocks(newBlocks);
+                            pushState({ blocks: newBlocks, productColumns });
                           }
-                          return prev;
-                        })}
+                        }}
                         className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                       >
                         <ArrowUp className="w-3 h-3" /> Forward
                       </button>
                       <button
-                        onClick={() => setBlocks(prev => {
-                          const sorted = [...prev].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+                        onClick={() => {
+                          const sorted = [...blocks].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
                           const idx = sorted.findIndex(b => b.id === selectedBlock);
                           if (idx > 0) {
                             [sorted[idx], sorted[idx - 1]] = [sorted[idx - 1], sorted[idx]];
-                            return sorted.map((b, i) => ({ ...b, zIndex: i }));
+                            const newBlocks = sorted.map((b, i) => ({ ...b, zIndex: i }));
+                            setBlocks(newBlocks);
+                            pushState({ blocks: newBlocks, productColumns });
                           }
-                          return prev;
-                        })}
+                        }}
                         className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                       >
                         <ArrowDown className="w-3 h-3" /> Backward
                       </button>
                       <button
-                        onClick={() => setBlocks(prev => {
-                          const maxZ = prev.reduce((max, b) => Math.max(max, b.zIndex || 0), 0);
-                          return prev.map(b => b.id === selectedBlock ? { ...b, zIndex: maxZ + 1 } : b);
-                        })}
+                        onClick={() => {
+                          const maxZ = blocks.reduce((max, b) => Math.max(max, b.zIndex || 0), 0);
+                          const newBlocks = blocks.map(b => b.id === selectedBlock ? { ...b, zIndex: maxZ + 1 } : b);
+                          setBlocks(newBlocks);
+                          pushState({ blocks: newBlocks, productColumns });
+                        }}
                         className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                       >
                         <ChevronsUp className="w-3 h-3" /> To Front
                       </button>
                       <button
-                        onClick={() => setBlocks(prev => {
-                          const minZ = prev.reduce((min, b) => Math.min(min, b.zIndex || 0), 0);
-                          return prev.map(b => b.id === selectedBlock ? { ...b, zIndex: minZ - 1 } : b);
-                        })}
+                        onClick={() => {
+                          const minZ = blocks.reduce((min, b) => Math.min(min, b.zIndex || 0), 0);
+                          const newBlocks = blocks.map(b => b.id === selectedBlock ? { ...b, zIndex: minZ - 1 } : b);
+                          setBlocks(newBlocks);
+                          pushState({ blocks: newBlocks, productColumns });
+                        }}
                         className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                       >
                         <ChevronsDown className="w-3 h-3" /> To Back
