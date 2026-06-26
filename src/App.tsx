@@ -14,7 +14,7 @@ import { InvoiceForm } from './components/InvoiceForm';
 import { InvoiceList } from './components/InvoiceList';
 import { NumberingSettingsPanel } from './components/NumberingSettings';
 import { exportTemplatePDF } from './utils/templatePdfExport';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Video as LucideIcon, Receipt } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, type LucideIcon } from 'lucide-react';
 
 type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice';
 
@@ -287,7 +287,10 @@ function App() {
       ? storage.getTemplateById(editingInvoice.selectedTemplateId)
       : storage.getDefaultTemplate();
     if (template) {
-      setPreviewingTemplate(template);
+      const templateWithColumns = editingInvoice.productColumns
+        ? { ...template, productColumns: editingInvoice.productColumns }
+        : template;
+      setPreviewingTemplate(templateWithColumns);
     }
   };
 
@@ -306,6 +309,7 @@ function App() {
       grandTotal: 0,
       status: 'Draft',
       selectedTemplateId: selectedTemplateId || undefined,
+      productColumns: getDefaultProductColumns(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

@@ -1,4 +1,4 @@
-import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate } from '../types';
+import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn } from '../types';
 import { CustomerDetails } from './CustomerDetails';
 import { ProductTable } from './ProductTable';
 import { Save, FileDown, Eye, Calendar, AlertCircle, Package } from 'lucide-react';
@@ -37,6 +37,7 @@ export function InvoiceForm({
   const update = (patch: Partial<Invoice>) => onChange({ ...invoice, ...patch });
   const updateCustomer = (customer: Customer) => update({ customer });
   const updateProducts = (products: Product[]) => update({ products });
+  const updateProductColumns = (productColumns: TableColumn[]) => update({ productColumns });
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -112,7 +113,7 @@ export function InvoiceForm({
       <CustomerDetails customer={invoice.customer} onChange={updateCustomer} />
 
       {/* Product table (reusing ProductTable component) */}
-      <ProductTable products={invoice.products} onChange={updateProducts} catalog={catalog} />
+      <ProductTable products={invoice.products} onChange={updateProducts} catalog={catalog} columns={invoice.productColumns} onColumnsChange={updateProductColumns} />
 
       {/* Notes */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

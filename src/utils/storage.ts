@@ -1,4 +1,4 @@
-import { CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn, BlockType, Invoice, NumberingSettings } from '../types';
+import { CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn, BlockType, Invoice, NumberingSettings, TemplateBlock } from '../types';
 
 const STORAGE_KEYS = {
   COMPANY_PROFILE: 'solar_company_profile',
@@ -117,7 +117,17 @@ export const storage = {
   // Templates
   getTemplates: (): QuotationTemplate[] => {
     const data = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
-    return data ? JSON.parse(data) : getDefaultTemplates();
+    if (!data) return getDefaultTemplates();
+    const stored: QuotationTemplate[] = JSON.parse(data);
+    const defaults = getDefaultTemplates();
+    const existingIds = new Set(stored.map(t => t.id));
+    const missing = defaults.filter(t => !existingIds.has(t.id));
+    if (missing.length > 0) {
+      const merged = [...stored, ...missing];
+      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(merged));
+      return merged;
+    }
+    return stored;
   },
 
   saveTemplates: (templates: QuotationTemplate[]): void => {
@@ -284,6 +294,7 @@ export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
     sourceQuotationId: quotation.id,
     sourceQuotationNumber: quotation.quotationNumber,
     selectedTemplateId: quotation.selectedTemplateId,
+    productColumns: quotation.productColumns,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -315,29 +326,227 @@ export const getDefaultProductColumns = (): TableColumn[] => [
 ];
 
 const getDefaultTemplates = (): QuotationTemplate[] => {
-  const templateId = generateId();
-  return [{
-    id: templateId,
-    name: 'Professional Solar Quotation',
-    description: 'Default professional template for solar quotations',
-    isDefault: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    productColumns: getDefaultProductColumns(),
-    blocks: [
-      { id: 'block_logo', type: 'company_logo' as BlockType, x: 10, y: 10, width: 30, height: 25, visible: true },
-      { id: 'block_company', type: 'company_details' as BlockType, x: 45, y: 10, width: 110, height: 30, visible: true },
-      { id: 'block_qtn_no', type: 'quotation_number' as BlockType, x: 160, y: 10, width: 40, height: 12, visible: true },
-      { id: 'block_qtn_date', type: 'quotation_date' as BlockType, x: 160, y: 24, width: 40, height: 12, visible: true },
-      { id: 'block_customer', type: 'customer_details' as BlockType, x: 10, y: 45, width: 90, height: 35, visible: true },
-      { id: 'block_products', type: 'product_table' as BlockType, x: 10, y: 85, width: 190, height: 80, visible: true },
-      { id: 'block_gst', type: 'gst_summary' as BlockType, x: 10, y: 170, width: 110, height: 30, visible: true },
-      { id: 'block_totals', type: 'totals' as BlockType, x: 130, y: 170, width: 70, height: 30, visible: true },
-      { id: 'block_bank', type: 'bank_details' as BlockType, x: 10, y: 210, width: 100, height: 25, visible: true },
-      { id: 'block_terms', type: 'terms_conditions' as BlockType, x: 10, y: 240, width: 100, height: 35, visible: true },
-      { id: 'block_signature', type: 'signature_box' as BlockType, x: 140, y: 230, width: 60, height: 35, visible: true },
-    ],
-  }];
+  const now = new Date().toISOString();
+  const stdCols = getDefaultProductColumns();
+
+  // Template 2: Tally/Vyapar style - full borders, company left, quote number right
+  const tallyCols = getDefaultProductColumns();
+  const tallyBlocks: TemplateBlock[] = [
+    { id: 't2_rect_outer', type: 'rectangle', x: 8, y: 8, width: 194, height: 281, visible: true, style: { borderWidth: 1, borderColor: '#000000', filled: false, borderRadius: 0 } },
+    { id: 't2_hline_top', type: 'horizontal_line', x: 8, y: 38, width: 194, height: 2, visible: true, style: { thickness: 1, color: '#000000' } },
+    { id: 't2_vline_hdr', type: 'vertical_line', x: 105, y: 8, width: 2, height: 30, visible: true, style: { thickness: 1, color: '#000000' } },
+    { id: 't2_logo', type: 'company_logo', x: 12, y: 12, width: 25, height: 20, visible: true },
+    { id: 't2_company', type: 'company_details', x: 40, y: 12, width: 60, height: 22, visible: true },
+    { id: 't2_qtn_no', type: 'quotation_number', x: 110, y: 12, width: 88, height: 10, visible: true },
+    { id: 't2_qtn_date', type: 'quotation_date', x: 110, y: 24, width: 88, height: 10, visible: true },
+    { id: 't2_hline_cust', type: 'horizontal_line', x: 8, y: 68, width: 194, height: 2, visible: true, style: { thickness: 1, color: '#000000' } },
+    { id: 't2_customer', type: 'customer_details', x: 12, y: 42, width: 90, height: 25, visible: true },
+    { id: 't2_vline_cust', type: 'vertical_line', x: 105, y: 38, width: 2, height: 30, visible: true, style: { thickness: 1, color: '#000000' } },
+    { id: 't2_text_party', type: 'text_block', x: 110, y: 42, width: 88, height: 8, visible: true, content: 'Party Details' },
+    { id: 't2_products', type: 'product_table', x: 10, y: 72, width: 190, height: 80, visible: true },
+    { id: 't2_hline_mid', type: 'horizontal_line', x: 8, y: 155, width: 194, height: 2, visible: true, style: { thickness: 1, color: '#000000' } },
+    { id: 't2_gst', type: 'gst_summary', x: 10, y: 158, width: 110, height: 30, visible: true },
+    { id: 't2_totals', type: 'totals', x: 125, y: 158, width: 75, height: 30, visible: true },
+    { id: 't2_hline_bank', type: 'horizontal_line', x: 8, y: 195, width: 194, height: 2, visible: true, style: { thickness: 1, color: '#000000' } },
+    { id: 't2_bank', type: 'bank_details', x: 12, y: 200, width: 90, height: 25, visible: true },
+    { id: 't2_terms', type: 'terms_conditions', x: 12, y: 230, width: 90, height: 35, visible: true },
+    { id: 't2_signature', type: 'signature_box', x: 130, y: 225, width: 65, height: 35, visible: true },
+    { id: 't2_footer', type: 'footer_notes', x: 10, y: 270, width: 190, height: 10, visible: true },
+  ];
+
+  // Template 3: Minimal - clean, few dividers
+  const minimalBlocks: TemplateBlock[] = [
+    { id: 't3_company', type: 'company_details', x: 10, y: 15, width: 120, height: 25, visible: true },
+    { id: 't3_qtn_no', type: 'quotation_number', x: 145, y: 15, width: 55, height: 10, visible: true },
+    { id: 't3_qtn_date', type: 'quotation_date', x: 145, y: 28, width: 55, height: 10, visible: true },
+    { id: 't3_divider1', type: 'divider', x: 10, y: 45, width: 190, height: 4, visible: true, style: { thickness: 1, color: '#cccccc' } },
+    { id: 't3_customer', type: 'customer_details', x: 10, y: 52, width: 100, height: 25, visible: true },
+    { id: 't3_products', type: 'product_table', x: 10, y: 82, width: 190, height: 80, visible: true },
+    { id: 't3_totals', type: 'totals', x: 120, y: 168, width: 80, height: 30, visible: true },
+    { id: 't3_divider2', type: 'divider', x: 10, y: 205, width: 190, height: 4, visible: true, style: { thickness: 1, color: '#cccccc' } },
+    { id: 't3_bank', type: 'bank_details', x: 10, y: 212, width: 90, height: 20, visible: true },
+    { id: 't3_signature', type: 'signature_box', x: 140, y: 212, width: 60, height: 25, visible: true },
+    { id: 't3_footer', type: 'footer_notes', x: 10, y: 250, width: 190, height: 10, visible: true },
+  ];
+
+  // Template 4: Solar Installation - panel/inverter/subsidy/system size sections
+  const solarBlocks: TemplateBlock[] = [
+    { id: 't4_logo', type: 'company_logo', x: 10, y: 10, width: 28, height: 22, visible: true },
+    { id: 't4_company', type: 'company_details', x: 42, y: 10, width: 100, height: 25, visible: true },
+    { id: 't4_qtn_no', type: 'quotation_number', x: 150, y: 10, width: 50, height: 10, visible: true },
+    { id: 't4_qtn_date', type: 'quotation_date', x: 150, y: 22, width: 50, height: 10, visible: true },
+    { id: 't4_rect_sys', type: 'rectangle', x: 10, y: 40, width: 190, height: 20, visible: true, style: { borderWidth: 1, borderColor: '#f59e0b', filled: true, backgroundColor: '#fffbeb', borderRadius: 4 } },
+    { id: 't4_text_sys', type: 'text_block', x: 14, y: 43, width: 182, height: 14, visible: true, content: 'System Size: {{system_size}} | Panel: {{panel_details}} | Inverter: {{inverter_details}}' },
+    { id: 't4_customer', type: 'customer_details', x: 10, y: 65, width: 90, height: 25, visible: true },
+    { id: 't4_rect_sub', type: 'rectangle', x: 110, y: 65, width: 90, height: 25, visible: true, style: { borderWidth: 1, borderColor: '#10b981', filled: true, backgroundColor: '#ecfdf5', borderRadius: 4 } },
+    { id: 't4_text_sub', type: 'text_block', x: 114, y: 68, width: 82, height: 18, visible: true, content: 'Subsidy: {{subsidy_amount}}\nNet Price: {{net_price}}' },
+    { id: 't4_products', type: 'product_table', x: 10, y: 95, width: 190, height: 80, visible: true },
+    { id: 't4_gst', type: 'gst_summary', x: 10, y: 180, width: 110, height: 30, visible: true },
+    { id: 't4_totals', type: 'totals', x: 130, y: 180, width: 70, height: 30, visible: true },
+    { id: 't4_bank', type: 'bank_details', x: 10, y: 215, width: 90, height: 25, visible: true },
+    { id: 't4_terms', type: 'terms_conditions', x: 10, y: 245, width: 90, height: 30, visible: true },
+    { id: 't4_signature', type: 'signature_box', x: 140, y: 235, width: 60, height: 35, visible: true },
+  ];
+
+  // Template 5: Premium Modern - rounded sections, clean
+  const premiumBlocks: TemplateBlock[] = [
+    { id: 't5_rect_hdr', type: 'rectangle', x: 10, y: 10, width: 190, height: 35, visible: true, style: { borderWidth: 0, filled: true, backgroundColor: '#f0f4ff', borderRadius: 8 } },
+    { id: 't5_logo', type: 'company_logo', x: 15, y: 14, width: 25, height: 22, visible: true },
+    { id: 't5_company', type: 'company_details', x: 44, y: 14, width: 100, height: 25, visible: true },
+    { id: 't5_qtn_no', type: 'quotation_number', x: 150, y: 16, width: 50, height: 10, visible: true },
+    { id: 't5_qtn_date', type: 'quotation_date', x: 150, y: 28, width: 50, height: 10, visible: true },
+    { id: 't5_rect_cust', type: 'rectangle', x: 10, y: 50, width: 90, height: 30, visible: true, style: { borderWidth: 0, filled: true, backgroundColor: '#f9fafb', borderRadius: 6 } },
+    { id: 't5_customer', type: 'customer_details', x: 14, y: 53, width: 82, height: 25, visible: true },
+    { id: 't5_rect_tot_top', type: 'rectangle', x: 110, y: 50, width: 90, height: 30, visible: true, style: { borderWidth: 0, filled: true, backgroundColor: '#f9fafb', borderRadius: 6 } },
+    { id: 't5_text_summary', type: 'text_block', x: 114, y: 53, width: 82, height: 25, visible: true, content: 'Quotation Summary\n{{quotation_no}}\n{{date}}' },
+    { id: 't5_products', type: 'product_table', x: 10, y: 85, width: 190, height: 80, visible: true },
+    { id: 't5_gst', type: 'gst_summary', x: 10, y: 170, width: 110, height: 30, visible: true },
+    { id: 't5_rect_totals', type: 'rectangle', x: 125, y: 170, width: 75, height: 30, visible: true, style: { borderWidth: 0, filled: true, backgroundColor: '#f0f4ff', borderRadius: 6 } },
+    { id: 't5_totals', type: 'totals', x: 128, y: 172, width: 70, height: 28, visible: true },
+    { id: 't5_rect_bank', type: 'rectangle', x: 10, y: 205, width: 90, height: 28, visible: true, style: { borderWidth: 0, filled: true, backgroundColor: '#f9fafb', borderRadius: 6 } },
+    { id: 't5_bank', type: 'bank_details', x: 14, y: 208, width: 82, height: 23, visible: true },
+    { id: 't5_rect_sig', type: 'rectangle', x: 130, y: 205, width: 70, height: 28, visible: true, style: { borderWidth: 0, filled: true, backgroundColor: '#f9fafb', borderRadius: 6 } },
+    { id: 't5_signature', type: 'signature_box', x: 134, y: 208, width: 62, height: 23, visible: true },
+    { id: 't5_footer', type: 'footer_notes', x: 10, y: 250, width: 190, height: 10, visible: true },
+  ];
+
+  // Template 6: Service Quotation - no HSN, no quantity
+  const serviceCols: TableColumn[] = [
+    { id: 'svc_1', key: 'sno', label: '#', width: 8, visible: true, order: 0 },
+    { id: 'svc_2', key: 'name', label: 'Service Description', width: 55, visible: true, order: 1 },
+    { id: 'svc_3', key: 'gstPercent', label: 'GST%', width: 12, visible: true, order: 2 },
+    { id: 'svc_4', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 3 },
+    { id: 'svc_5', key: 'amount', label: 'Amount', width: 13, visible: true, order: 4 },
+  ];
+  const serviceBlocks: TemplateBlock[] = [
+    { id: 't6_logo', type: 'company_logo', x: 10, y: 10, width: 28, height: 22, visible: true },
+    { id: 't6_company', type: 'company_details', x: 42, y: 10, width: 110, height: 25, visible: true },
+    { id: 't6_qtn_no', type: 'quotation_number', x: 155, y: 12, width: 45, height: 10, visible: true },
+    { id: 't6_qtn_date', type: 'quotation_date', x: 155, y: 24, width: 45, height: 10, visible: true },
+    { id: 't6_divider1', type: 'divider', x: 10, y: 40, width: 190, height: 4, visible: true, style: { thickness: 1, color: '#3b82f6' } },
+    { id: 't6_customer', type: 'customer_details', x: 10, y: 48, width: 100, height: 25, visible: true },
+    { id: 't6_text_svc', type: 'text_block', x: 120, y: 48, width: 80, height: 10, visible: true, content: 'Service Quotation' },
+    { id: 't6_products', type: 'product_table', x: 10, y: 80, width: 190, height: 80, visible: true },
+    { id: 't6_totals', type: 'totals', x: 120, y: 165, width: 80, height: 30, visible: true },
+    { id: 't6_divider2', type: 'divider', x: 10, y: 200, width: 190, height: 4, visible: true, style: { thickness: 1, color: '#3b82f6' } },
+    { id: 't6_bank', type: 'bank_details', x: 10, y: 208, width: 90, height: 22, visible: true },
+    { id: 't6_terms', type: 'terms_conditions', x: 10, y: 235, width: 90, height: 30, visible: true },
+    { id: 't6_signature', type: 'signature_box', x: 140, y: 225, width: 60, height: 35, visible: true },
+  ];
+
+  // Template 7: Wholesale Dealer - large table, discount column, transport charges
+  const wholesaleCols: TableColumn[] = [
+    { id: 'whl_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'whl_2', key: 'name', label: 'Product Name', width: 30, visible: true, order: 1 },
+    { id: 'whl_3', key: 'hsnCode', label: 'HSN', width: 10, visible: true, order: 2 },
+    { id: 'whl_4', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 3 },
+    { id: 'whl_5', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 4 },
+    { id: 'whl_6', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 5 },
+    { id: 'whl_7', key: 'amount', label: 'Amount', width: 12, visible: true, order: 6 },
+  ];
+  const wholesaleBlocks: TemplateBlock[] = [
+    { id: 't7_logo', type: 'company_logo', x: 10, y: 10, width: 25, height: 20, visible: true },
+    { id: 't7_company', type: 'company_details', x: 38, y: 10, width: 100, height: 22, visible: true },
+    { id: 't7_qtn_no', type: 'quotation_number', x: 145, y: 10, width: 55, height: 10, visible: true },
+    { id: 't7_qtn_date', type: 'quotation_date', x: 145, y: 22, width: 55, height: 10, visible: true },
+    { id: 't7_hline1', type: 'horizontal_line', x: 10, y: 36, width: 190, height: 2, visible: true, style: { thickness: 2, color: '#000000' } },
+    { id: 't7_text_dealer', type: 'text_block', x: 10, y: 40, width: 190, height: 8, visible: true, content: 'WHOLESALE DEALER QUOTATION' },
+    { id: 't7_customer', type: 'customer_details', x: 10, y: 52, width: 90, height: 22, visible: true },
+    { id: 't7_rect_transport', type: 'rectangle', x: 110, y: 52, width: 90, height: 22, visible: true, style: { borderWidth: 1, borderColor: '#000000', filled: false, borderRadius: 0 } },
+    { id: 't7_text_transport', type: 'text_block', x: 114, y: 55, width: 82, height: 16, visible: true, content: 'Transport Charges: {{transport_charges}}\nDelivery: {{delivery_terms}}' },
+    { id: 't7_products', type: 'product_table', x: 10, y: 78, width: 190, height: 100, visible: true },
+    { id: 't7_gst', type: 'gst_summary', x: 10, y: 182, width: 110, height: 30, visible: true },
+    { id: 't7_totals', type: 'totals', x: 130, y: 182, width: 70, height: 30, visible: true },
+    { id: 't7_hline2', type: 'horizontal_line', x: 10, y: 215, width: 190, height: 2, visible: true, style: { thickness: 1, color: '#000000' } },
+    { id: 't7_bank', type: 'bank_details', x: 10, y: 220, width: 90, height: 22, visible: true },
+    { id: 't7_terms', type: 'terms_conditions', x: 10, y: 245, width: 100, height: 30, visible: true },
+    { id: 't7_signature', type: 'signature_box', x: 140, y: 235, width: 60, height: 35, visible: true },
+  ];
+
+  return [
+    {
+      id: 'tpl_professional_default',
+      name: 'Professional Corporate',
+      description: 'Default professional template for solar quotations',
+      isDefault: true,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: stdCols,
+      blocks: [
+        { id: 'block_logo', type: 'company_logo' as BlockType, x: 10, y: 10, width: 30, height: 25, visible: true },
+        { id: 'block_company', type: 'company_details' as BlockType, x: 45, y: 10, width: 110, height: 30, visible: true },
+        { id: 'block_qtn_no', type: 'quotation_number' as BlockType, x: 160, y: 10, width: 40, height: 12, visible: true },
+        { id: 'block_qtn_date', type: 'quotation_date' as BlockType, x: 160, y: 24, width: 40, height: 12, visible: true },
+        { id: 'block_customer', type: 'customer_details' as BlockType, x: 10, y: 45, width: 90, height: 35, visible: true },
+        { id: 'block_products', type: 'product_table' as BlockType, x: 10, y: 85, width: 190, height: 80, visible: true },
+        { id: 'block_gst', type: 'gst_summary' as BlockType, x: 10, y: 170, width: 110, height: 30, visible: true },
+        { id: 'block_totals', type: 'totals' as BlockType, x: 130, y: 170, width: 70, height: 30, visible: true },
+        { id: 'block_bank', type: 'bank_details' as BlockType, x: 10, y: 210, width: 100, height: 25, visible: true },
+        { id: 'block_terms', type: 'terms_conditions' as BlockType, x: 10, y: 240, width: 100, height: 35, visible: true },
+        { id: 'block_signature', type: 'signature_box' as BlockType, x: 140, y: 230, width: 60, height: 35, visible: true },
+      ],
+    },
+    {
+      id: 'tpl_tally_vyapar',
+      name: 'Tally / Vyapar Style',
+      description: 'Full table borders with horizontal and vertical dividers, company left, quotation right',
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: tallyCols,
+      blocks: tallyBlocks,
+    },
+    {
+      id: 'tpl_minimal_clean',
+      name: 'Minimal Clean',
+      description: 'Simple clean layout with minimal dividers',
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: getDefaultProductColumns(),
+      blocks: minimalBlocks,
+    },
+    {
+      id: 'tpl_solar_installation',
+      name: 'Solar Installation',
+      description: 'Panel details, inverter details, subsidy section, and system size section',
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: getDefaultProductColumns(),
+      blocks: solarBlocks,
+    },
+    {
+      id: 'tpl_premium_modern',
+      name: 'Premium Modern',
+      description: 'Clean modern layout with rounded sections and professional styling',
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: getDefaultProductColumns(),
+      blocks: premiumBlocks,
+    },
+    {
+      id: 'tpl_service_quotation',
+      name: 'Service Quotation',
+      description: 'Service-based layout with no HSN code and no quantity column',
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: serviceCols,
+      blocks: serviceBlocks,
+    },
+    {
+      id: 'tpl_wholesale_dealer',
+      name: 'Wholesale Dealer',
+      description: 'Large product table with transport charges section',
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: wholesaleCols,
+      blocks: wholesaleBlocks,
+    },
+  ];
 };
 
 export const calculateProductAmount = (product: Product): number => {
