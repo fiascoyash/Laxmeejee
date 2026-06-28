@@ -180,17 +180,31 @@ function buildDocumentHTML(params: {
   const bodyTextColor = settings.bodyTextColor ?? '#000000';
   const tableHeaderTextColor = settings.tableHeaderTextColor ?? '#000000';
   const totalSectionColor = settings.totalSectionColor ?? '#000000';
+  const companyNameFontSize = settings.companyNameFontSize ?? 28;
+  const companyDetailsFontSize = settings.companyDetailsFontSize ?? 14;
+  const documentTitleFontSize = settings.documentTitleFontSize ?? 22;
+  const customerDetailsFontSize = settings.customerDetailsFontSize ?? 14;
+  const tableHeaderFontSize = settings.tableHeaderFontSize ?? 14;
+  const productRowFontSize = settings.productRowFontSize ?? 13;
+  const taxSummaryFontSize = settings.taxSummaryFontSize ?? 13;
+  const totalSectionFontSize = settings.totalSectionFontSize ?? 16;
+  const grandTotalFontSize = settings.grandTotalFontSize ?? 26;
+  const termsFontSize = settings.termsFontSize ?? 12;
+  const headerFontWeight = settings.headerFontWeight ?? 700;
+  const bodyFontWeight = settings.bodyFontWeight ?? 500;
+  const tableFontWeight = settings.tableFontWeight ?? 600;
+  const grandTotalFontWeight = settings.grandTotalFontWeight ?? 700;
   const logoHtml = company.logo ? `<img src="${company.logo}" alt="Logo" style="width:52px;height:42px;object-fit:contain;flex-shrink:0;${headerAlign === 'center' ? 'align-self:center;' : ''}" />` : '';
 
   const companyInfoInner = `
-    <div style="font-size:${theme.companyNameSize}px;font-weight:700;color:${headerTextColor};line-height:1.15;letter-spacing:-0.2px;">${company.companyName || 'Company Name'}</div>
+    <div style="font-size:${companyNameFontSize}px;font-weight:${headerFontWeight};color:${headerTextColor};line-height:1.15;letter-spacing:-0.2px;">${company.companyName || 'Company Name'}</div>
     ${company.address ? `<div style="font-size:10px;margin-top:3px;">${company.address}</div>` : ''}
     ${settings.showGstin && company.gstNumber ? `<div style="font-size:10px;margin-top:3px;">GSTIN <strong style="letter-spacing:0.3px;">${company.gstNumber}</strong></div>` : ''}
     ${settings.showPhone && company.phone ? `<div style="font-size:10px;margin-top:2px;display:flex;align-items:center;gap:4px;justify-content:${headerAlign === 'center' ? 'center' : 'flex-start'};"><span>📞</span> ${company.phone}${company.email ? '<><span style="margin:0 4px;">✉</span>' + company.email : ''}</div>` : ''}
     ${!settings.showPhone && company.email ? `<div style="font-size:10px;margin-top:2px;">✉ ${company.email}</div>` : ''}
   `;
 
-  const docTypeLabelHtml = `<div style="font-size:${theme.docTypeFontSize}px;font-weight:800;color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:1px;">${docLabel}</div>`;
+  const docTypeLabelHtml = `<div style="font-size:${documentTitleFontSize}px;font-weight:${headerFontWeight};color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:1px;">${docLabel}</div>`;
   const originalBadgeHtml = `<div style="font-size:7.5px;border:1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor};padding:1px 7px;color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:0.5px;display:inline-block;">ORIGINAL FOR RECIPIENT</div>`;
 
   let headerHtml: string;
@@ -199,7 +213,7 @@ function buildDocumentHTML(params: {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div style="flex:1;"></div>
         <div style="text-align:center;">
-          <div style="font-size:${theme.docTypeFontSize}px;font-weight:800;color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:1px;margin-bottom:6px;">${docLabel}</div>
+          <div style="font-size:${documentTitleFontSize}px;font-weight:${headerFontWeight};color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:1px;margin-bottom:6px;">${docLabel}</div>
           <div style="display:flex;gap:12px;align-items:flex-start;flex-direction:column;">
             ${logoHtml}
             <div style="text-align:center;">${companyInfoInner}</div>
@@ -250,14 +264,14 @@ function buildDocumentHTML(params: {
     const rowBg = i % 2 === 1 ? theme.tableRowAltBg : '#FFFFFF';
     return `
       <tr style="background-color:${rowBg};border-bottom:1px solid ${theme.tableBorderColor};">
-        <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${i + 1}</td>
-        <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:500;">${p.name}</div>${settings.showDescription && p.description && p.description.trim() ? `<div style="font-size:9.5px;color:${bodyTextColor};margin-top:2px;white-space:pre-wrap;line-height:1.4;">${p.description}</div>` : ''}</td>
-        ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${p.hsnCode || '—'}</td>` : ''}
-        ${settings.showBatchNumber ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${p.batchNumber || '—'}</td>` : ''}
-        ${settings.showExpiryDate ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${p.expiryDate || '—'}</td>` : ''}
+        <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${i + 1}</td>
+        <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:${bodyFontWeight};font-size:${productRowFontSize}px;">${p.name}</div>${settings.showDescription && p.description && p.description.trim() ? `<div style="font-size:${Math.max(8, productRowFontSize - 3)}px;color:${bodyTextColor};margin-top:2px;white-space:pre-wrap;line-height:1.4;">${p.description}</div>` : ''}</td>
+        ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.hsnCode || '—'}</td>` : ''}
+        ${settings.showBatchNumber ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.batchNumber || '—'}</td>` : ''}
+        ${settings.showExpiryDate ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.expiryDate || '—'}</td>` : ''}
         ${settings.showQuantity ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${theme.primaryColor};">${p.quantity}${settings.showUnit ? '<span style="font-size:9px;color:${bodyTextColor};margin-left:2px;">PCS</span>' : ''}</td>` : ''}
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;">${p.unitPrice.toLocaleString('en-IN')}</td>
-        ${settings.showDiscount ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${p.discount ?? 0}</td>` : ''}
+        ${settings.showDiscount ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.discount ?? 0}</td>` : ''}
         ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;"><div>${taxAmount.toLocaleString('en-IN')}</div><div style="font-size:9px;color:${bodyTextColor};">(${p.gstPercent}%)</div></td>` : ''}
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;font-weight:600;">${amount.toLocaleString('en-IN')}</td>
       </tr>
@@ -288,7 +302,7 @@ function buildDocumentHTML(params: {
 
   const bankSection = settings.showBankDetails ? `
     <div style="flex:1;padding:10px 16px;border-right:${(settings.showPaymentQr || settings.showSignature) ? `1px solid ${theme.sectionBorderColor}` : 'none'};">
-      <div style="font-size:10px;font-weight:700;color:${theme.primaryColor};margin-bottom:4px;">Bank Details</div>
+      <div style="font-size:${companyDetailsFontSize}px;font-weight:${headerFontWeight};color:${theme.primaryColor};margin-bottom:4px;">Bank Details</div>
       ${company.bankName ? `<div style="font-size:10.5px;">Bank: <strong>${company.bankName}</strong></div>` : ''}
       ${company.bankAccount ? `<div style="font-size:10.5px;">A/c: <strong>${company.bankAccount}</strong></div>` : ''}
       ${company.bankIfsc ? `<div style="font-size:10.5px;">IFSC: <strong>${company.bankIfsc}</strong></div>` : ''}
@@ -322,7 +336,7 @@ function buildDocumentHTML(params: {
   const termsSection = settings.showTermsConditions ? `
     <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;padding:8px 16px;font-size:10px;">
       <div style="font-weight:700;color:${theme.primaryColor};margin-bottom:3px;">Terms &amp; Conditions</div>
-      <div style="color:${bodyTextColor};line-height:1.5;white-space:pre-wrap;">
+      <div style="color:${bodyTextColor};line-height:1.5;white-space:pre-wrap;font-size:${termsFontSize}px;">
 ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
       </div>
     </div>
@@ -347,18 +361,18 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
       <!-- Party Section -->
       <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;display:flex;min-height:60px;">
         <div style="flex:1;padding:10px 16px;border-right:${hasShipTo ? `1px solid ${theme.sectionBorderColor}` : 'none'};">
-          <div style="font-size:10px;font-weight:700;color:${theme.primaryColor};margin-bottom:4px;">Bill To</div>
+          <div style="font-size:${companyDetailsFontSize}px;font-weight:${headerFontWeight};color:${theme.primaryColor};margin-bottom:4px;">Bill To</div>
           <div style="font-weight:700;font-size:12px;">${customer.name}</div>
-          ${settings.showBillingAddress && customer.billingAddress ? `<div style="color:${bodyTextColor};margin-top:2px;font-size:10.5px;">${customer.billingAddress}</div>` : ''}
-          ${(customer.village || customer.district) ? `<div style="color:${bodyTextColor};font-size:10.5px;">${[customer.village, customer.district].filter(Boolean).join(', ')}</div>` : ''}
+          ${settings.showBillingAddress && customer.billingAddress ? `<div style="color:${bodyTextColor};margin-top:2px;font-size:${customerDetailsFontSize}px;">${customer.billingAddress}</div>` : ''}
+          ${(customer.village || customer.district) ? `<div style="color:${bodyTextColor};font-size:${customerDetailsFontSize}px;">${[customer.village, customer.district].filter(Boolean).join(', ')}</div>` : ''}
           ${settings.showPhone && customer.mobile ? `<div style="margin-top:2px;font-size:10.5px;">Mobile <strong>${customer.mobile}</strong></div>` : ''}
           ${settings.showGstin && customer.gstNumber ? `<div style="font-size:10.5px;">GSTIN <strong>${customer.gstNumber}</strong></div>` : ''}
         </div>
         ${hasShipTo ? `
           <div style="flex:1;padding:10px 16px;">
-            <div style="font-size:10px;font-weight:700;color:${theme.primaryColor};margin-bottom:4px;">Ship To</div>
+            <div style="font-size:${companyDetailsFontSize}px;font-weight:${headerFontWeight};color:${theme.primaryColor};margin-bottom:4px;">Ship To</div>
             ${quotation.shipTo?.name ? `<div style="font-weight:700;font-size:12px;">${quotation.shipTo.name}</div>` : ''}
-            ${quotation.shipTo?.address ? `<div style="color:${bodyTextColor};margin-top:2px;font-size:10.5px;">${quotation.shipTo.address}</div>` : ''}
+            ${quotation.shipTo?.address ? `<div style="color:${bodyTextColor};margin-top:2px;font-size:${customerDetailsFontSize}px;">${quotation.shipTo.address}</div>` : ''}
             ${settings.showPhone && quotation.shipTo?.mobile ? `<div style="margin-top:2px;font-size:10.5px;">Mobile <strong>${quotation.shipTo.mobile}</strong></div>` : ''}
             ${settings.showGstin && quotation.shipTo?.gstNumber ? `<div style="font-size:10.5px;">GSTIN <strong>${quotation.shipTo.gstNumber}</strong></div>` : ''}
           </div>
@@ -368,7 +382,7 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
       <!-- Product Table -->
       <table style="width:100%;border-collapse:collapse;position:relative;z-index:1;border-bottom:1px solid ${theme.sectionBorderColor};">
         <thead>
-          <tr style="background-color:${theme.tableHeaderBg};color:${tableHeaderTextColor};font-weight:600;border-bottom:1.5px solid ${theme.tableBorderColor};">
+          <tr style="background-color:${theme.tableHeaderBg};color:${tableHeaderTextColor};font-weight:${tableFontWeight};font-size:${tableHeaderFontSize}px;border-bottom:1.5px solid ${theme.tableBorderColor};">
             <th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:32px;">No</th>
             <th style="padding:6px 8px;text-align:left;font-weight:700;font-size:10.5px;white-space:nowrap;">Items</th>
             ${settings.showTax ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">HSN No.</th>` : ''}
@@ -390,10 +404,10 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
       <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;display:flex;">
         ${settings.showTaxSummary !== false ? `
         <div style="flex:1;padding:10px 16px;border-right:1px solid ${theme.sectionBorderColor};">
-          <div style="font-size:10px;font-weight:700;color:${theme.primaryColor};margin-bottom:5px;">Tax Summary</div>
-          <table style="width:100%;border-collapse:collapse;font-size:10px;">
+          <div style="font-size:${taxSummaryFontSize}px;font-weight:${tableFontWeight};color:${theme.primaryColor};margin-bottom:5px;">Tax Summary</div>
+          <table style="width:100%;border-collapse:collapse;font-size:${Math.max(8, taxSummaryFontSize - 2)}px;">
             <thead>
-              <tr style="background-color:${theme.tableHeaderBg};color:${tableHeaderTextColor};font-weight:600;">
+              <tr style="background-color:${theme.tableHeaderBg};color:${tableHeaderTextColor};font-weight:${tableFontWeight};font-size:${tableHeaderFontSize}px;">
                 <th style="padding:3px 5px;text-align:left;font-weight:600;">HSN</th>
                 <th style="padding:3px 5px;text-align:right;font-weight:600;">Tax%</th>
                 <th style="padding:3px 5px;text-align:right;font-weight:600;">Taxable Amt</th>
@@ -408,11 +422,11 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
         </div>
         ` : ''}
         <div style="width:${settings.showTaxSummary !== false ? '220px' : '100%'};padding:10px 16px;flex-shrink:0;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:${totalSectionColor};font-weight:600;">Sub Total</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalTaxable)}</span></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:${totalSectionColor};font-weight:600;">CGST</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalCgst)}</span></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:${totalSectionColor};font-weight:600;">SGST</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalSgst)}</span></div>
-          ${roundOff !== 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:${totalSectionColor};font-weight:600;">Round Off</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(roundOff)}</span></div>` : ''}
-          <div style="display:flex;justify-content:space-between;border-top:1.5px solid ${theme.sectionBorderColor};padding-top:5px;margin-top:5px;font-size:13px;font-weight:700;color:${totalSectionColor};"><span>Total</span><span style="color:${totalSectionColor};">₹${fmt(roundedGrandTotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:${totalSectionFontSize}px;"><span style="color:${totalSectionColor};font-weight:600;">Sub Total</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalTaxable)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:${totalSectionFontSize}px;"><span style="color:${totalSectionColor};font-weight:600;">CGST</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalCgst)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:${totalSectionFontSize}px;"><span style="color:${totalSectionColor};font-weight:600;">SGST</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalSgst)}</span></div>
+          ${roundOff !== 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:${totalSectionFontSize}px;"><span style="color:${totalSectionColor};font-weight:600;">Round Off</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(roundOff)}</span></div>` : ''}
+          <div style="display:flex;justify-content:space-between;border-top:1.5px solid ${theme.sectionBorderColor};padding-top:5px;margin-top:5px;font-size:${grandTotalFontSize}px;font-weight:${grandTotalFontWeight};color:${totalSectionColor};"><span>Total</span><span style="color:${totalSectionColor};">₹${fmt(roundedGrandTotal)}</span></div>
           <div style="font-size:9px;color:${totalSectionColor};margin-top:4px;font-style:italic;line-height:1.4;">${numberToWords(roundedGrandTotal)}</div>
         </div>
       </div>

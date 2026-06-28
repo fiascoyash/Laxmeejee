@@ -320,6 +320,22 @@ export interface TemplateSettings {
   bodyTextColor: string;      // Customer name, address, product rows
   tableHeaderTextColor: string; // Items, HSN, Qty, Rate, Tax
   totalSectionColor: string;  // Subtotal, CGST, SGST, Grand Total
+  // Typography Font Sizes (px)
+  companyNameFontSize: number;
+  companyDetailsFontSize: number;
+  documentTitleFontSize: number;
+  customerDetailsFontSize: number;
+  tableHeaderFontSize: number;
+  productRowFontSize: number;
+  taxSummaryFontSize: number;
+  totalSectionFontSize: number;
+  grandTotalFontSize: number;
+  termsFontSize: number;
+  // Typography Font Weights
+  headerFontWeight: number;
+  bodyFontWeight: number;
+  tableFontWeight: number;
+  grandTotalFontWeight: number;
 }
 
 export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
@@ -350,6 +366,20 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   bodyTextColor: '#000000',
   tableHeaderTextColor: '#000000',
   totalSectionColor: '#000000',
+  companyNameFontSize: 28,
+  companyDetailsFontSize: 14,
+  documentTitleFontSize: 22,
+  customerDetailsFontSize: 14,
+  tableHeaderFontSize: 14,
+  productRowFontSize: 13,
+  taxSummaryFontSize: 13,
+  totalSectionFontSize: 16,
+  grandTotalFontSize: 26,
+  termsFontSize: 12,
+  headerFontWeight: 700,
+  bodyFontWeight: 500,
+  tableFontWeight: 600,
+  grandTotalFontWeight: 700,
 };
 
 // ─── Invoice Theme System ────────────────────────────────────────────────────

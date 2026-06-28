@@ -123,6 +123,22 @@ export function DocumentRenderer({
   const bodyTextColor = settings.bodyTextColor ?? '#000000';
   const tableHeaderTextColor = settings.tableHeaderTextColor ?? '#000000';
   const totalSectionColor = settings.totalSectionColor ?? '#000000';
+  // Typography font sizes (px)
+  const companyNameFontSize = settings.companyNameFontSize ?? 28;
+  const companyDetailsFontSize = settings.companyDetailsFontSize ?? 14;
+  const documentTitleFontSize = settings.documentTitleFontSize ?? 22;
+  const customerDetailsFontSize = settings.customerDetailsFontSize ?? 14;
+  const tableHeaderFontSize = settings.tableHeaderFontSize ?? 14;
+  const productRowFontSize = settings.productRowFontSize ?? 13;
+  const taxSummaryFontSize = settings.taxSummaryFontSize ?? 13;
+  const totalSectionFontSize = settings.totalSectionFontSize ?? 16;
+  const grandTotalFontSize = settings.grandTotalFontSize ?? 26;
+  const termsFontSize = settings.termsFontSize ?? 12;
+  // Typography font weights
+  const headerFontWeight = settings.headerFontWeight ?? 700;
+  const bodyFontWeight = settings.bodyFontWeight ?? 500;
+  const tableFontWeight = settings.tableFontWeight ?? 600;
+  const grandTotalFontWeight = settings.grandTotalFontWeight ?? 700;
 
   const taxSummary = calculateTaxSummary(products, gstMode);
   const totalTaxable = roundTo2(
@@ -192,7 +208,7 @@ export function DocumentRenderer({
         case 'bank_details':
           return (
             <>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: theme.primaryColor, marginBottom: '4px' }}>
+              <div style={{ fontSize: `${companyDetailsFontSize}px`, fontWeight: headerFontWeight, color: theme.primaryColor, marginBottom: '4px' }}>
                 Bank Details
               </div>
               {company.bankName && <div style={{ fontSize: '10.5px' }}>Bank: <strong>{company.bankName}</strong></div>}
@@ -422,8 +438,8 @@ export function DocumentRenderer({
       <div style={{ textAlign: align }}>
         <div
           style={{
-            fontSize: `${theme.companyNameSize}px`,
-            fontWeight: 700,
+            fontSize: `${companyNameFontSize}px`,
+            fontWeight: headerFontWeight,
             color: headerTextColor,
             lineHeight: 1.15,
             letterSpacing: '-0.2px',
@@ -459,8 +475,8 @@ export function DocumentRenderer({
     <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '12px' }}>
       <div
         style={{
-          fontSize: `${theme.docTypeFontSize}px`,
-          fontWeight: 800,
+          fontSize: `${documentTitleFontSize}px`,
+          fontWeight: headerFontWeight,
           color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
           letterSpacing: '1px',
         }}
@@ -498,8 +514,8 @@ export function DocumentRenderer({
           <div style={{ textAlign: 'center' }}>
             <div
               style={{
-                fontSize: `${theme.docTypeFontSize}px`,
-                fontWeight: 800,
+                fontSize: `${documentTitleFontSize}px`,
+                fontWeight: headerFontWeight,
                 color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
                 letterSpacing: '1px',
                 marginBottom: '6px',
@@ -598,17 +614,17 @@ export function DocumentRenderer({
           borderRight: hasShipTo ? `1px solid ${theme.sectionBorderColor}` : 'none',
         }}
       >
-        <div style={{ fontSize: '10px', fontWeight: 700, color: theme.primaryColor, marginBottom: '4px' }}>
+        <div style={{ fontSize: `${companyDetailsFontSize}px`, fontWeight: headerFontWeight, color: theme.primaryColor, marginBottom: '4px' }}>
           Bill To
         </div>
         <div style={{ fontWeight: 700, fontSize: '12px' }}>{customer.name}</div>
         {settings.showBillingAddress && customer.billingAddress && (
-          <div style={{ color: bodyTextColor, marginTop: '2px', fontSize: '10.5px' }}>
+          <div style={{ color: bodyTextColor, marginTop: '2px', fontSize: `${customerDetailsFontSize}px` }}>
             {customer.billingAddress}
           </div>
         )}
         {(customer.village || customer.district) && (
-          <div style={{ color: bodyTextColor, fontSize: '10.5px' }}>
+          <div style={{ color: bodyTextColor, fontSize: `${customerDetailsFontSize}px` }}>
             {[customer.village, customer.district].filter(Boolean).join(', ')}
           </div>
         )}
@@ -627,14 +643,14 @@ export function DocumentRenderer({
       {/* Ship To */}
       {hasShipTo && (
         <div style={{ flex: 1, padding: '10px 16px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: theme.primaryColor, marginBottom: '4px' }}>
+          <div style={{ fontSize: `${companyDetailsFontSize}px`, fontWeight: headerFontWeight, color: theme.primaryColor, marginBottom: '4px' }}>
             Ship To
           </div>
           {quotation.shipTo?.name && (
             <div style={{ fontWeight: 700, fontSize: '12px' }}>{quotation.shipTo.name}</div>
           )}
           {quotation.shipTo?.address && (
-            <div style={{ color: bodyTextColor, marginTop: '2px', fontSize: '10.5px' }}>
+            <div style={{ color: bodyTextColor, marginTop: '2px', fontSize: `${customerDetailsFontSize}px` }}>
               {quotation.shipTo.address}
             </div>
           )}
@@ -669,7 +685,8 @@ export function DocumentRenderer({
           style={{
             backgroundColor: theme.tableHeaderBg,
             color: tableHeaderTextColor,
-            fontWeight: 600,
+            fontWeight: tableFontWeight,
+            fontSize: `${tableHeaderFontSize}px`,
             borderBottom: `1.5px solid ${theme.tableBorderColor}`,
           }}
         >
@@ -703,23 +720,23 @@ export function DocumentRenderer({
                 borderBottom: `1px solid ${theme.tableBorderColor}`,
               }}
             >
-              <Td style={{ color: bodyTextColor, textAlign: 'center' }}>{i + 1}</Td>
+              <Td style={{ color: bodyTextColor, textAlign: 'center', fontSize: `${productRowFontSize}px` }}>{i + 1}</Td>
               <Td style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 500 }}>{product.name}</div>
+                <div style={{ fontWeight: bodyFontWeight, fontSize: `${productRowFontSize}px` }}>{product.name}</div>
                 {settings.showDescription && product.description?.trim() && (
-                  <div style={{ fontSize: '9.5px', color: bodyTextColor, marginTop: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: `${Math.max(8, productRowFontSize - 3)}px`, color: bodyTextColor, marginTop: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
                     {product.description}
                   </div>
                 )}
               </Td>
               {settings.showTax && (
-                <Td style={{ color: bodyTextColor }}>{product.hsnCode || '—'}</Td>
+                <Td style={{ color: bodyTextColor, fontSize: `${productRowFontSize}px` }}>{product.hsnCode || '—'}</Td>
               )}
               {settings.showBatchNumber && (
-                <Td style={{ color: bodyTextColor }}>{product.batchNumber || '—'}</Td>
+                <Td style={{ color: bodyTextColor, fontSize: `${productRowFontSize}px` }}>{product.batchNumber || '—'}</Td>
               )}
               {settings.showExpiryDate && (
-                <Td style={{ color: bodyTextColor }}>{product.expiryDate || '—'}</Td>
+                <Td style={{ color: bodyTextColor, fontSize: `${productRowFontSize}px` }}>{product.expiryDate || '—'}</Td>
               )}
               {settings.showQuantity && (
                 <Td style={{ color: theme.primaryColor }}>
@@ -730,7 +747,7 @@ export function DocumentRenderer({
                 </Td>
               )}
               <Td>{product.unitPrice.toLocaleString('en-IN')}</Td>
-              {settings.showDiscount && <Td style={{ color: bodyTextColor }}>{product.discount ?? 0}</Td>}
+              {settings.showDiscount && <Td style={{ color: bodyTextColor, fontSize: `${productRowFontSize}px` }}>{product.discount ?? 0}</Td>}
               {settings.showTax && (
                 <Td>
                   <div>{taxAmount.toLocaleString('en-IN')}</div>
@@ -780,10 +797,10 @@ export function DocumentRenderer({
             borderRight: `1px solid ${theme.sectionBorderColor}`,
           }}
         >
-          <div style={{ fontSize: '10px', fontWeight: 700, color: theme.primaryColor, marginBottom: '5px' }}>
+          <div style={{ fontSize: `${taxSummaryFontSize}px`, fontWeight: tableFontWeight, color: theme.primaryColor, marginBottom: '5px' }}>
             Tax Summary
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: `${Math.max(8, taxSummaryFontSize - 2)}px` }}>
             <thead>
               <tr style={{ backgroundColor: theme.tableHeaderBg, color: tableHeaderTextColor }}>
                 {['HSN', 'Tax%', 'Taxable Amt', 'CGST', 'SGST'].map(h => (
@@ -813,11 +830,11 @@ export function DocumentRenderer({
 
       {/* Grand Total */}
       <div style={{ width: showTaxSummary ? '220px' : '100%', padding: '10px 16px', flexShrink: 0 }}>
-        <TotalRow label="Sub Total" value={`₹${fmt(totalTaxable)}`} color={totalSectionColor} />
-        <TotalRow label="CGST" value={`₹${fmt(totalCgst)}`} color={totalSectionColor} />
-        <TotalRow label="SGST" value={`₹${fmt(totalSgst)}`} color={totalSectionColor} />
+        <TotalRow label="Sub Total" value={`₹${fmt(totalTaxable)}`} color={totalSectionColor} fontSize={totalSectionFontSize} />
+        <TotalRow label="CGST" value={`₹${fmt(totalCgst)}`} color={totalSectionColor} fontSize={totalSectionFontSize} />
+        <TotalRow label="SGST" value={`₹${fmt(totalSgst)}`} color={totalSectionColor} fontSize={totalSectionFontSize} />
         {roundOff !== 0 && (
-          <TotalRow label="Round Off" value={`₹${fmt(roundOff)}`} color={totalSectionColor} />
+          <TotalRow label="Round Off" value={`₹${fmt(roundOff)}`} color={totalSectionColor} fontSize={totalSectionFontSize} />
         )}
         <div
           style={{
@@ -826,8 +843,8 @@ export function DocumentRenderer({
             borderTop: `1.5px solid ${theme.sectionBorderColor}`,
             paddingTop: '5px',
             marginTop: '5px',
-            fontSize: '13px',
-            fontWeight: 700,
+            fontSize: `${grandTotalFontSize}px`,
+            fontWeight: grandTotalFontWeight,
             color: totalSectionColor,
           }}
         >
@@ -871,7 +888,7 @@ export function DocumentRenderer({
                 : 'none',
           }}
         >
-          <div style={{ fontSize: '10px', fontWeight: 700, color: theme.primaryColor, marginBottom: '4px' }}>
+          <div style={{ fontSize: `${companyDetailsFontSize}px`, fontWeight: headerFontWeight, color: theme.primaryColor, marginBottom: '4px' }}>
             Bank Details
           </div>
           {company.bankName && (
@@ -996,7 +1013,7 @@ export function DocumentRenderer({
       <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px' }}>
         Terms &amp; Conditions
       </div>
-      <div style={{ color: bodyTextColor, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+      <div style={{ color: bodyTextColor, lineHeight: 1.5, whiteSpace: 'pre-wrap', fontSize: `${termsFontSize}px` }}>
         {quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
       </div>
     </div>
@@ -1101,14 +1118,14 @@ function MetaCell({
   );
 }
 
-function TotalRow({ label, value, color = '#000000' }: { label: string; value: string; color?: string }) {
+function TotalRow({ label, value, color = '#000000', fontSize = 16 }: { label: string; value: string; color?: string; fontSize?: number }) {
   return (
     <div
       style={{
         display: 'flex',
         justifyContent: 'space-between',
         marginBottom: '3px',
-        fontSize: '11px',
+        fontSize: `${fontSize}px`,
         fontWeight: 500,
       }}
     >

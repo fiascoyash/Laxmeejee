@@ -287,6 +287,75 @@ export function TemplateSettingsPanel({ settings, onChange }: Props) {
               <p className="text-xs text-gray-400 mt-1">Subtotal, CGST, SGST, Grand Total</p>
             </div>
           </div>
+
+          {/* Font Sizes */}
+          <div className="mt-4 pt-3 border-t border-gray-200">
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">Font Sizes</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                ['companyNameFontSize', 'Company Name', 28],
+                ['companyDetailsFontSize', 'Company Details', 14],
+                ['documentTitleFontSize', 'Doc Title (TAX INVOICE)', 22],
+                ['customerDetailsFontSize', 'Customer Details', 14],
+                ['tableHeaderFontSize', 'Table Header', 14],
+                ['productRowFontSize', 'Product Row', 13],
+                ['taxSummaryFontSize', 'Tax Summary', 13],
+                ['totalSectionFontSize', 'Total Section', 16],
+                ['grandTotalFontSize', 'Grand Total', 26],
+                ['termsFontSize', 'Terms & Conditions', 12],
+              ] as const).map(([key, label, def]) => (
+                <div key={key}>
+                  <label className="block text-xs text-gray-600 mb-1">{label}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={8}
+                      max={48}
+                      value={settings[key] ?? def}
+                      onChange={(e) => updateSetting(key, Number(e.target.value))}
+                      className="flex-1 accent-purple-600"
+                    />
+                    <input
+                      type="number"
+                      min={6}
+                      max={72}
+                      value={settings[key] ?? def}
+                      onChange={(e) => updateSetting(key, Number(e.target.value))}
+                      className="w-14 px-1 py-0.5 border border-gray-300 rounded-md text-xs text-center"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Font Weights */}
+          <div className="mt-4 pt-3 border-t border-gray-200">
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">Font Weights</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                ['headerFontWeight', 'Header', 700],
+                ['bodyFontWeight', 'Body', 500],
+                ['tableFontWeight', 'Product Table', 600],
+                ['grandTotalFontWeight', 'Grand Total', 700],
+              ] as const).map(([key, label, def]) => (
+                <div key={key}>
+                  <label className="block text-xs text-gray-600 mb-1">{label}</label>
+                  <select
+                    value={settings[key] ?? def}
+                    onChange={(e) => updateSetting(key, Number(e.target.value))}
+                    className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value={300}>Light (300)</option>
+                    <option value={400}>Normal (400)</option>
+                    <option value={500}>Medium (500)</option>
+                    <option value={600}>Semi Bold (600)</option>
+                    <option value={700}>Bold (700)</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
         </SettingsSection>
 
         {/* Totals */}
