@@ -1,7 +1,7 @@
 import {
   CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn,
-  BlockType, Invoice, NumberingSettings, TemplateBlock, GstMode, TemplateSettings,
-  DEFAULT_TEMPLATE_SETTINGS, TemplateCategory, ThemeId
+  Invoice, NumberingSettings, GstMode,
+  DEFAULT_TEMPLATE_SETTINGS, TemplateSchema
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -165,7 +165,7 @@ export const storage = {
       name: `${original.name} (Copy)`,
       category: original.category || 'professional',
       themeId: (original as any).themeId || 'simple',
-      settings: { ...original.settings },
+      settings: original.settings ? { ...original.settings } : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isDefault: false,
@@ -336,20 +336,300 @@ export const getDefaultProductColumns = (): TableColumn[] => [
   { id: 'col_7', key: 'amount', label: 'Amount', width: 13, visible: true, order: 6 },
 ];
 
+// ─── Industry-Specific Template Schemas ─────────────────────────────────────
+
+// Solar Industry Schema
+export const SOLAR_SCHEMA: TemplateSchema = {
+  industry: 'solar',
+  productColumns: [
+    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_2', key: 'name', label: 'Product Name', width: 30, visible: true, order: 1 },
+    { id: 'col_3', key: 'wattage', label: 'Wattage', width: 10, visible: true, order: 2 },
+    { id: 'col_4', key: 'hsnCode', label: 'HSN', width: 10, visible: true, order: 3 },
+    { id: 'col_5', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 4 },
+    { id: 'col_6', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 5 },
+    { id: 'col_7', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 6 },
+    { id: 'col_8', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
+  ],
+  productFields: [
+    {
+      id: 'fld_wattage',
+      key: 'wattage',
+      label: 'Wattage (W)',
+      type: 'number',
+      required: false,
+      placeholder: 'e.g., 335',
+      location: 'product',
+      columnWidth: 10,
+    },
+    {
+      id: 'fld_installation',
+      key: 'installationCharge',
+      label: 'Installation',
+      type: 'number',
+      required: false,
+      placeholder: 'Installation charges',
+      location: 'product',
+    },
+  ],
+  customerFields: [],
+  documentFields: [
+    {
+      id: 'fld_net_meter',
+      key: 'netMeterCharge',
+      label: 'Net Meter Charge',
+      type: 'number',
+      required: false,
+      placeholder: 'Net metering charges',
+      location: 'quotation',
+    },
+    {
+      id: 'fld_site_survey',
+      key: 'siteSurveyDate',
+      label: 'Site Survey Date',
+      type: 'date',
+      required: false,
+      location: 'quotation',
+    },
+  ],
+  defaultGstMode: 'inclusive',
+  features: {
+    enableShipTo: true,
+    enableInstallation: true,
+  },
+};
+
+// Medical/Pharmacy Schema
+export const MEDICAL_SCHEMA: TemplateSchema = {
+  industry: 'medical',
+  productColumns: [
+    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_2', key: 'name', label: 'Product Name', width: 28, visible: true, order: 1 },
+    { id: 'col_3', key: 'batchNumber', label: 'Batch No.', width: 12, visible: true, order: 2 },
+    { id: 'col_4', key: 'expiryDate', label: 'Expiry', width: 10, visible: true, order: 3 },
+    { id: 'col_5', key: 'mrp', label: 'MRP', width: 10, visible: true, order: 4 },
+    { id: 'col_6', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 5 },
+    { id: 'col_7', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 6 },
+    { id: 'col_8', key: 'unitPrice', label: 'Rate', width: 10, visible: true, order: 7 },
+    { id: 'col_9', key: 'amount', label: 'Amount', width: 10, visible: true, order: 8 },
+  ],
+  productFields: [
+    {
+      id: 'fld_batch',
+      key: 'batchNumber',
+      label: 'Batch Number',
+      type: 'text',
+      required: true,
+      placeholder: 'Batch no.',
+      location: 'product',
+      columnWidth: 12,
+    },
+    {
+      id: 'fld_expiry',
+      key: 'expiryDate',
+      label: 'Expiry Date',
+      type: 'date',
+      required: true,
+      placeholder: 'MM/YYYY',
+      location: 'product',
+      columnWidth: 10,
+    },
+    {
+      id: 'fld_mrp',
+      key: 'mrp',
+      label: 'MRP',
+      type: 'number',
+      required: true,
+      placeholder: 'MRP',
+      location: 'product',
+      columnWidth: 10,
+    },
+  ],
+  customerFields: [
+    {
+      id: 'fld_doctor',
+      key: 'doctorName',
+      label: 'Doctor Name',
+      type: 'text',
+      required: false,
+      placeholder: 'Prescribing doctor',
+      location: 'customer',
+    },
+    {
+      id: 'fld_prescription',
+      key: 'prescriptionId',
+      label: 'Prescription No.',
+      type: 'text',
+      required: false,
+      placeholder: 'Prescription ID',
+      location: 'customer',
+    },
+  ],
+  documentFields: [],
+  defaultGstMode: 'inclusive',
+  features: {
+    enableBatchNumber: true,
+    enableExpiryDate: true,
+  },
+};
+
+// Automobile Schema
+export const AUTOMOBILE_SCHEMA: TemplateSchema = {
+  industry: 'automobile',
+  productColumns: [
+    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_2', key: 'name', label: 'Part Name', width: 28, visible: true, order: 1 },
+    { id: 'col_3', key: 'partNumber', label: 'Part No.', width: 12, visible: true, order: 2 },
+    { id: 'col_4', key: 'vehicleModel', label: 'Vehicle', width: 14, visible: true, order: 3 },
+    { id: 'col_5', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 4 },
+    { id: 'col_6', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 5 },
+    { id: 'col_7', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 6 },
+    { id: 'col_8', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
+  ],
+  productFields: [
+    {
+      id: 'fld_partnum',
+      key: 'partNumber',
+      label: 'Part Number',
+      type: 'text',
+      required: false,
+      placeholder: 'OEM part number',
+      location: 'product',
+      columnWidth: 12,
+    },
+    {
+      id: 'fld_vehicle',
+      key: 'vehicleModel',
+      label: 'Vehicle Model',
+      type: 'text',
+      required: false,
+      placeholder: 'e.g., Maruti Swift',
+      location: 'product',
+      columnWidth: 14,
+    },
+    {
+      id: 'fld_engine',
+      key: 'engineNumber',
+      label: 'Engine Number',
+      type: 'text',
+      required: false,
+      placeholder: 'Engine/chassis no.',
+      location: 'product',
+    },
+    {
+      id: 'fld_warranty_months',
+      key: 'warrantyMonths',
+      label: 'Warranty (months)',
+      type: 'number',
+      required: false,
+      placeholder: 'Warranty period',
+      location: 'product',
+    },
+  ],
+  customerFields: [
+    {
+      id: 'fld_vehicle_reg',
+      key: 'vehicleRegistration',
+      label: 'Vehicle Reg. No.',
+      type: 'text',
+      required: false,
+      placeholder: 'e.g., MH01AB1234',
+      location: 'customer',
+    },
+  ],
+  documentFields: [],
+  defaultGstMode: 'inclusive',
+  features: {
+    enableWarranty: true,
+  },
+};
+
+// Retail Schema
+export const RETAIL_SCHEMA: TemplateSchema = {
+  industry: 'retail',
+  productColumns: [
+    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_2', key: 'name', label: 'Item', width: 35, visible: true, order: 1 },
+    { id: 'col_3', key: 'hsnCode', label: 'HSN', width: 10, visible: true, order: 2 },
+    { id: 'col_4', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 3 },
+    { id: 'col_5', key: 'quantity', label: 'Qty', width: 10, visible: true, order: 4 },
+    { id: 'col_6', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 5 },
+    { id: 'col_7', key: 'discount', label: 'Disc%', width: 8, visible: true, order: 6 },
+    { id: 'col_8', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
+  ],
+  productFields: [
+    {
+      id: 'fld_discount',
+      key: 'discount',
+      label: 'Discount %',
+      type: 'number',
+      required: false,
+      defaultValue: 0,
+      placeholder: 'Discount',
+      location: 'product',
+      columnWidth: 8,
+      validation: { min: 0, max: 100 },
+    },
+  ],
+  customerFields: [],
+  documentFields: [],
+  defaultGstMode: 'inclusive',
+  features: {
+    enableDiscount: true,
+  },
+};
+
+// Services Schema
+export const SERVICES_SCHEMA: TemplateSchema = {
+  industry: 'services',
+  productColumns: [
+    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_2', key: 'name', label: 'Service Description', width: 40, visible: true, order: 1 },
+    { id: 'col_3', key: 'sacCode', label: 'SAC', width: 10, visible: true, order: 2 },
+    { id: 'col_4', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 3 },
+    { id: 'col_5', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 4 },
+    { id: 'col_6', key: 'unitPrice', label: 'Rate', width: 14, visible: true, order: 5 },
+    { id: 'col_7', key: 'amount', label: 'Amount', width: 14, visible: true, order: 6 },
+  ],
+  productFields: [
+    {
+      id: 'fld_sac',
+      key: 'sacCode',
+      label: 'SAC Code',
+      type: 'text',
+      required: false,
+      placeholder: 'Services Accounting Code',
+      location: 'product',
+      columnWidth: 10,
+    },
+  ],
+  customerFields: [],
+  documentFields: [],
+  defaultGstMode: 'exclusive',
+  features: {},
+};
+
+// General Default Schema
+export const GENERAL_SCHEMA: TemplateSchema = {
+  industry: 'general',
+  productColumns: getDefaultProductColumns(),
+  productFields: [],
+  customerFields: [],
+  documentFields: [],
+  defaultGstMode: 'inclusive',
+  features: {},
+};
+
 const getDefaultTemplates = (): QuotationTemplate[] => {
   const now = new Date().toISOString();
   const stdCols = getDefaultProductColumns();
-
-  // ==================== NEW FLOW-BASED TEMPLATES ====================
-  // Each template uses themeId + settings for flow-based DocumentRenderer
-  // No absolute positioning - sections stack vertically and reflow dynamically
 
   return [
     // Template 1: Luxury Gold Invoice
     {
       id: 'tpl_luxury_gold',
       name: 'Luxury Gold Invoice',
-      description: 'Premium invoice with elegant gold borders, decorative corners, and sophisticated styling. Inspired by myBillBook premium templates.',
+      description: 'Premium invoice with elegant gold borders, decorative corners, and sophisticated styling.',
       category: 'luxury',
       themeId: 'luxury',
       isDefault: true,
@@ -357,6 +637,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
       createdAt: now,
       updatedAt: now,
       productColumns: stdCols,
+      schema: GENERAL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
         showBankDetails: true,
@@ -370,7 +651,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
     {
       id: 'tpl_stylish_blue',
       name: 'Stylish Blue Invoice',
-      description: 'Modern blue header with professional styling. Clean and elegant for business use.',
+      description: 'Modern blue header with professional styling.',
       category: 'modern',
       themeId: 'stylish',
       isDefault: false,
@@ -378,6 +659,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
       createdAt: now,
       updatedAt: now,
       productColumns: stdCols,
+      schema: GENERAL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
         showBankDetails: true,
@@ -389,7 +671,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
     {
       id: 'tpl_tally_gst',
       name: 'Tally GST Professional',
-      description: 'Full borders with accounting-style layout, ledger-focused design. Perfect for tax-compliant documentation.',
+      description: 'Full borders with accounting-style layout.',
       category: 'gst',
       themeId: 'tally',
       isDefault: false,
@@ -397,6 +679,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
       createdAt: now,
       updatedAt: now,
       productColumns: stdCols,
+      schema: GENERAL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
         showGstin: true,
@@ -409,14 +692,15 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
     {
       id: 'tpl_billbook_retail',
       name: 'Billbook Retail Invoice',
-      description: 'Dmart/Big Bazaar inspired layout with dense item table and accent bar styling.',
+      description: 'Dmart/Big Bazaar inspired layout.',
       category: 'retail',
       themeId: 'billbook',
       isDefault: false,
       isPremium: false,
       createdAt: now,
       updatedAt: now,
-      productColumns: stdCols,
+      productColumns: RETAIL_SCHEMA.productColumns,
+      schema: RETAIL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
         showPhone: true,
@@ -427,43 +711,87 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
         showTermsConditions: false,
       },
     },
-    // Template 5: Modern Corporate Invoice
+    // Template 5: Solar Energy Invoice
     {
-      id: 'tpl_modern_corporate',
-      name: 'Modern Corporate Invoice',
-      description: 'Clean modern header with professional styling. Perfect for business-to-business invoicing.',
-      category: 'modern',
+      id: 'tpl_solar',
+      name: 'Solar Energy Invoice',
+      description: 'Specialized template for solar panel and inverter businesses with wattage and installation fields.',
+      category: 'specialty',
       themeId: 'modern',
       isDefault: false,
       isPremium: false,
       createdAt: now,
       updatedAt: now,
-      productColumns: stdCols,
-      settings: {
-        ...DEFAULT_TEMPLATE_SETTINGS,
-        showBankDetails: true,
-        showSignature: true,
-        showNotes: true,
-      },
-    },
-    // Template 6: Simple Clean Invoice
-    {
-      id: 'tpl_simple_clean',
-      name: 'Simple Clean Invoice',
-      description: 'Pure white layout with elegant typography. Sophisticated simplicity.',
-      category: 'modern',
-      themeId: 'simple',
-      isDefault: false,
-      isPremium: false,
-      createdAt: now,
-      updatedAt: now,
-      productColumns: stdCols,
+      productColumns: SOLAR_SCHEMA.productColumns,
+      schema: SOLAR_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
         showBankDetails: true,
         showSignature: true,
         showTermsConditions: true,
-        showNotes: true,
+      },
+    },
+    // Template 6: Medical/Pharmacy Invoice
+    {
+      id: 'tpl_medical',
+      name: 'Medical/Pharmacy Invoice',
+      description: 'Pharmacy invoice with batch number, expiry date, and doctor information.',
+      category: 'specialty',
+      themeId: 'simple',
+      isDefault: false,
+      isPremium: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: MEDICAL_SCHEMA.productColumns,
+      schema: MEDICAL_SCHEMA,
+      settings: {
+        ...DEFAULT_TEMPLATE_SETTINGS,
+        showBankDetails: true,
+        showSignature: true,
+        showTermsConditions: true,
+        showBatchNumber: true,
+        showExpiryDate: true,
+      },
+    },
+    // Template 7: Automobile Spare Parts
+    {
+      id: 'tpl_automobile',
+      name: 'Automobile Spare Parts',
+      description: 'Auto parts invoice with part numbers, vehicle model, and warranty.',
+      category: 'specialty',
+      themeId: 'stylish',
+      isDefault: false,
+      isPremium: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: AUTOMOBILE_SCHEMA.productColumns,
+      schema: AUTOMOBILE_SCHEMA,
+      settings: {
+        ...DEFAULT_TEMPLATE_SETTINGS,
+        showBankDetails: true,
+        showSignature: true,
+        showTermsConditions: true,
+        showVehicleNumber: true,
+      },
+    },
+    // Template 8: Services Invoice
+    {
+      id: 'tpl_services',
+      name: 'Services Invoice',
+      description: 'Professional services invoice with SAC codes.',
+      category: 'professional',
+      themeId: 'modern',
+      isDefault: false,
+      isPremium: false,
+      createdAt: now,
+      updatedAt: now,
+      productColumns: SERVICES_SCHEMA.productColumns,
+      schema: SERVICES_SCHEMA,
+      settings: {
+        ...DEFAULT_TEMPLATE_SETTINGS,
+        showBankDetails: true,
+        showSignature: true,
+        showTermsConditions: true,
       },
     },
   ];

@@ -1,7 +1,7 @@
-import { Product, ProductCatalogItem, TableColumn, GstMode } from '../types';
+import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS } from '../types';
 import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, calculateGrandTotalAmount, roundTo2 } from '../utils/storage';
 import { Plus, Trash2, Package, ChevronDown, Settings2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface Props {
   products: Product[];
@@ -11,13 +11,42 @@ interface Props {
   onColumnsChange?: (columns: TableColumn[]) => void;
   gstMode?: GstMode;
   onGstModeChange?: (mode: GstMode) => void;
+  // Custom fields from template schema
+  customFields?: TemplateField[];
+  // Template settings - controls which columns are visible
+  templateSettings?: TemplateSettings;
 }
 
-export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange }: Props) {
+export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
-  const activeColumns = columns && columns.length > 0 ? columns : getDefaultProductColumns();
+  const settings = templateSettings || DEFAULT_TEMPLATE_SETTINGS;
+
+  // Merge columns with template settings visibility
+  const activeColumns = useMemo(() => {
+    const baseColumns = columns && columns.length > 0 ? columns : getDefaultProductColumns();
+
+    // Update visibility based on template settings
+    return baseColumns.map(col => {
+      // Map template settings to column keys
+      const settingMap: Record<string, boolean> = {
+        description: settings.showDescription,
+        quantity: settings.showQuantity,
+        unit: settings.showUnit,
+        discount: settings.showDiscount,
+        tax: settings.showTax,
+        batchNumber: settings.showBatchNumber,
+        expiryDate: settings.showExpiryDate,
+      };
+
+      if (col.key in settingMap && settingMap[col.key] !== undefined) {
+        return { ...col, visible: settingMap[col.key] };
+      }
+      return col;
+    });
+  }, [columns, settings]);
+
   const visibleColumns = activeColumns.filter(c => c.visible).sort((a, b) => a.order - b.order);
 
   const toggleColumn = (colId: string) => {
@@ -33,6 +62,10 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       gstPercent: 18,
       quantity: 1,
       unitPrice: 0,
+      batchNumber: '',
+      expiryDate: '',
+      discount: 0,
+      customFields: {},
     };
     onChange([...products, newProduct]);
   };
@@ -45,6 +78,10 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       gstPercent: catalogItem.gstPercent,
       quantity: 1,
       unitPrice: catalogItem.defaultPrice,
+      batchNumber: '',
+      expiryDate: '',
+      discount: 0,
+      customFields: {},
     };
     onChange([...products, newProduct]);
     setShowCatalog(false);
@@ -57,6 +94,14 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
   const updateProduct = (id: string, field: keyof Product, value: string | number) => {
     onChange(products.map(p =>
       p.id === id ? { ...p, [field]: value } : p
+    ));
+  };
+
+  const updateCustomField = (productId: string, fieldKey: string, value: string | number | boolean) => {
+    onChange(products.map(p =>
+      p.id === productId
+        ? { ...p, customFields: { ...p.customFields, [fieldKey]: value } }
+        : p
     ));
   };
 
@@ -83,13 +128,14 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
           />
         );
       case 'hsnCode':
+      case 'sacCode':
         return (
           <input
             type="text"
             value={product.hsnCode}
             onChange={(e) => updateProduct(product.id, 'hsnCode', e.target.value)}
             className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center font-mono"
-            placeholder="HSN"
+            placeholder={colKey === 'sacCode' ? 'SAC' : 'HSN'}
           />
         );
       case 'gstPercent':
@@ -102,7 +148,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             <option value={0}>0%</option>
             <option value={5}>5%</option>
             <option value={18}>18%</option>
-            <option value={40}>40%</option>
+            <option value={28}>28%</option>
           </select>
         );
       case 'quantity':
@@ -132,7 +178,142 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             Rs. {calculateProductAmount(product).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         );
-      default: return null;
+      case 'batchNumber':
+        return (
+          <input
+            type="text"
+            value={product.batchNumber || ''}
+            onChange={(e) => updateProduct(product.id, 'batchNumber', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center font-mono"
+            placeholder="Batch#"
+          />
+        );
+      case 'expiryDate':
+        return (
+          <input
+            type="month"
+            value={product.expiryDate || ''}
+            onChange={(e) => updateProduct(product.id, 'expiryDate', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
+            placeholder="MM/YYYY"
+          />
+        );
+      case 'discount':
+        return (
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value={product.discount || 0}
+            onChange={(e) => updateProduct(product.id, 'discount', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
+          />
+        );
+      case 'mrp':
+        return (
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={product.mrp || 0}
+            onChange={(e) => updateProduct(product.id, 'mrp', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-right"
+          />
+        );
+      case 'partNumber':
+        return (
+          <input
+            type="text"
+            value={product.partNumber || ''}
+            onChange={(e) => updateProduct(product.id, 'partNumber', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+            placeholder="Part#"
+          />
+        );
+      case 'vehicleModel':
+        return (
+          <input
+            type="text"
+            value={product.vehicleModel || ''}
+            onChange={(e) => updateProduct(product.id, 'vehicleModel', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Vehicle"
+          />
+        );
+      case 'warrantyMonths':
+        return (
+          <input
+            type="number"
+            min="0"
+            value={product.warrantyMonths || 0}
+            onChange={(e) => updateProduct(product.id, 'warrantyMonths', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
+          />
+        );
+      case 'wattage':
+        return (
+          <input
+            type="number"
+            min="0"
+            value={product.wattage || 0}
+            onChange={(e) => updateProduct(product.id, 'wattage', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
+            placeholder="W"
+          />
+        );
+      default:
+        // Handle custom fields from template schema
+        const customField = customFields.find(f => f.key === colKey);
+        if (customField) {
+          const value = product.customFields?.[colKey] ?? customField.defaultValue ?? '';
+          if (customField.type === 'number') {
+            return (
+              <input
+                type="number"
+                value={value as number}
+                onChange={(e) => updateCustomField(product.id, colKey, Number(e.target.value))}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                placeholder={customField.placeholder}
+              />
+            );
+          }
+          if (customField.type === 'date') {
+            return (
+              <input
+                type="month"
+                value={value as string}
+                onChange={(e) => updateCustomField(product.id, colKey, e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+            );
+          }
+          if (customField.type === 'select' && customField.options) {
+            return (
+              <select
+                value={value as string}
+                onChange={(e) => updateCustomField(product.id, colKey, e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select...</option>
+                {customField.options.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            );
+          }
+          // Default: text input
+          return (
+            <input
+              type="text"
+              value={value as string}
+              onChange={(e) => updateCustomField(product.id, colKey, e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder={customField.placeholder}
+            />
+          );
+        }
+        return null;
     }
   };
 

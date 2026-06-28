@@ -74,8 +74,6 @@ const exportFlowBasedPDF = async (
   const dueDate = documentType === 'invoice' ? invoice?.dueDate : undefined;
   const hasShipTo = settings.showShippingAddress && !!(quotation.shipTo?.name?.trim() || quotation.shipTo?.address?.trim());
 
-  const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   // Build HTML content matching DocumentRenderer
   container.innerHTML = buildDocumentHTML({
     theme,
@@ -199,9 +197,11 @@ function buildDocumentHTML(params: {
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#888;">${i + 1}</td>
         <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:500;">${p.name}</div></td>
         ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#666;">${p.hsnCode || '—'}</td>` : ''}
+        ${settings.showBatchNumber ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:#666;">${p.batchNumber || '—'}</td>` : ''}
+        ${settings.showExpiryDate ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:#666;">${p.expiryDate || '—'}</td>` : ''}
         ${settings.showQuantity ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${theme.primaryColor};">${p.quantity}${settings.showUnit ? '<span style="font-size:9px;color:#999;margin-left:2px;">PCS</span>' : ''}</td>` : ''}
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;">${p.unitPrice.toLocaleString('en-IN')}</td>
-        ${settings.showDiscount ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#999;">0</td>` : ''}
+        ${settings.showDiscount ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#999;">${p.discount ?? 0}</td>` : ''}
         ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;"><div>${taxAmount.toLocaleString('en-IN')}</div><div style="font-size:9px;color:#888;">(${p.gstPercent}%)</div></td>` : ''}
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;font-weight:600;">${amount.toLocaleString('en-IN')}</td>
       </tr>
@@ -226,7 +226,7 @@ function buildDocumentHTML(params: {
   const notesSection = settings.showNotes ? `
     <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;padding:8px 16px;font-size:10.5px;">
       <span style="font-weight:700;color:${theme.primaryColor};">Notes: </span>
-      <span style="color:#666;">Thank you for your business!</span>
+      <span style="color:#666;">${quotation.notes || 'Thank you for your business!'}</span>
     </div>
   ` : '';
 
@@ -242,14 +242,14 @@ function buildDocumentHTML(params: {
 
   const qrSection = settings.showPaymentQr ? `
     <div style="padding:10px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:${settings.showSignature ? `1px solid ${theme.sectionBorderColor}` : 'none'};">
-      <div style="width:64px;height:64px;border:1.5px solid ${theme.primaryColor};display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;border-radius:2px;">QR Code</div>
+      ${quotation.paymentQr ? `<img src="${quotation.paymentQr}" alt="Payment QR" style="width:64px;height:64px;object-fit:contain;border-radius:2px;" />` : '<div style="width:64px;height:64px;border:1.5px solid ' + theme.primaryColor + ';display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;border-radius:2px;">QR Code</div>'}
       <div style="font-size:8.5px;color:#777;margin-top:3px;">Scan to Pay</div>
     </div>
   ` : '';
 
   const sigSection = settings.showSignature ? `
     <div style="padding:10px 16px;text-align:center;min-width:130px;display:flex;flex-direction:column;justify-content:flex-end;">
-      ${company.signature ? `<img src="${company.signature}" alt="Signature" style="height:45px;object-fit:contain;margin-bottom:4px;" />` : '<div style="height:45px;"></div>'}
+      ${quotation.signature ? `<img src="${quotation.signature}" alt="Signature" style="height:45px;object-fit:contain;margin-bottom:4px;" />` : company.signature ? `<img src="${company.signature}" alt="Signature" style="height:45px;object-fit:contain;margin-bottom:4px;" />` : '<div style="height:45px;"></div>'}
       <div style="border-top:1px solid ${theme.sectionBorderColor};padding-top:4px;font-size:9px;color:#777;">Authorised Signatory</div>
     </div>
   ` : '';
@@ -266,10 +266,8 @@ function buildDocumentHTML(params: {
   const termsSection = settings.showTermsConditions ? `
     <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;padding:8px 16px;font-size:10px;">
       <div style="font-weight:700;color:${theme.primaryColor};margin-bottom:3px;">Terms &amp; Conditions</div>
-      <div style="color:#555;line-height:1.5;">
-        1. Goods once sold will not be taken back or exchanged.<br />
-        2. All disputes are subject to local jurisdiction only.<br />
-        3. Payment due within 30 days of the invoice/quotation date.
+      <div style="color:#555;line-height:1.5;white-space:pre-wrap;">
+${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
       </div>
     </div>
   ` : '';
@@ -333,6 +331,8 @@ function buildDocumentHTML(params: {
             <th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:32px;">No</th>
             <th style="padding:6px 8px;text-align:left;font-weight:700;font-size:10.5px;white-space:nowrap;">Items</th>
             ${settings.showTax ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">HSN No.</th>` : ''}
+            ${settings.showBatchNumber ? `<th style="padding:6px 8px;text-align:center;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">Batch No.</th>` : ''}
+            ${settings.showExpiryDate ? `<th style="padding:6px 8px;text-align:center;font-weight:700;font-size:10.5px;white-space:nowrap;width:80px;">Expiry</th>` : ''}
             ${settings.showQuantity ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:54px;">Qty.</th>` : ''}
             <th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:76px;">Rate</th>
             ${settings.showDiscount ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:70px;">Disc.</th>` : ''}
@@ -435,11 +435,15 @@ const exportBlockBasedPDF = (
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
 
-  // Sort blocks by Y position to handle overlapping properly
-  const sortedBlocks = [...(template.blocks || []).filter(b => b.visible)].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+  // Sort blocks by Y position to handle overlapping properly - only render canvas zone blocks in legacy mode
+  const sortedBlocks = [...(template.blocks || []).filter(b => b.visible && b.zone === 'canvas')].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
   for (const block of sortedBlocks) {
-    const { type, x, y, width, height, content } = block;
+    const { type, content } = block;
+    const x = block.x ?? 10;
+    const y = block.y ?? 10;
+    const width = block.width ?? 60;
+    const height = block.height ?? 30;
 
     switch (type) {
       case 'company_logo':
@@ -706,6 +710,9 @@ const renderProductTable = (
         case 'gstPercent': return `${p.gstPercent}%`;
         case 'quantity': return p.quantity.toString();
         case 'unitPrice': return `Rs. ${p.unitPrice.toLocaleString('en-IN')}`;
+        case 'discount': return `${p.discount ?? 0}%`;
+        case 'batchNumber': return p.batchNumber || '—';
+        case 'expiryDate': return p.expiryDate || '—';
         case 'amount': return `Rs. ${calculateProductAmount(p).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
         default: return '';
       }

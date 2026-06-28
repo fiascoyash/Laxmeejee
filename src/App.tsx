@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo } from './types';
-import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, numberToWords, roundTo2, calculateGrandTotalAmount } from './utils/storage';
+import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
 import { ProductTable } from './components/ProductTable';
@@ -14,7 +14,7 @@ import { InvoiceForm } from './components/InvoiceForm';
 import { InvoiceList } from './components/InvoiceList';
 import { NumberingSettingsPanel } from './components/NumberingSettings';
 import { exportTemplatePDF } from './utils/templatePdfExport';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, type LucideIcon } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon } from 'lucide-react';
 
 type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice';
 
@@ -45,6 +45,14 @@ function App() {
   const [productColumns, setProductColumns] = useState<TableColumn[]>(getDefaultProductColumns());
   const [gstMode, setGstMode] = useState<GstMode>('inclusive');
   const [shipTo, setShipTo] = useState<ShipTo>({ name: '', address: '', mobile: '', gstNumber: '' });
+
+  // Quotation dynamic fields state (controlled by template settings)
+  const [quotation, setQuotation] = useState<{
+    notes?: string;
+    signature?: string;
+    paymentQr?: string;
+    terms?: string;
+  }>({});
 
   // Selected Template State
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -100,6 +108,7 @@ function App() {
     setProductColumns(getDefaultProductColumns());
     setGstMode('inclusive');
     setShipTo({ name: '', address: '', mobile: '', gstNumber: '' });
+    setQuotation({ notes: '', signature: '', paymentQr: '', terms: '' });
   };
 
   // Start new quotation - go to template selection first
@@ -115,12 +124,29 @@ function App() {
     setQuotationDate(quotation.date);
     setCustomer(quotation.customer);
     setProducts(quotation.products);
-    setProductColumns(quotation.productColumns || getDefaultProductColumns());
     setGstMode(quotation.gstMode || 'inclusive');
     setShipTo(quotation.shipTo || { name: '', address: '', mobile: '', gstNumber: '' });
+    // Restore dynamic fields
+    setQuotation({
+      notes: quotation.notes || '',
+      signature: quotation.signature || '',
+      paymentQr: quotation.paymentQr || '',
+      terms: quotation.terms || '',
+    });
     // Restore the template used for this quotation
     if (quotation.selectedTemplateId) {
       setSelectedTemplateId(quotation.selectedTemplateId);
+      // Load template schema columns
+      const template = storage.getTemplateById(quotation.selectedTemplateId);
+      if (template?.schema?.productColumns) {
+        setProductColumns(template.schema.productColumns);
+      } else if (quotation.productColumns) {
+        setProductColumns(quotation.productColumns);
+      } else {
+        setProductColumns(getDefaultProductColumns());
+      }
+    } else {
+      setProductColumns(quotation.productColumns || getDefaultProductColumns());
     }
     setView('new');
   };
@@ -143,7 +169,7 @@ function App() {
     const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
     const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
-    const quotation: Quotation = {
+    const newQuotation: Quotation = {
       id: editingQuotationId || generateId(),
       quotationNumber: editingQuotationId ? quotationNumber : generateQuotationNumber(),
       date: quotationDate,
@@ -159,9 +185,14 @@ function App() {
       selectedTemplateId: selectedTemplateId || undefined,
       productColumns,
       gstMode,
+      // Dynamic fields from template settings
+      notes: quotation.notes,
+      signature: quotation.signature,
+      paymentQr: quotation.paymentQr,
+      terms: quotation.terms,
     };
 
-    storage.saveQuotation(quotation);
+    storage.saveQuotation(newQuotation);
     if (!editingQuotationId) incrementQuotationNumber();
     setQuotations(storage.getQuotations());
     alert(editingQuotationId ? 'Quotation updated successfully!' : 'Quotation saved successfully!');
@@ -375,6 +406,11 @@ function App() {
       grandTotal: 177200,
       createdAt: new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
+      // Include dynamic fields from form state
+      notes: quotation.notes,
+      signature: quotation.signature,
+      paymentQr: quotation.paymentQr,
+      terms: quotation.terms,
     } as Quotation,
     products: products.length > 0 ? products : [
       { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
@@ -410,7 +446,7 @@ function App() {
     const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
     const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
-    const quotation: Quotation = {
+    const quotationForPdf: Quotation = {
       id: editingQuotationId || 'temp',
       quotationNumber: quotationNumber || 'QT-PREVIEW',
       date: quotationDate,
@@ -426,10 +462,15 @@ function App() {
       selectedTemplateId: selectedTemplateId || undefined,
       productColumns,
       gstMode,
+      // Dynamic fields from form state
+      notes: quotation.notes,
+      signature: quotation.signature,
+      paymentQr: quotation.paymentQr,
+      terms: quotation.terms,
     };
 
     const templateWithColumns = { ...template, productColumns };
-    exportTemplatePDF(templateWithColumns, companyProfile, customer, quotation, products, 'quotation', undefined, gstMode);
+    exportTemplatePDF(templateWithColumns, companyProfile, customer, quotationForPdf, products, 'quotation', undefined, gstMode);
   };
 
   // Template handlers
@@ -486,6 +527,14 @@ function App() {
 
   const handleSelectTemplate = (templateId: string) => {
     setSelectedTemplateId(templateId);
+    // Apply template schema to form
+    const template = storage.getTemplateById(templateId);
+    if (template?.schema?.productColumns) {
+      setProductColumns(template.schema.productColumns);
+    }
+    if (template?.schema?.defaultGstMode) {
+      setGstMode(template.schema.defaultGstMode);
+    }
   };
 
   const handleTemplateContinue = () => {
@@ -794,8 +843,150 @@ function App() {
                 </div>
               </div>
 
-              <CustomerDetails customer={customer} onChange={setCustomer} shipTo={shipTo} onShipToChange={setShipTo} />
-              <ProductTable products={products} onChange={setProducts} catalog={catalog} columns={productColumns} onColumnsChange={setProductColumns} gstMode={gstMode} onGstModeChange={setGstMode} />
+              <CustomerDetails
+                customer={customer}
+                onChange={setCustomer}
+                shipTo={shipTo}
+                onShipToChange={setShipTo}
+                customFields={selectedTemplate?.schema?.customerFields || []}
+              />
+              <ProductTable
+                products={products}
+                onChange={setProducts}
+                catalog={catalog}
+                columns={productColumns}
+                onColumnsChange={setProductColumns}
+                gstMode={gstMode}
+                onGstModeChange={setGstMode}
+                customFields={selectedTemplate?.schema?.productFields || []}
+                templateSettings={selectedTemplate?.settings}
+              />
+
+              {/* Dynamic Fields based on Template Settings */}
+              {selectedTemplate?.settings && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Notes */}
+                    {selectedTemplate.settings.showNotes && (
+                      <div className="lg:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <textarea
+                          value={quotation.notes || ''}
+                          onChange={(e) => setQuotation(prev => ({ ...prev, notes: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          rows={3}
+                          placeholder="Additional notes for this quotation..."
+                        />
+                      </div>
+                    )}
+
+                    {/* Signature Upload */}
+                    {selectedTemplate.settings.showSignature && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Signature</label>
+                        <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 transition-colors">
+                          {quotation.signature ? (
+                            <div className="relative w-full h-full flex items-center justify-center">
+                              <img
+                                src={quotation.signature}
+                                alt="Signature"
+                                className="max-h-28 max-w-full object-contain"
+                              />
+                              <button
+                                onClick={() => setQuotation(prev => ({ ...prev, signature: '' }))}
+                                className="absolute top-1 right-1 bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
+                                type="button"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="cursor-pointer flex flex-col items-center justify-center text-gray-500 hover:text-blue-600">
+                              <PenTool className="w-8 h-8 mb-2" />
+                              <span className="text-sm">Upload Signature</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                      setQuotation(prev => ({ ...prev, signature: ev.target?.result as string }));
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* QR Code Upload */}
+                    {selectedTemplate.settings.showPaymentQr && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Payment QR Code</label>
+                        <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 transition-colors">
+                          {quotation.paymentQr ? (
+                            <div className="relative w-full h-full flex items-center justify-center">
+                              <img
+                                src={quotation.paymentQr}
+                                alt="Payment QR"
+                                className="max-h-28 max-w-full object-contain"
+                              />
+                              <button
+                                onClick={() => setQuotation(prev => ({ ...prev, paymentQr: '' }))}
+                                className="absolute top-1 right-1 bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
+                                type="button"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="cursor-pointer flex flex-col items-center justify-center text-gray-500 hover:text-blue-600">
+                              <FileText className="w-8 h-8 mb-2" />
+                              <span className="text-sm">Upload QR Code</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                      setQuotation(prev => ({ ...prev, paymentQr: ev.target?.result as string }));
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Terms & Conditions */}
+                    {selectedTemplate.settings.showTermsConditions && (
+                      <div className="lg:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Terms & Conditions</label>
+                        <textarea
+                          value={quotation.terms || ''}
+                          onChange={(e) => setQuotation(prev => ({ ...prev, terms: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          rows={3}
+                          placeholder="1. Goods once sold will not be taken back or exchanged.&#10;2. All disputes are subject to local jurisdiction only."
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row gap-3 justify-end bg-white rounded-lg border border-gray-200 p-4 sticky bottom-4">
                 <button

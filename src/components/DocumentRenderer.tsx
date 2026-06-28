@@ -7,12 +7,14 @@
  *  - Toggle a section OFF → it vanishes completely, page reflows automatically.
  *  - Every theme is applied via inline styles; layout never changes between themes.
  *  - Identical markup is used for both preview and PDF capture (WYSIWYG).
+ *  - Custom blocks can be inserted into predefined dynamic zones.
  */
 
 import React from 'react';
 import {
   CompanyProfile, Customer, Quotation, Product,
   TemplateSettings, Invoice, InvoiceTheme, INVOICE_THEMES, ThemeId,
+  TemplateBlock, BlockZone,
 } from '../types';
 import {
   calculateProductAmount, calculateTaxSummary,
@@ -30,8 +32,18 @@ interface Props {
   products: Product[];
   docType?: DocType;
   invoice?: Invoice;
+  /** Custom blocks to render in dynamic zones */
+  customBlocks?: TemplateBlock[];
   /** When true, renders at 100% for PDF capture. Otherwise scales to preview container. */
   forPdf?: boolean;
+  /** Called when a zone is clicked (for builder mode) */
+  onZoneClick?: (zone: BlockZone) => void;
+  /** Called when a block is clicked (for builder mode) */
+  onBlockClick?: (blockId: string) => void;
+  /** ID of currently selected block (for builder mode) */
+  selectedBlockId?: string;
+  /** Whether to show zone drop indicators */
+  showZones?: boolean;
 }
 
 const fmt = (n: number) =>
@@ -97,6 +109,11 @@ export function DocumentRenderer({
   products,
   docType = 'quotation',
   invoice,
+  customBlocks = [],
+  onZoneClick,
+  onBlockClick,
+  selectedBlockId,
+  showZones = false,
 }: Props) {
   const theme: InvoiceTheme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES.simple;
   const gstMode = quotation.gstMode ?? 'inclusive';
@@ -144,6 +161,245 @@ export function DocumentRenderer({
   };
 
   const secNoBorder: React.CSSProperties = { position: 'relative', zIndex: 1 };
+
+  // ─── Get blocks for a specific zone ───────────────────────────────────────
+  const getBlocksForZone = (zone: BlockZone): TemplateBlock[] => {
+    return customBlocks
+      .filter(b => b.zone === zone && b.visible)
+      .sort((a, b) => a.order - b.order);
+  };
+
+  // ─── Render a custom block ────────────────────────────────────────────────
+  const renderCustomBlock = (block: TemplateBlock): React.ReactNode => {
+    const isSelected = selectedBlockId === block.id;
+    const blockStyle: React.CSSProperties = {
+      padding: '8px 16px',
+      borderBottom: `1px solid ${theme.sectionBorderColor}`,
+      backgroundColor: isSelected ? '#FEF3C7' : 'transparent',
+      cursor: onBlockClick ? 'pointer' : 'default',
+      position: 'relative',
+      zIndex: 1,
+    };
+
+    const content = (() => {
+      switch (block.type) {
+        case 'bank_details':
+          return (
+            <>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: theme.primaryColor, marginBottom: '4px' }}>
+                Bank Details
+              </div>
+              {company.bankName && <div style={{ fontSize: '10.5px' }}>Bank: <strong>{company.bankName}</strong></div>}
+              {company.bankAccount && <div style={{ fontSize: '10.5px' }}>A/c: <strong>{company.bankAccount}</strong></div>}
+              {company.bankIfsc && <div style={{ fontSize: '10.5px' }}>IFSC: <strong>{company.bankIfsc}</strong></div>}
+              {company.bankBranch && <div style={{ fontSize: '10.5px' }}>Branch: {company.bankBranch}</div>}
+            </>
+          );
+
+        case 'signature_box':
+          return (
+            <div style={{ textAlign: 'center', minWidth: '130px' }}>
+              {company.signature ? (
+                <img src={company.signature} alt="Signature" style={{ height: '45px', objectFit: 'contain', marginBottom: '4px' }} />
+              ) : (
+                <div style={{ height: '45px' }} />
+              )}
+              <div style={{ borderTop: `1px solid ${theme.sectionBorderColor}`, paddingTop: '4px', fontSize: '9px', color: '#777' }}>
+                Authorised Signatory
+              </div>
+            </div>
+          );
+
+        case 'terms_conditions':
+          return (
+            <>
+              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+                Terms &amp; Conditions
+              </div>
+              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px', whiteSpace: 'pre-wrap' }}>
+                {block.content || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
+              </div>
+            </>
+          );
+
+        case 'footer_notes':
+          return (
+            <div style={{ fontSize: '10px', textAlign: 'center', color: '#666', whiteSpace: 'pre-wrap' }}>
+              {block.content || 'Thank you for your business!'}
+            </div>
+          );
+
+        case 'warranty':
+          return (
+            <>
+              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+                Warranty
+              </div>
+              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px', whiteSpace: 'pre-wrap' }}>
+                {block.content || 'Product warranty: 12 months from date of purchase.\nWarranty covers manufacturing defects only.'}
+              </div>
+            </>
+          );
+
+        case 'transport_details':
+          return (
+            <>
+              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+                Transport Details
+              </div>
+              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px' }}>
+                {block.content || 'Transport: To be arranged by buyer'}
+              </div>
+            </>
+          );
+
+        case 'delivery_details':
+          return (
+            <>
+              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+                Delivery Details
+              </div>
+              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px' }}>
+                {block.content || 'Delivery: Within 7-10 working days\nDelivery charges extra as applicable'}
+              </div>
+            </>
+          );
+
+        case 'installation_details':
+          return (
+            <>
+              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+                Installation Details
+              </div>
+              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px' }}>
+                {block.content || 'Installation: To be done by our certified technician\nInstallation charges included in the quote'}
+              </div>
+            </>
+          );
+
+        case 'divider':
+          return (
+            <div style={{ width: '100%', height: '1px', backgroundColor: block.style?.color || theme.sectionBorderColor, margin: '4px 0' }} />
+          );
+
+        case 'text_block':
+        default:
+          return (
+            <div style={{ fontSize: '10px', color: '#555', whiteSpace: 'pre-wrap' }}>
+              {block.content || 'Custom content'}
+            </div>
+          );
+      }
+    })();
+
+    const handleClick = onBlockClick ? () => onBlockClick(block.id) : undefined;
+
+    return (
+      <div
+        key={block.id}
+        style={blockStyle}
+        onClick={handleClick}
+      >
+        {content}
+      </div>
+    );
+  };
+
+  // ─── Zone Drop Indicator ──────────────────────────────────────────────────
+  const ZoneIndicator = ({ zone, direction = 'horizontal' }: { zone: BlockZone; direction?: 'horizontal' | 'vertical' }) => {
+    if (!showZones) return null;
+
+    const zoneLabels: Record<BlockZone, string> = {
+      after_header: 'After Header',
+      after_meta: 'After Invoice Details',
+      after_party: 'After Party Details',
+      after_products: 'After Products',
+      after_totals: 'After Totals',
+      after_bank: 'After Bank Details',
+      footer: 'At Footer',
+      party_left: 'Bill To Area',
+      party_right: 'Ship To Area',
+      bank_left: 'Left Bank Area',
+      bank_right: 'Right Bank Area',
+      footer_left: 'Footer Left',
+      footer_center: 'Footer Center',
+      footer_right: 'Footer Right',
+      canvas: 'Canvas',
+    };
+
+    const baseStyle: React.CSSProperties = {
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '10px',
+      color: '#3B82F6',
+      fontWeight: 500,
+      backgroundColor: '#EFF6FF',
+    };
+
+    if (direction === 'vertical') {
+      return (
+        <div
+          onClick={() => onZoneClick?.(zone)}
+          style={{
+            ...baseStyle,
+            flexDirection: 'column',
+            padding: '8px 4px',
+            borderRight: `1px dashed #93C5FD`,
+            minWidth: '60px',
+            flex: 1,
+          }}
+        >
+          <span style={{ writingMode: 'horizontal-tb', textAlign: 'center' }}>+ {zoneLabels[zone]}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        onClick={() => onZoneClick?.(zone)}
+        style={{
+          ...baseStyle,
+          padding: '10px 16px',
+          borderBottom: '1px dashed #93C5FD',
+          gap: '6px',
+        }}
+      >
+        <span>+ Add Block: {zoneLabels[zone]}</span>
+      </div>
+    );
+  };
+
+  // ─── Split Zone Container (for side-by-side zones) ───────────────────────────
+  const SplitZoneIndicators = ({ leftZone, rightZone }: { leftZone: BlockZone; rightZone: BlockZone }) => {
+    if (!showZones) return null;
+    return (
+      <div
+        style={{
+          display: 'flex',
+          borderBottom: `1px solid ${theme.sectionBorderColor}`,
+        }}
+      >
+        <div style={{ flex: 1, borderRight: `1px dashed #93C5FD` }}>
+          <ZoneIndicator zone={leftZone} direction="vertical" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <ZoneIndicator zone={rightZone} direction="vertical" />
+        </div>
+      </div>
+    );
+  };
+
+  // ─── Render blocks for a specific zone ─────────────────────────────────────
+  const RenderZoneBlocks = (zone: BlockZone) => {
+    const zoneBlocks = getBlocksForZone(zone);
+    return (
+      <>
+        {zoneBlocks.map(block => renderCustomBlock(block))}
+      </>
+    );
+  };
 
   // ── SECTION 1: Company Header ─────────────────────────────────────────────
   const HeaderSection = (
@@ -366,6 +622,8 @@ export function DocumentRenderer({
           <Th style={{ width: '32px' }}>No</Th>
           <Th style={{ textAlign: 'left' }}>Items</Th>
           {settings.showTax && <Th style={{ width: '72px' }}>HSN No.</Th>}
+          {settings.showBatchNumber && <Th style={{ width: '72px' }}>Batch No.</Th>}
+          {settings.showExpiryDate && <Th style={{ width: '80px' }}>Expiry</Th>}
           {settings.showQuantity && <Th style={{ width: '54px' }}>Qty.</Th>}
           <Th style={{ width: '76px' }}>Rate</Th>
           {settings.showDiscount && <Th style={{ width: '70px' }}>Disc.</Th>}
@@ -398,6 +656,12 @@ export function DocumentRenderer({
               {settings.showTax && (
                 <Td style={{ color: '#666' }}>{product.hsnCode || '—'}</Td>
               )}
+              {settings.showBatchNumber && (
+                <Td style={{ color: '#666' }}>{product.batchNumber || '—'}</Td>
+              )}
+              {settings.showExpiryDate && (
+                <Td style={{ color: '#666' }}>{product.expiryDate || '—'}</Td>
+              )}
               {settings.showQuantity && (
                 <Td style={{ color: theme.primaryColor }}>
                   {product.quantity}
@@ -407,7 +671,7 @@ export function DocumentRenderer({
                 </Td>
               )}
               <Td>{product.unitPrice.toLocaleString('en-IN')}</Td>
-              {settings.showDiscount && <Td style={{ color: '#999' }}>0</Td>}
+              {settings.showDiscount && <Td style={{ color: '#999' }}>{product.discount ?? 0}</Td>}
               {settings.showTax && (
                 <Td>
                   <div>{taxAmount.toLocaleString('en-IN')}</div>
@@ -518,7 +782,7 @@ export function DocumentRenderer({
   const NotesSection = settings.showNotes ? (
     <div style={{ ...sec, padding: '8px 16px', fontSize: '10.5px' }}>
       <span style={{ fontWeight: 700, color: theme.primaryColor }}>Notes: </span>
-      <span style={{ color: '#666' }}>Thank you for your business!</span>
+      <span style={{ color: '#666' }}>{quotation.notes || 'Thank you for your business!'}</span>
     </div>
   ) : null;
 
@@ -584,21 +848,34 @@ export function DocumentRenderer({
               : 'none',
           }}
         >
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              border: `1.5px solid ${theme.primaryColor}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '9px',
-              color: '#999',
-              borderRadius: '2px',
-            }}
-          >
-            QR Code
-          </div>
+          {quotation.paymentQr ? (
+            <img
+              src={quotation.paymentQr}
+              alt="Payment QR"
+              style={{
+                width: '64px',
+                height: '64px',
+                objectFit: 'contain',
+                borderRadius: '2px',
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                border: `1.5px solid ${theme.primaryColor}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '9px',
+                color: '#999',
+                borderRadius: '2px',
+              }}
+            >
+              QR Code
+            </div>
+          )}
           <div style={{ fontSize: '8.5px', color: '#777', marginTop: '3px' }}>Scan to Pay</div>
         </div>
       )}
@@ -614,7 +891,13 @@ export function DocumentRenderer({
             justifyContent: 'flex-end',
           }}
         >
-          {company.signature ? (
+          {quotation.signature ? (
+            <img
+              src={quotation.signature}
+              alt="Signature"
+              style={{ height: '45px', objectFit: 'contain', marginBottom: '4px' }}
+            />
+          ) : company.signature ? (
             <img
               src={company.signature}
               alt="Signature"
@@ -650,10 +933,8 @@ export function DocumentRenderer({
       <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px' }}>
         Terms &amp; Conditions
       </div>
-      <div style={{ color: '#555', lineHeight: 1.5 }}>
-        1. Goods once sold will not be taken back or exchanged.<br />
-        2. All disputes are subject to local jurisdiction only.<br />
-        3. Payment due within 30 days of the invoice/quotation date.
+      <div style={{ color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+        {quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
       </div>
     </div>
   ) : null;
@@ -681,13 +962,49 @@ export function DocumentRenderer({
       {theme.cornerDecorations && <CornerDecos color={theme.primaryColor} />}
 
       {HeaderSection}
+      {/* Zone: after_header */}
+      {RenderZoneBlocks('after_header')}
+      <ZoneIndicator zone="after_header" />
+
       {MetaSection}
+      {/* Zone: after_meta */}
+      {RenderZoneBlocks('after_meta')}
+      <ZoneIndicator zone="after_meta" />
+
       {PartySection}
+      {/* Split zones inside party section for Bill To / Ship To areas */}
+      {showZones && hasShipTo && <SplitZoneIndicators leftZone="party_left" rightZone="party_right" />}
+      {/* Zone: after_party */}
+      {RenderZoneBlocks('after_party')}
+      <ZoneIndicator zone="after_party" />
+
       {ProductTable}
+      {/* Zone: after_products */}
+      {RenderZoneBlocks('after_products')}
+      <ZoneIndicator zone="after_products" />
+
       {TotalsSection}
+      {/* Zone: after_totals */}
+      {RenderZoneBlocks('after_totals')}
+      <ZoneIndicator zone="after_totals" />
+
       {NotesSection}
       {FooterSection}
+      {/* Split zones for bank/signature area */}
+      {showZones && settings.showBankDetails && settings.showSignature && (
+        <SplitZoneIndicators leftZone="bank_left" rightZone="bank_right" />
+      )}
+      {/* Zone: after_bank */}
+      {RenderZoneBlocks('after_bank')}
+      <ZoneIndicator zone="after_bank" />
+
       {TermsSection}
+      {/* Split zones for footer area */}
+      {showZones && <SplitZoneIndicators leftZone="footer_left" rightZone="footer_right" />}
+      {/* Zone: footer */}
+      {RenderZoneBlocks('footer')}
+      <ZoneIndicator zone="footer" />
+
       {FooterStrip}
     </div>
   );

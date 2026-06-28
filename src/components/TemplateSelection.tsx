@@ -1,5 +1,5 @@
 import { QuotationTemplate, A4_WIDTH, A4_HEIGHT, CompanyProfile, TemplateCategory } from '../types';
-import { Check, Layout, Star, ChevronRight, Crown, Sparkles } from 'lucide-react';
+import { Check, Layout, Star, ChevronRight, Sparkles } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   professional: 'Professional',
@@ -156,15 +156,15 @@ function TemplateCard({
             height: A4_HEIGHT * MM_TO_PX,
           }}
         >
-          {(template.blocks || []).filter(b => b.visible).map(block => (
+          {(template.blocks || []).filter(b => b.visible && b.zone === 'canvas' && b.x !== undefined && b.y !== undefined).map(block => (
             <div
               key={block.id}
               className="absolute overflow-hidden"
               style={{
-                left: block.x * MM_TO_PX,
-                top: block.y * MM_TO_PX,
-                width: block.width * MM_TO_PX,
-                height: block.height * MM_TO_PX,
+                left: (block.x || 0) * MM_TO_PX,
+                top: (block.y || 0) * MM_TO_PX,
+                width: (block.width || 60) * MM_TO_PX,
+                height: (block.height || 30) * MM_TO_PX,
               }}
             >
               {block.type === 'company_logo' && companyProfile.logo && (

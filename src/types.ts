@@ -19,6 +19,8 @@ export interface Customer {
   district: string;
   village: string;
   gstNumber?: string;
+  // Dynamic custom fields from template schema
+  customFields?: Record<string, string | number | boolean>;
 }
 
 export interface ShipTo {
@@ -37,6 +39,18 @@ export interface Product {
   gstPercent: number;
   quantity: number;
   unitPrice: number;
+  // Fields controlled by template settings
+  batchNumber?: string;      // For medical templates
+  expiryDate?: string;       // For medical templates (format: MM/YYYY)
+  discount?: number;         // Discount percentage
+  mrp?: number;              // MRP for medical
+  partNumber?: string;       // For automobile templates
+  vehicleModel?: string;     // For automobile templates
+  warrantyMonths?: number;   // Warranty period
+  wattage?: number;          // For solar templates
+  sacCode?: string;          // For services templates
+  // Dynamic custom fields from template schema
+  customFields?: Record<string, string | number | boolean>;
 }
 
 export interface ProductCatalogItem {
@@ -64,6 +78,11 @@ export interface Quotation {
   selectedTemplateId?: string; // Link to template
   productColumns?: TableColumn[]; // Per-quotation column visibility
   gstMode?: GstMode; // GST calculation mode
+  // Dynamic fields controlled by template settings
+  notes?: string;           // Notes field
+  signature?: string;       // Signature image URL
+  paymentQr?: string;       // QR Code image URL
+  terms?: string;           // Custom terms & conditions
 }
 
 export interface NumberingSettings {
@@ -134,20 +153,105 @@ export type BlockType =
   | 'rectangle'
   | 'horizontal_line'
   | 'vertical_line'
-  | 'divider';
+  | 'divider'
+  | 'warranty'
+  | 'transport_details'
+  | 'delivery_details'
+  | 'installation_details';
+
+// Dynamic zone IDs where custom blocks can be inserted
+// Supports horizontal, vertical, split, and nested zones
+export type BlockZone =
+  // Horizontal flow zones (full width)
+  | 'after_header'       // Between header and invoice details
+  | 'after_meta'         // Between invoice details and party section
+  | 'after_party'        // Between party section and product table
+  | 'after_products'     // Between product table and totals
+  | 'after_totals'       // Between totals and bank details
+  | 'after_bank'         // Between bank details and signature
+  | 'footer'              // At the very bottom before final strip
+  // Split zones (side by side vertical columns)
+  | 'party_left'         // Left side of party section (Bill To area)
+  | 'party_right'        // Right side of party section (Ship To area)
+  | 'bank_left'          // Left side of bank section
+  | 'bank_right'         // Right side of bank/signature area
+  // Footer split zones
+  | 'footer_left'        // Left side of footer
+  | 'footer_center'      // Center of footer
+  | 'footer_right'       // Right side of footer
+  // Legacy
+  | 'canvas';            // Legacy: free-positioned on old block canvas
+
+// Field types for dynamic form generation
+export type FieldType = 'text' | 'number' | 'date' | 'select' | 'textarea' | 'checkbox';
+
+// Custom field definition for templates
+export interface TemplateField {
+  id: string;
+  key: string;              // Used to store data: e.g., 'doctor_name', 'vehicle_model'
+  label: string;            // Display label: e.g., 'Doctor Name', 'Vehicle Model'
+  type: FieldType;
+  required?: boolean;
+  placeholder?: string;
+  defaultValue?: string | number | boolean;
+  options?: { value: string; label: string }[]; // For select type
+  validation?: {
+    min?: number;
+    max?: number;
+    pattern?: string;
+    message?: string;
+  };
+  // Where this field appears
+  location: 'customer' | 'product' | 'quotation' | 'invoice';
+  // Column width when in product table (percentage)
+  columnWidth?: number;
+}
+
+// Industry-specific template schema
+export interface TemplateSchema {
+  // Industry category
+  industry: 'solar' | 'medical' | 'automobile' | 'retail' | 'services' | 'general';
+
+  // Product table columns - defines what columns appear in product table
+  productColumns: TableColumn[];
+
+  // Additional custom fields for products
+  productFields: TemplateField[];
+
+  // Additional custom fields for customer
+  customerFields: TemplateField[];
+
+  // Additional custom fields for quotation/invoice header
+  documentFields: TemplateField[];
+
+  // Default GST mode
+  defaultGstMode?: GstMode;
+
+  // Whether certain features are enabled
+  features?: {
+    enableShipTo?: boolean;
+    enableDiscount?: boolean;
+    enableBatchNumber?: boolean;
+    enableExpiryDate?: boolean;
+    enableWarranty?: boolean;
+    enableInstallation?: boolean;
+  };
+}
 
 export interface TemplateBlock {
   id: string;
   type: BlockType;
-  x: number; // mm from left
-  y: number; // mm from top
-  width: number; // mm
-  height: number; // mm
+  zone: BlockZone;       // Which dynamic zone this block belongs to
+  order: number;         // Order within the zone
+  x?: number; // mm from left (only for canvas zone)
+  y?: number; // mm from top (only for canvas zone)
+  width?: number; // mm
+  height?: number; // mm
   content?: string; // for text blocks
   style?: BlockStyle;
   visible: boolean;
-  locked?: boolean; // locked blocks cannot be dragged accidentally
-  zIndex?: number; // layer order
+  locked?: boolean;
+  zIndex?: number;
   columns?: TableColumn[]; // for product table
 }
 
@@ -399,6 +503,8 @@ export interface QuotationTemplate {
   blocks?: TemplateBlock[];  // optional: for advanced canvas editor
   productColumns?: TableColumn[];
   settings?: TemplateSettings;
+  // NEW: Template schema for dynamic form generation
+  schema?: TemplateSchema;
   createdAt: string;
   updatedAt: string;
   isDefault?: boolean;
