@@ -402,6 +402,81 @@ export function DocumentRenderer({
   };
 
   // ── SECTION 1: Company Header ─────────────────────────────────────────────
+  const headerAlign = settings.headerAlignment ?? 'left';
+
+  const CompanyInfoBlock = ({ align }: { align: 'left' | 'center' | 'right' }) => (
+    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flex: 1, flexDirection: align === 'center' ? 'column' : 'row', justifyContent: align === 'right' ? 'flex-end' : 'flex-start' }}>
+      {company.logo && (
+        <img
+          src={company.logo}
+          alt="Logo"
+          style={{ width: '52px', height: '42px', objectFit: 'contain', flexShrink: 0, alignSelf: align === 'center' ? 'center' : 'flex-start' }}
+        />
+      )}
+      <div style={{ textAlign: align }}>
+        <div
+          style={{
+            fontSize: `${theme.companyNameSize}px`,
+            fontWeight: 900,
+            color: theme.companyNameColor,
+            lineHeight: 1.15,
+            letterSpacing: '-0.2px',
+          }}
+        >
+          {company.companyName || 'Company Name'}
+        </div>
+        {company.address && (
+          <div style={{ fontSize: '10px', marginTop: '3px' }}>{company.address}</div>
+        )}
+        {settings.showGstin && company.gstNumber && (
+          <div style={{ fontSize: '10px', marginTop: '3px' }}>
+            GSTIN&nbsp;
+            <strong style={{ letterSpacing: '0.3px' }}>{company.gstNumber}</strong>
+          </div>
+        )}
+        {settings.showPhone && company.phone && (
+          <div style={{ fontSize: '10px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: align === 'center' ? 'center' : 'flex-start' }}>
+            <span>📞</span> {company.phone}
+            {company.email && (
+              <><span style={{ margin: '0 4px' }}>✉</span>{company.email}</>
+            )}
+          </div>
+        )}
+        {!settings.showPhone && company.email && (
+          <div style={{ fontSize: '10px', marginTop: '2px' }}>✉ {company.email}</div>
+        )}
+      </div>
+    </div>
+  );
+
+  const DocTypeBlock = (
+    <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '12px' }}>
+      <div
+        style={{
+          fontSize: `${theme.docTypeFontSize}px`,
+          fontWeight: 800,
+          color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
+          letterSpacing: '1px',
+        }}
+      >
+        {docLabel}
+      </div>
+      <div
+        style={{
+          fontSize: '7.5px',
+          border: `1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor}`,
+          padding: '1px 7px',
+          marginTop: '3px',
+          color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
+          letterSpacing: '0.5px',
+          display: 'inline-block',
+        }}
+      >
+        ORIGINAL FOR RECIPIENT
+      </div>
+    </div>
+  );
+
   const HeaderSection = (
     <div
       style={{
@@ -411,77 +486,49 @@ export function DocumentRenderer({
         padding: '14px 16px 12px',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        {/* Left: logo + info */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flex: 1 }}>
-          {company.logo && (
-            <img
-              src={company.logo}
-              alt="Logo"
-              style={{ width: '52px', height: '42px', objectFit: 'contain', flexShrink: 0 }}
-            />
-          )}
-          <div>
+      {headerAlign === 'center' ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1 }} />
+          <div style={{ textAlign: 'center' }}>
             <div
               style={{
-                fontSize: `${theme.companyNameSize}px`,
-                fontWeight: 900,
-                color: theme.companyNameColor,
-                lineHeight: 1.15,
-                letterSpacing: '-0.2px',
+                fontSize: `${theme.docTypeFontSize}px`,
+                fontWeight: 800,
+                color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
+                letterSpacing: '1px',
+                marginBottom: '6px',
               }}
             >
-              {company.companyName || 'Company Name'}
+              {docLabel}
             </div>
-            {settings.showGstin && company.gstNumber && (
-              <div style={{ fontSize: '10px', marginTop: '3px' }}>
-                GSTIN&nbsp;
-                <strong style={{ letterSpacing: '0.3px' }}>{company.gstNumber}</strong>
-              </div>
-            )}
-            {settings.showPhone && company.phone && (
-              <div style={{ fontSize: '10px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span>📞</span> {company.phone}
-                {company.email && (
-                  <><span style={{ margin: '0 4px' }}>✉</span>{company.email}</>
-                )}
-              </div>
-            )}
-            {!settings.showPhone && company.email && (
-              <div style={{ fontSize: '10px', marginTop: '2px' }}>✉ {company.email}</div>
-            )}
-            {company.address && (
-              <div style={{ fontSize: '10px', marginTop: '2px' }}>📍 {company.address}</div>
-            )}
+            <CompanyInfoBlock align="center" />
+          </div>
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <div
+              style={{
+                fontSize: '7.5px',
+                border: `1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor}`,
+                padding: '1px 7px',
+                color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
+                letterSpacing: '0.5px',
+                display: 'inline-block',
+              }}
+            >
+              ORIGINAL FOR RECIPIENT
+            </div>
           </div>
         </div>
-
-        {/* Right: doc type */}
-        <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '12px' }}>
-          <div
-            style={{
-              fontSize: `${theme.docTypeFontSize}px`,
-              fontWeight: 800,
-              color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
-              letterSpacing: '1px',
-            }}
-          >
-            {docLabel}
-          </div>
-          <div
-            style={{
-              fontSize: '7.5px',
-              border: `1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor}`,
-              padding: '1px 7px',
-              marginTop: '3px',
-              color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
-              letterSpacing: '0.5px',
-            }}
-          >
-            ORIGINAL FOR RECIPIENT
-          </div>
+      ) : headerAlign === 'right' ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          {DocTypeBlock}
+          <CompanyInfoBlock align="right" />
         </div>
-      </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <CompanyInfoBlock align="left" />
+          {DocTypeBlock}
+        </div>
+      )}
 
       {/* Accent bar for billbook theme */}
       {theme.accentBar && (
@@ -652,6 +699,11 @@ export function DocumentRenderer({
               <Td style={{ color: '#888', textAlign: 'center' }}>{i + 1}</Td>
               <Td style={{ textAlign: 'left' }}>
                 <div style={{ fontWeight: 500 }}>{product.name}</div>
+                {settings.showDescription && product.description?.trim() && (
+                  <div style={{ fontSize: '9.5px', color: '#666', marginTop: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                    {product.description}
+                  </div>
+                )}
               </Td>
               {settings.showTax && (
                 <Td style={{ color: '#666' }}>{product.hsnCode || '—'}</Td>
@@ -704,6 +756,7 @@ export function DocumentRenderer({
   );
 
   // ── SECTION 5: Tax Summary + Grand Total ─────────────────────────────────
+  const showTaxSummary = settings.showTaxSummary !== false;
   const TotalsSection = (
     <div
       style={{
@@ -712,45 +765,47 @@ export function DocumentRenderer({
       }}
     >
       {/* HSN / Tax Summary */}
-      <div
-        style={{
-          flex: 1,
-          padding: '10px 16px',
-          borderRight: `1px solid ${theme.sectionBorderColor}`,
-        }}
-      >
-        <div style={{ fontSize: '10px', fontWeight: 700, color: theme.primaryColor, marginBottom: '5px' }}>
-          Tax Summary
+      {showTaxSummary && (
+        <div
+          style={{
+            flex: 1,
+            padding: '10px 16px',
+            borderRight: `1px solid ${theme.sectionBorderColor}`,
+          }}
+        >
+          <div style={{ fontSize: '10px', fontWeight: 700, color: theme.primaryColor, marginBottom: '5px' }}>
+            Tax Summary
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+            <thead>
+              <tr style={{ backgroundColor: theme.tableHeaderBg, color: theme.tableHeaderTextColor }}>
+                {['HSN', 'Tax%', 'Taxable Amt', 'CGST', 'SGST'].map(h => (
+                  <th key={h} style={{ padding: '3px 5px', textAlign: h === 'HSN' ? 'left' : 'right', fontWeight: 600 }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from(taxSummary.entries()).map(([key, data]) => {
+                const [hsn, rate] = key.split('_');
+                return (
+                  <tr key={key} style={{ borderTop: `1px solid ${theme.tableBorderColor}` }}>
+                    <td style={{ padding: '2px 5px' }}>{hsn}</td>
+                    <td style={{ padding: '2px 5px', textAlign: 'right' }}>{rate}%</td>
+                    <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.taxableAmount)}</td>
+                    <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.cgstAmount)}</td>
+                    <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.sgstAmount)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
-          <thead>
-            <tr style={{ backgroundColor: theme.tableHeaderBg, color: theme.tableHeaderTextColor }}>
-              {['HSN', 'Tax%', 'Taxable Amt', 'CGST', 'SGST'].map(h => (
-                <th key={h} style={{ padding: '3px 5px', textAlign: h === 'HSN' ? 'left' : 'right', fontWeight: 600 }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from(taxSummary.entries()).map(([key, data]) => {
-              const [hsn, rate] = key.split('_');
-              return (
-                <tr key={key} style={{ borderTop: `1px solid ${theme.tableBorderColor}` }}>
-                  <td style={{ padding: '2px 5px' }}>{hsn}</td>
-                  <td style={{ padding: '2px 5px', textAlign: 'right' }}>{rate}%</td>
-                  <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.taxableAmount)}</td>
-                  <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.cgstAmount)}</td>
-                  <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.sgstAmount)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      )}
 
       {/* Grand Total */}
-      <div style={{ width: '220px', padding: '10px 16px', flexShrink: 0 }}>
+      <div style={{ width: showTaxSummary ? '220px' : '100%', padding: '10px 16px', flexShrink: 0 }}>
         <TotalRow label="Sub Total" value={`₹${fmt(totalTaxable)}`} />
         <TotalRow label="CGST" value={`₹${fmt(totalCgst)}`} />
         <TotalRow label="SGST" value={`₹${fmt(totalSgst)}`} />

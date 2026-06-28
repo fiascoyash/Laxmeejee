@@ -1,7 +1,7 @@
 import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn, GstMode, ShipTo } from '../types';
 import { CustomerDetails } from './CustomerDetails';
 import { ProductTable } from './ProductTable';
-import { Save, FileDown, Eye, Calendar, AlertCircle, Package } from 'lucide-react';
+import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, FileText } from 'lucide-react';
 
 interface Props {
   invoice: Invoice;
@@ -125,17 +125,145 @@ export function InvoiceForm({
         onGstModeChange={updateGstMode}
       />
 
-      {/* Notes */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-        <textarea
-          value={invoice.notes || ''}
-          onChange={(e) => update({ notes: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          rows={3}
-          placeholder="Additional notes for this invoice..."
-        />
-      </div>
+      {/* Dynamic Fields based on Template Settings */}
+      {selectedTemplate?.settings && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Notes */}
+            {selectedTemplate.settings.showNotes && (
+              <div className="lg:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={invoice.notes || ''}
+                  onChange={(e) => update({ notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={3}
+                  placeholder="Additional notes for this invoice..."
+                />
+              </div>
+            )}
+
+            {/* Signature Upload */}
+            {selectedTemplate.settings.showSignature && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Signature</label>
+                <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 transition-colors">
+                  {invoice.signature ? (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <img
+                        src={invoice.signature}
+                        alt="Signature"
+                        className="max-h-28 max-w-full object-contain"
+                      />
+                      <button
+                        onClick={() => update({ signature: '' })}
+                        className="absolute top-1 right-1 bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
+                        type="button"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center justify-center text-gray-500 hover:text-blue-600">
+                      <PenTool className="w-8 h-8 mb-2" />
+                      <span className="text-sm">Upload Signature</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              update({ signature: ev.target?.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* QR Code Upload */}
+            {selectedTemplate.settings.showPaymentQr && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment QR Code</label>
+                <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 transition-colors">
+                  {invoice.paymentQr ? (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <img
+                        src={invoice.paymentQr}
+                        alt="Payment QR"
+                        className="max-h-28 max-w-full object-contain"
+                      />
+                      <button
+                        onClick={() => update({ paymentQr: '' })}
+                        className="absolute top-1 right-1 bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
+                        type="button"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center justify-center text-gray-500 hover:text-blue-600">
+                      <FileText className="w-8 h-8 mb-2" />
+                      <span className="text-sm">Upload QR Code</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              update({ paymentQr: ev.target?.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Terms & Conditions */}
+            {selectedTemplate.settings.showTermsConditions && (
+              <div className="lg:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Terms & Conditions</label>
+                <textarea
+                  value={invoice.terms || ''}
+                  onChange={(e) => update({ terms: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={3}
+                  placeholder="1. Goods once sold will not be taken back or exchanged.&#10;2. All disputes are subject to local jurisdiction only."
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback Notes when no template settings */}
+      {!selectedTemplate?.settings && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+          <textarea
+            value={invoice.notes || ''}
+            onChange={(e) => update({ notes: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            rows={3}
+            placeholder="Additional notes for this invoice..."
+          />
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3 justify-end bg-white rounded-lg border border-gray-200 p-4 sticky bottom-4">
         <button

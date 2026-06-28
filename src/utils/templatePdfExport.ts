@@ -174,6 +174,58 @@ function buildDocumentHTML(params: {
 
   const accentBar = theme.accentBar ? `<div style="height:3px;background-color:${theme.primaryColor};margin:10px -16px -12px;"></div>` : '';
 
+  // Build header based on alignment
+  const headerAlign = settings.headerAlignment ?? 'left';
+  const logoHtml = company.logo ? `<img src="${company.logo}" alt="Logo" style="width:52px;height:42px;object-fit:contain;flex-shrink:0;${headerAlign === 'center' ? 'align-self:center;' : ''}" />` : '';
+
+  const companyInfoInner = `
+    <div style="font-size:${theme.companyNameSize}px;font-weight:900;color:${theme.companyNameColor};line-height:1.15;letter-spacing:-0.2px;">${company.companyName || 'Company Name'}</div>
+    ${company.address ? `<div style="font-size:10px;margin-top:3px;">${company.address}</div>` : ''}
+    ${settings.showGstin && company.gstNumber ? `<div style="font-size:10px;margin-top:3px;">GSTIN <strong style="letter-spacing:0.3px;">${company.gstNumber}</strong></div>` : ''}
+    ${settings.showPhone && company.phone ? `<div style="font-size:10px;margin-top:2px;display:flex;align-items:center;gap:4px;justify-content:${headerAlign === 'center' ? 'center' : 'flex-start'};"><span>📞</span> ${company.phone}${company.email ? '<><span style="margin:0 4px;">✉</span>' + company.email : ''}</div>` : ''}
+    ${!settings.showPhone && company.email ? `<div style="font-size:10px;margin-top:2px;">✉ ${company.email}</div>` : ''}
+  `;
+
+  const docTypeLabelHtml = `<div style="font-size:${theme.docTypeFontSize}px;font-weight:800;color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:1px;">${docLabel}</div>`;
+  const originalBadgeHtml = `<div style="font-size:7.5px;border:1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor};padding:1px 7px;color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:0.5px;display:inline-block;">ORIGINAL FOR RECIPIENT</div>`;
+
+  let headerHtml: string;
+  if (headerAlign === 'center') {
+    headerHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="flex:1;"></div>
+        <div style="text-align:center;">
+          <div style="font-size:${theme.docTypeFontSize}px;font-weight:800;color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:1px;margin-bottom:6px;">${docLabel}</div>
+          <div style="display:flex;gap:12px;align-items:flex-start;flex-direction:column;">
+            ${logoHtml}
+            <div style="text-align:center;">${companyInfoInner}</div>
+          </div>
+        </div>
+        <div style="flex:1;display:flex;justify-content:flex-end;">${originalBadgeHtml}</div>
+      </div>
+    `;
+  } else if (headerAlign === 'right') {
+    headerHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="text-align:right;flex-shrink:0;padding-right:12px;">${docTypeLabelHtml}${originalBadgeHtml}</div>
+        <div style="display:flex;gap:12px;align-items:flex-start;flex:1;flex-direction:row;justify-content:flex-end;">
+          ${logoHtml}
+          <div style="text-align:right;">${companyInfoInner}</div>
+        </div>
+      </div>
+    `;
+  } else {
+    headerHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="display:flex;gap:12px;align-items:flex-start;flex:1;">
+          ${logoHtml}
+          <div style="text-align:left;">${companyInfoInner}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;padding-left:12px;">${docTypeLabelHtml}${originalBadgeHtml}</div>
+      </div>
+    `;
+  }
+
   // Build meta cells
   const metaItems: string[] = [];
   metaItems.push(`<div><div style="font-size:8.5px;color:#777;margin-bottom:2px;">${params.documentType === 'invoice' ? 'Invoice No.' : 'Quotation No.'}</div><div style="font-weight:700;font-size:11px;">${docNumber}</div></div>`);
@@ -195,7 +247,7 @@ function buildDocumentHTML(params: {
     return `
       <tr style="background-color:${rowBg};border-bottom:1px solid ${theme.tableBorderColor};">
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#888;">${i + 1}</td>
-        <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:500;">${p.name}</div></td>
+        <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:500;">${p.name}</div>${settings.showDescription && p.description && p.description.trim() ? `<div style="font-size:9.5px;color:#666;margin-top:2px;white-space:pre-wrap;line-height:1.4;">${p.description}</div>` : ''}</td>
         ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#666;">${p.hsnCode || '—'}</td>` : ''}
         ${settings.showBatchNumber ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:#666;">${p.batchNumber || '—'}</td>` : ''}
         ${settings.showExpiryDate ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:#666;">${p.expiryDate || '—'}</td>` : ''}
@@ -279,22 +331,7 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
 
       <!-- Header Section -->
       <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;background-color:${theme.headerBg};color:${theme.headerTextColor};padding:14px 16px 12px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-          <div style="display:flex;gap:12px;align-items:flex-start;flex:1;">
-            ${company.logo ? `<img src="${company.logo}" alt="Logo" style="width:52px;height:42px;object-fit:contain;flex-shrink:0;" />` : ''}
-            <div>
-              <div style="font-size:${theme.companyNameSize}px;font-weight:900;color:${theme.companyNameColor};line-height:1.15;letter-spacing:-0.2px;">${company.companyName || 'Company Name'}</div>
-              ${settings.showGstin && company.gstNumber ? `<div style="font-size:10px;margin-top:3px;">GSTIN <strong style="letter-spacing:0.3px;">${company.gstNumber}</strong></div>` : ''}
-              ${settings.showPhone && company.phone ? `<div style="font-size:10px;margin-top:2px;display:flex;align-items:center;gap:4px;"><span>📞</span> ${company.phone}${company.email ? '<><span style="margin:0 4px;">✉</span>' + company.email : ''}</div>` : ''}
-              ${!settings.showPhone && company.email ? `<div style="font-size:10px;margin-top:2px;">✉ ${company.email}</div>` : ''}
-              ${company.address ? `<div style="font-size:10px;margin-top:2px;">📍 ${company.address}</div>` : ''}
-            </div>
-          </div>
-          <div style="text-align:right;flex-shrink:0;padding-left:12px;">
-            <div style="font-size:${theme.docTypeFontSize}px;font-weight:800;color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:1px;">${docLabel}</div>
-            <div style="font-size:7.5px;border:1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor};padding:1px 7px;margin-top:3px;color:${themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor};letter-spacing:0.5px;">ORIGINAL FOR RECIPIENT</div>
-          </div>
-        </div>
+        ${headerHtml}
         ${accentBar}
       </div>
 
@@ -347,6 +384,7 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
 
       <!-- Totals Section -->
       <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;display:flex;">
+        ${settings.showTaxSummary !== false ? `
         <div style="flex:1;padding:10px 16px;border-right:1px solid ${theme.sectionBorderColor};">
           <div style="font-size:10px;font-weight:700;color:${theme.primaryColor};margin-bottom:5px;">Tax Summary</div>
           <table style="width:100%;border-collapse:collapse;font-size:10px;">
@@ -364,7 +402,8 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
             </tbody>
           </table>
         </div>
-        <div style="width:220px;padding:10px 16px;flex-shrink:0;">
+        ` : ''}
+        <div style="width:${settings.showTaxSummary !== false ? '220px' : '100%'};padding:10px 16px;flex-shrink:0;">
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:#666;">Sub Total</span><span>₹${fmt(totalTaxable)}</span></div>
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:#666;">CGST</span><span>₹${fmt(totalCgst)}</span></div>
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:#666;">SGST</span><span>₹${fmt(totalSgst)}</span></div>

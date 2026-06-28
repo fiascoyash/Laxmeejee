@@ -90,6 +90,28 @@ export function TemplateSettingsPanel({ settings, onChange }: Props) {
 
       {/* Settings sections */}
       <div className="flex-1 overflow-y-auto">
+        {/* Header Layout */}
+        <SettingsSection
+          icon={<Settings2 className="w-4 h-4 text-blue-600" />}
+          title="Header Layout"
+        >
+          <div className="py-2 px-3">
+            <label className="block text-sm text-gray-700 mb-1.5">Header Position</label>
+            <select
+              value={settings.headerAlignment}
+              onChange={(e) => updateSetting('headerAlignment', e.target.value as 'left' | 'center' | 'right')}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+            >
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1.5">
+              Controls company header alignment in preview, PDF &amp; print.
+            </p>
+          </div>
+        </SettingsSection>
+
         {/* Invoice Details */}
         <SettingsSection
           icon={<FileText className="w-4 h-4 text-blue-600" />}
@@ -183,6 +205,18 @@ export function TemplateSettingsPanel({ settings, onChange }: Props) {
             label="Expiry Date"
             checked={settings.showExpiryDate}
             onChange={(v) => updateSetting('showExpiryDate', v)}
+          />
+        </SettingsSection>
+
+        {/* Totals */}
+        <SettingsSection
+          icon={<Table2 className="w-4 h-4 text-emerald-600" />}
+          title="Totals"
+        >
+          <SettingToggle
+            label="Show Tax Summary Table"
+            checked={settings.showTaxSummary}
+            onChange={(v) => updateSetting('showTaxSummary', v)}
           />
         </SettingsSection>
 

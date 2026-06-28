@@ -35,6 +35,7 @@ export type GstMode = 'inclusive' | 'exclusive';
 export interface Product {
   id: string;
   name: string;
+  description?: string;
   hsnCode: string;
   gstPercent: number;
   quantity: number;
@@ -115,6 +116,9 @@ export interface Invoice {
   grandTotal: number;
   status: InvoiceStatus;
   notes?: string;
+  signature?: string;       // Signature image URL
+  paymentQr?: string;       // QR Code image URL
+  terms?: string;           // Custom terms & conditions
   sourceQuotationId?: string;
   sourceQuotationNumber?: string;
   selectedTemplateId?: string;
@@ -308,6 +312,9 @@ export interface TemplateSettings {
   showNotes: boolean;
   showTermsConditions: boolean;
   showWatermark: boolean;
+  showTaxSummary: boolean;
+  // Header Layout
+  headerAlignment: 'left' | 'center' | 'right';
 }
 
 export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
@@ -332,6 +339,8 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   showNotes: true,
   showTermsConditions: true,
   showWatermark: false,
+  showTaxSummary: true,
+  headerAlignment: 'left',
 };
 
 // ─── Invoice Theme System ────────────────────────────────────────────────────

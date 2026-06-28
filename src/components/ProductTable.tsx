@@ -58,6 +58,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     const newProduct: Product = {
       id: generateId(),
       name: '',
+      description: '',
       hsnCode: '',
       gstPercent: 18,
       quantity: 1,
@@ -74,6 +75,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     const newProduct: Product = {
       id: generateId(),
       name: catalogItem.name,
+      description: '',
       hsnCode: catalogItem.hsnCode,
       gstPercent: catalogItem.gstPercent,
       quantity: 1,
@@ -119,13 +121,22 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       case 'sno': return null;
       case 'name':
         return (
-          <input
-            type="text"
-            value={product.name}
-            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Product/Service name"
-          />
+          <div className="flex flex-col gap-1.5">
+            <input
+              type="text"
+              value={product.name}
+              onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Product/Service name"
+            />
+            <textarea
+              value={product.description || ''}
+              onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm resize-y"
+              placeholder="Description (optional) — supports multi-line"
+              rows={2}
+            />
+          </div>
         );
       case 'hsnCode':
       case 'sacCode':

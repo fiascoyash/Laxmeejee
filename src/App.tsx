@@ -322,6 +322,10 @@ function App() {
       createdAt: editingInvoice.createdAt,
       selectedTemplateId: editingInvoice.selectedTemplateId,
       gstMode: editingInvoice.gstMode,
+      notes: editingInvoice.notes,
+      signature: editingInvoice.signature,
+      paymentQr: editingInvoice.paymentQr,
+      terms: editingInvoice.terms,
     } as Quotation;
 
     exportTemplatePDF(templateWithColumns, companyProfile, editingInvoice.customer, quotationProxy, editingInvoice.products, 'invoice', editingInvoice, editingInvoice.gstMode || 'inclusive');
