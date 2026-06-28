@@ -118,6 +118,12 @@ export function DocumentRenderer({
   const theme: InvoiceTheme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES.simple;
   const gstMode = quotation.gstMode ?? 'inclusive';
 
+  // Typography colors (user-customizable via Template Settings → Typography)
+  const headerTextColor = settings.headerTextColor ?? '#000000';
+  const bodyTextColor = settings.bodyTextColor ?? '#000000';
+  const tableHeaderTextColor = settings.tableHeaderTextColor ?? '#000000';
+  const totalSectionColor = settings.totalSectionColor ?? '#000000';
+
   const taxSummary = calculateTaxSummary(products, gstMode);
   const totalTaxable = roundTo2(
     Array.from(taxSummary.values()).reduce((s, t) => s + t.taxableAmount, 0),
@@ -145,7 +151,7 @@ export function DocumentRenderer({
   const outerStyle: React.CSSProperties = {
     fontFamily: "'Helvetica Neue', Arial, sans-serif",
     fontSize: '11px',
-    color: '#333',
+    color: bodyTextColor,
     backgroundColor: '#FFFFFF',
     position: 'relative',
     width: '100%',
@@ -204,7 +210,7 @@ export function DocumentRenderer({
               ) : (
                 <div style={{ height: '45px' }} />
               )}
-              <div style={{ borderTop: `1px solid ${theme.sectionBorderColor}`, paddingTop: '4px', fontSize: '9px', color: '#777' }}>
+              <div style={{ borderTop: `1px solid ${theme.sectionBorderColor}`, paddingTop: '4px', fontSize: '9px', color: bodyTextColor }}>
                 Authorised Signatory
               </div>
             </div>
@@ -216,7 +222,7 @@ export function DocumentRenderer({
               <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
                 Terms &amp; Conditions
               </div>
-              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px', whiteSpace: 'pre-wrap' }}>
+              <div style={{ color: bodyTextColor, lineHeight: 1.5, fontSize: '10px', whiteSpace: 'pre-wrap' }}>
                 {block.content || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
               </div>
             </>
@@ -224,7 +230,7 @@ export function DocumentRenderer({
 
         case 'footer_notes':
           return (
-            <div style={{ fontSize: '10px', textAlign: 'center', color: '#666', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontSize: '10px', textAlign: 'center', color: bodyTextColor, whiteSpace: 'pre-wrap' }}>
               {block.content || 'Thank you for your business!'}
             </div>
           );
@@ -235,7 +241,7 @@ export function DocumentRenderer({
               <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
                 Warranty
               </div>
-              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px', whiteSpace: 'pre-wrap' }}>
+              <div style={{ color: bodyTextColor, lineHeight: 1.5, fontSize: '10px', whiteSpace: 'pre-wrap' }}>
                 {block.content || 'Product warranty: 12 months from date of purchase.\nWarranty covers manufacturing defects only.'}
               </div>
             </>
@@ -247,7 +253,7 @@ export function DocumentRenderer({
               <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
                 Transport Details
               </div>
-              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px' }}>
+              <div style={{ color: bodyTextColor, lineHeight: 1.5, fontSize: '10px' }}>
                 {block.content || 'Transport: To be arranged by buyer'}
               </div>
             </>
@@ -259,7 +265,7 @@ export function DocumentRenderer({
               <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
                 Delivery Details
               </div>
-              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px' }}>
+              <div style={{ color: bodyTextColor, lineHeight: 1.5, fontSize: '10px' }}>
                 {block.content || 'Delivery: Within 7-10 working days\nDelivery charges extra as applicable'}
               </div>
             </>
@@ -285,7 +291,7 @@ export function DocumentRenderer({
         case 'text_block':
         default:
           return (
-            <div style={{ fontSize: '10px', color: '#555', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontSize: '10px', color: bodyTextColor, whiteSpace: 'pre-wrap' }}>
               {block.content || 'Custom content'}
             </div>
           );
@@ -417,8 +423,8 @@ export function DocumentRenderer({
         <div
           style={{
             fontSize: `${theme.companyNameSize}px`,
-            fontWeight: 900,
-            color: theme.companyNameColor,
+            fontWeight: 700,
+            color: headerTextColor,
             lineHeight: 1.15,
             letterSpacing: '-0.2px',
           }}
@@ -597,12 +603,12 @@ export function DocumentRenderer({
         </div>
         <div style={{ fontWeight: 700, fontSize: '12px' }}>{customer.name}</div>
         {settings.showBillingAddress && customer.billingAddress && (
-          <div style={{ color: '#555', marginTop: '2px', fontSize: '10.5px' }}>
+          <div style={{ color: bodyTextColor, marginTop: '2px', fontSize: '10.5px' }}>
             {customer.billingAddress}
           </div>
         )}
         {(customer.village || customer.district) && (
-          <div style={{ color: '#555', fontSize: '10.5px' }}>
+          <div style={{ color: bodyTextColor, fontSize: '10.5px' }}>
             {[customer.village, customer.district].filter(Boolean).join(', ')}
           </div>
         )}
@@ -628,7 +634,7 @@ export function DocumentRenderer({
             <div style={{ fontWeight: 700, fontSize: '12px' }}>{quotation.shipTo.name}</div>
           )}
           {quotation.shipTo?.address && (
-            <div style={{ color: '#555', marginTop: '2px', fontSize: '10.5px' }}>
+            <div style={{ color: bodyTextColor, marginTop: '2px', fontSize: '10.5px' }}>
               {quotation.shipTo.address}
             </div>
           )}
@@ -662,7 +668,8 @@ export function DocumentRenderer({
         <tr
           style={{
             backgroundColor: theme.tableHeaderBg,
-            color: theme.tableHeaderTextColor,
+            color: tableHeaderTextColor,
+            fontWeight: 600,
             borderBottom: `1.5px solid ${theme.tableBorderColor}`,
           }}
         >
@@ -696,38 +703,38 @@ export function DocumentRenderer({
                 borderBottom: `1px solid ${theme.tableBorderColor}`,
               }}
             >
-              <Td style={{ color: '#888', textAlign: 'center' }}>{i + 1}</Td>
+              <Td style={{ color: bodyTextColor, textAlign: 'center' }}>{i + 1}</Td>
               <Td style={{ textAlign: 'left' }}>
                 <div style={{ fontWeight: 500 }}>{product.name}</div>
                 {settings.showDescription && product.description?.trim() && (
-                  <div style={{ fontSize: '9.5px', color: '#666', marginTop: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '9.5px', color: bodyTextColor, marginTop: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
                     {product.description}
                   </div>
                 )}
               </Td>
               {settings.showTax && (
-                <Td style={{ color: '#666' }}>{product.hsnCode || '—'}</Td>
+                <Td style={{ color: bodyTextColor }}>{product.hsnCode || '—'}</Td>
               )}
               {settings.showBatchNumber && (
-                <Td style={{ color: '#666' }}>{product.batchNumber || '—'}</Td>
+                <Td style={{ color: bodyTextColor }}>{product.batchNumber || '—'}</Td>
               )}
               {settings.showExpiryDate && (
-                <Td style={{ color: '#666' }}>{product.expiryDate || '—'}</Td>
+                <Td style={{ color: bodyTextColor }}>{product.expiryDate || '—'}</Td>
               )}
               {settings.showQuantity && (
                 <Td style={{ color: theme.primaryColor }}>
                   {product.quantity}
                   {settings.showUnit && (
-                    <span style={{ fontSize: '9px', color: '#999', marginLeft: '2px' }}>PCS</span>
+                    <span style={{ fontSize: '9px', color: bodyTextColor, marginLeft: '2px' }}>PCS</span>
                   )}
                 </Td>
               )}
               <Td>{product.unitPrice.toLocaleString('en-IN')}</Td>
-              {settings.showDiscount && <Td style={{ color: '#999' }}>{product.discount ?? 0}</Td>}
+              {settings.showDiscount && <Td style={{ color: bodyTextColor }}>{product.discount ?? 0}</Td>}
               {settings.showTax && (
                 <Td>
                   <div>{taxAmount.toLocaleString('en-IN')}</div>
-                  <div style={{ fontSize: '9px', color: '#888' }}>({product.gstPercent}%)</div>
+                  <div style={{ fontSize: '9px', color: bodyTextColor }}>({product.gstPercent}%)</div>
                 </Td>
               )}
               <Td style={{ fontWeight: 600 }}>
@@ -778,7 +785,7 @@ export function DocumentRenderer({
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
             <thead>
-              <tr style={{ backgroundColor: theme.tableHeaderBg, color: theme.tableHeaderTextColor }}>
+              <tr style={{ backgroundColor: theme.tableHeaderBg, color: tableHeaderTextColor }}>
                 {['HSN', 'Tax%', 'Taxable Amt', 'CGST', 'SGST'].map(h => (
                   <th key={h} style={{ padding: '3px 5px', textAlign: h === 'HSN' ? 'left' : 'right', fontWeight: 600 }}>
                     {h}
@@ -806,11 +813,11 @@ export function DocumentRenderer({
 
       {/* Grand Total */}
       <div style={{ width: showTaxSummary ? '220px' : '100%', padding: '10px 16px', flexShrink: 0 }}>
-        <TotalRow label="Sub Total" value={`₹${fmt(totalTaxable)}`} />
-        <TotalRow label="CGST" value={`₹${fmt(totalCgst)}`} />
-        <TotalRow label="SGST" value={`₹${fmt(totalSgst)}`} />
+        <TotalRow label="Sub Total" value={`₹${fmt(totalTaxable)}`} color={totalSectionColor} />
+        <TotalRow label="CGST" value={`₹${fmt(totalCgst)}`} color={totalSectionColor} />
+        <TotalRow label="SGST" value={`₹${fmt(totalSgst)}`} color={totalSectionColor} />
         {roundOff !== 0 && (
-          <TotalRow label="Round Off" value={`₹${fmt(roundOff)}`} />
+          <TotalRow label="Round Off" value={`₹${fmt(roundOff)}`} color={totalSectionColor} />
         )}
         <div
           style={{
@@ -820,13 +827,14 @@ export function DocumentRenderer({
             paddingTop: '5px',
             marginTop: '5px',
             fontSize: '13px',
-            fontWeight: 800,
+            fontWeight: 700,
+            color: totalSectionColor,
           }}
         >
           <span>Total</span>
-          <span style={{ color: theme.primaryColor }}>₹{fmt(roundedGrandTotal)}</span>
+          <span style={{ color: totalSectionColor }}>₹{fmt(roundedGrandTotal)}</span>
         </div>
-        <div style={{ fontSize: '9px', color: '#777', marginTop: '4px', fontStyle: 'italic', lineHeight: 1.4 }}>
+        <div style={{ fontSize: '9px', color: totalSectionColor, marginTop: '4px', fontStyle: 'italic', lineHeight: 1.4 }}>
           {numberToWords(roundedGrandTotal)}
         </div>
       </div>
@@ -837,7 +845,7 @@ export function DocumentRenderer({
   const NotesSection = settings.showNotes ? (
     <div style={{ ...sec, padding: '8px 16px', fontSize: '10.5px' }}>
       <span style={{ fontWeight: 700, color: theme.primaryColor }}>Notes: </span>
-      <span style={{ color: '#666' }}>{quotation.notes || 'Thank you for your business!'}</span>
+      <span style={{ color: bodyTextColor }}>{quotation.notes || 'Thank you for your business!'}</span>
     </div>
   ) : null;
 
@@ -924,14 +932,14 @@ export function DocumentRenderer({
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '9px',
-                color: '#999',
+                color: bodyTextColor,
                 borderRadius: '2px',
               }}
             >
               QR Code
             </div>
           )}
-          <div style={{ fontSize: '8.5px', color: '#777', marginTop: '3px' }}>Scan to Pay</div>
+          <div style={{ fontSize: '8.5px', color: bodyTextColor, marginTop: '3px' }}>Scan to Pay</div>
         </div>
       )}
 
@@ -966,7 +974,7 @@ export function DocumentRenderer({
               borderTop: `1px solid ${theme.sectionBorderColor}`,
               paddingTop: '4px',
               fontSize: '9px',
-              color: '#777',
+              color: bodyTextColor,
             }}
           >
             Authorised Signatory
@@ -988,7 +996,7 @@ export function DocumentRenderer({
       <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px' }}>
         Terms &amp; Conditions
       </div>
-      <div style={{ color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+      <div style={{ color: bodyTextColor, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
         {quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
       </div>
     </div>
@@ -1079,7 +1087,7 @@ function MetaCell({
 }) {
   return (
     <div>
-      <div style={{ fontSize: '8.5px', color: '#777', marginBottom: '2px' }}>{label}</div>
+      <div style={{ fontSize: '8.5px', color: '#111111', marginBottom: '2px' }}>{label}</div>
       <div
         style={{
           fontWeight: 700,
@@ -1093,7 +1101,7 @@ function MetaCell({
   );
 }
 
-function TotalRow({ label, value }: { label: string; value: string }) {
+function TotalRow({ label, value, color = '#000000' }: { label: string; value: string; color?: string }) {
   return (
     <div
       style={{
@@ -1101,10 +1109,11 @@ function TotalRow({ label, value }: { label: string; value: string }) {
         justifyContent: 'space-between',
         marginBottom: '3px',
         fontSize: '11px',
+        fontWeight: 500,
       }}
     >
-      <span style={{ color: '#666' }}>{label}</span>
-      <span>{value}</span>
+      <span style={{ color, fontWeight: 600 }}>{label}</span>
+      <span style={{ color, fontWeight: 500 }}>{value}</span>
     </div>
   );
 }

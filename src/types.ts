@@ -315,6 +315,11 @@ export interface TemplateSettings {
   showTaxSummary: boolean;
   // Header Layout
   headerAlignment: 'left' | 'center' | 'right';
+  // Typography Colors
+  headerTextColor: string;    // Company name, GSTIN, phone, email
+  bodyTextColor: string;      // Customer name, address, product rows
+  tableHeaderTextColor: string; // Items, HSN, Qty, Rate, Tax
+  totalSectionColor: string;  // Subtotal, CGST, SGST, Grand Total
 }
 
 export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
@@ -341,6 +346,10 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   showWatermark: false,
   showTaxSummary: true,
   headerAlignment: 'left',
+  headerTextColor: '#000000',
+  bodyTextColor: '#000000',
+  tableHeaderTextColor: '#000000',
+  totalSectionColor: '#000000',
 };
 
 // ─── Invoice Theme System ────────────────────────────────────────────────────

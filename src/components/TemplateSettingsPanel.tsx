@@ -208,6 +208,87 @@ export function TemplateSettingsPanel({ settings, onChange }: Props) {
           />
         </SettingsSection>
 
+        {/* Typography */}
+        <SettingsSection
+          icon={<Settings2 className="w-4 h-4 text-purple-600" />}
+          title="Typography"
+        >
+          <div className="py-2 px-3 space-y-3">
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Header Text Color</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={settings.headerTextColor}
+                  onChange={(e) => updateSetting('headerTextColor', e.target.value)}
+                  className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={settings.headerTextColor}
+                  onChange={(e) => updateSetting('headerTextColor', e.target.value)}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm font-mono"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Company name, GSTIN, phone, email</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Body Text Color</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={settings.bodyTextColor}
+                  onChange={(e) => updateSetting('bodyTextColor', e.target.value)}
+                  className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={settings.bodyTextColor}
+                  onChange={(e) => updateSetting('bodyTextColor', e.target.value)}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm font-mono"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Customer name, address, product rows</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Table Header Color</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={settings.tableHeaderTextColor}
+                  onChange={(e) => updateSetting('tableHeaderTextColor', e.target.value)}
+                  className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={settings.tableHeaderTextColor}
+                  onChange={(e) => updateSetting('tableHeaderTextColor', e.target.value)}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm font-mono"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Items, HSN, Qty, Rate, Tax</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Total Section Color</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={settings.totalSectionColor}
+                  onChange={(e) => updateSetting('totalSectionColor', e.target.value)}
+                  className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={settings.totalSectionColor}
+                  onChange={(e) => updateSetting('totalSectionColor', e.target.value)}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm font-mono"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Subtotal, CGST, SGST, Grand Total</p>
+            </div>
+          </div>
+        </SettingsSection>
+
         {/* Totals */}
         <SettingsSection
           icon={<Table2 className="w-4 h-4 text-emerald-600" />}

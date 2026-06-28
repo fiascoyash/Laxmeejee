@@ -176,10 +176,14 @@ function buildDocumentHTML(params: {
 
   // Build header based on alignment
   const headerAlign = settings.headerAlignment ?? 'left';
+  const headerTextColor = settings.headerTextColor ?? '#000000';
+  const bodyTextColor = settings.bodyTextColor ?? '#000000';
+  const tableHeaderTextColor = settings.tableHeaderTextColor ?? '#000000';
+  const totalSectionColor = settings.totalSectionColor ?? '#000000';
   const logoHtml = company.logo ? `<img src="${company.logo}" alt="Logo" style="width:52px;height:42px;object-fit:contain;flex-shrink:0;${headerAlign === 'center' ? 'align-self:center;' : ''}" />` : '';
 
   const companyInfoInner = `
-    <div style="font-size:${theme.companyNameSize}px;font-weight:900;color:${theme.companyNameColor};line-height:1.15;letter-spacing:-0.2px;">${company.companyName || 'Company Name'}</div>
+    <div style="font-size:${theme.companyNameSize}px;font-weight:700;color:${headerTextColor};line-height:1.15;letter-spacing:-0.2px;">${company.companyName || 'Company Name'}</div>
     ${company.address ? `<div style="font-size:10px;margin-top:3px;">${company.address}</div>` : ''}
     ${settings.showGstin && company.gstNumber ? `<div style="font-size:10px;margin-top:3px;">GSTIN <strong style="letter-spacing:0.3px;">${company.gstNumber}</strong></div>` : ''}
     ${settings.showPhone && company.phone ? `<div style="font-size:10px;margin-top:2px;display:flex;align-items:center;gap:4px;justify-content:${headerAlign === 'center' ? 'center' : 'flex-start'};"><span>📞</span> ${company.phone}${company.email ? '<><span style="margin:0 4px;">✉</span>' + company.email : ''}</div>` : ''}
@@ -228,14 +232,14 @@ function buildDocumentHTML(params: {
 
   // Build meta cells
   const metaItems: string[] = [];
-  metaItems.push(`<div><div style="font-size:8.5px;color:#777;margin-bottom:2px;">${params.documentType === 'invoice' ? 'Invoice No.' : 'Quotation No.'}</div><div style="font-weight:700;font-size:11px;">${docNumber}</div></div>`);
-  metaItems.push(`<div><div style="font-size:8.5px;color:#777;margin-bottom:2px;">${params.documentType === 'invoice' ? 'Invoice Date' : 'Quotation Date'}</div><div style="font-weight:700;font-size:11px;">${docDate}</div></div>`);
+  metaItems.push(`<div><div style="font-size:8.5px;color:${headerTextColor};margin-bottom:2px;">${params.documentType === 'invoice' ? 'Invoice No.' : 'Quotation No.'}</div><div style="font-weight:700;font-size:11px;">${docNumber}</div></div>`);
+  metaItems.push(`<div><div style="font-size:8.5px;color:${headerTextColor};margin-bottom:2px;">${params.documentType === 'invoice' ? 'Invoice Date' : 'Quotation Date'}</div><div style="font-weight:700;font-size:11px;">${docDate}</div></div>`);
   if (settings.showDueDate) {
-    metaItems.push(`<div><div style="font-size:8.5px;color:#777;margin-bottom:2px;">Due Date</div><div style="font-weight:700;font-size:11px;color:${theme.primaryColor};">${dueDate || '—'}</div></div>`);
+    metaItems.push(`<div><div style="font-size:8.5px;color:${headerTextColor};margin-bottom:2px;">Due Date</div><div style="font-weight:700;font-size:11px;color:${theme.primaryColor};">${dueDate || '—'}</div></div>`);
   }
-  if (settings.showPoNumber) metaItems.push(`<div><div style="font-size:8.5px;color:#777;margin-bottom:2px;">PO Number</div><div style="font-weight:700;font-size:11px;">—</div></div>`);
-  if (settings.showEwayBill) metaItems.push(`<div><div style="font-size:8.5px;color:#777;margin-bottom:2px;">E-Way Bill</div><div style="font-weight:700;font-size:11px;">—</div></div>`);
-  if (settings.showVehicleNumber) metaItems.push(`<div><div style="font-size:8.5px;color:#777;margin-bottom:2px;">Vehicle No.</div><div style="font-weight:700;font-size:11px;">—</div></div>`);
+  if (settings.showPoNumber) metaItems.push(`<div><div style="font-size:8.5px;color:${headerTextColor};margin-bottom:2px;">PO Number</div><div style="font-weight:700;font-size:11px;">—</div></div>`);
+  if (settings.showEwayBill) metaItems.push(`<div><div style="font-size:8.5px;color:${headerTextColor};margin-bottom:2px;">E-Way Bill</div><div style="font-weight:700;font-size:11px;">—</div></div>`);
+  if (settings.showVehicleNumber) metaItems.push(`<div><div style="font-size:8.5px;color:${headerTextColor};margin-bottom:2px;">Vehicle No.</div><div style="font-weight:700;font-size:11px;">—</div></div>`);
 
   // Build product rows
   const productRows = products.map((p, i) => {
@@ -246,15 +250,15 @@ function buildDocumentHTML(params: {
     const rowBg = i % 2 === 1 ? theme.tableRowAltBg : '#FFFFFF';
     return `
       <tr style="background-color:${rowBg};border-bottom:1px solid ${theme.tableBorderColor};">
-        <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#888;">${i + 1}</td>
-        <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:500;">${p.name}</div>${settings.showDescription && p.description && p.description.trim() ? `<div style="font-size:9.5px;color:#666;margin-top:2px;white-space:pre-wrap;line-height:1.4;">${p.description}</div>` : ''}</td>
-        ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#666;">${p.hsnCode || '—'}</td>` : ''}
-        ${settings.showBatchNumber ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:#666;">${p.batchNumber || '—'}</td>` : ''}
-        ${settings.showExpiryDate ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:#666;">${p.expiryDate || '—'}</td>` : ''}
-        ${settings.showQuantity ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${theme.primaryColor};">${p.quantity}${settings.showUnit ? '<span style="font-size:9px;color:#999;margin-left:2px;">PCS</span>' : ''}</td>` : ''}
+        <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${i + 1}</td>
+        <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:500;">${p.name}</div>${settings.showDescription && p.description && p.description.trim() ? `<div style="font-size:9.5px;color:${bodyTextColor};margin-top:2px;white-space:pre-wrap;line-height:1.4;">${p.description}</div>` : ''}</td>
+        ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${p.hsnCode || '—'}</td>` : ''}
+        ${settings.showBatchNumber ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${p.batchNumber || '—'}</td>` : ''}
+        ${settings.showExpiryDate ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${p.expiryDate || '—'}</td>` : ''}
+        ${settings.showQuantity ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${theme.primaryColor};">${p.quantity}${settings.showUnit ? '<span style="font-size:9px;color:${bodyTextColor};margin-left:2px;">PCS</span>' : ''}</td>` : ''}
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;">${p.unitPrice.toLocaleString('en-IN')}</td>
-        ${settings.showDiscount ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:#999;">${p.discount ?? 0}</td>` : ''}
-        ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;"><div>${taxAmount.toLocaleString('en-IN')}</div><div style="font-size:9px;color:#888;">(${p.gstPercent}%)</div></td>` : ''}
+        ${settings.showDiscount ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};">${p.discount ?? 0}</td>` : ''}
+        ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;"><div>${taxAmount.toLocaleString('en-IN')}</div><div style="font-size:9px;color:${bodyTextColor};">(${p.gstPercent}%)</div></td>` : ''}
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;font-weight:600;">${amount.toLocaleString('en-IN')}</td>
       </tr>
     `;
@@ -278,7 +282,7 @@ function buildDocumentHTML(params: {
   const notesSection = settings.showNotes ? `
     <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;padding:8px 16px;font-size:10.5px;">
       <span style="font-weight:700;color:${theme.primaryColor};">Notes: </span>
-      <span style="color:#666;">${quotation.notes || 'Thank you for your business!'}</span>
+      <span style="color:${bodyTextColor};">${quotation.notes || 'Thank you for your business!'}</span>
     </div>
   ` : '';
 
@@ -294,15 +298,15 @@ function buildDocumentHTML(params: {
 
   const qrSection = settings.showPaymentQr ? `
     <div style="padding:10px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:${settings.showSignature ? `1px solid ${theme.sectionBorderColor}` : 'none'};">
-      ${quotation.paymentQr ? `<img src="${quotation.paymentQr}" alt="Payment QR" style="width:64px;height:64px;object-fit:contain;border-radius:2px;" />` : '<div style="width:64px;height:64px;border:1.5px solid ' + theme.primaryColor + ';display:flex;align-items:center;justify-content:center;font-size:9px;color:#999;border-radius:2px;">QR Code</div>'}
-      <div style="font-size:8.5px;color:#777;margin-top:3px;">Scan to Pay</div>
+      ${quotation.paymentQr ? `<img src="${quotation.paymentQr}" alt="Payment QR" style="width:64px;height:64px;object-fit:contain;border-radius:2px;" />` : '<div style="width:64px;height:64px;border:1.5px solid ' + theme.primaryColor + ';display:flex;align-items:center;justify-content:center;font-size:9px;color:${bodyTextColor};border-radius:2px;">QR Code</div>'}
+      <div style="font-size:8.5px;color:${bodyTextColor};margin-top:3px;">Scan to Pay</div>
     </div>
   ` : '';
 
   const sigSection = settings.showSignature ? `
     <div style="padding:10px 16px;text-align:center;min-width:130px;display:flex;flex-direction:column;justify-content:flex-end;">
       ${quotation.signature ? `<img src="${quotation.signature}" alt="Signature" style="height:45px;object-fit:contain;margin-bottom:4px;" />` : company.signature ? `<img src="${company.signature}" alt="Signature" style="height:45px;object-fit:contain;margin-bottom:4px;" />` : '<div style="height:45px;"></div>'}
-      <div style="border-top:1px solid ${theme.sectionBorderColor};padding-top:4px;font-size:9px;color:#777;">Authorised Signatory</div>
+      <div style="border-top:1px solid ${theme.sectionBorderColor};padding-top:4px;font-size:9px;color:${bodyTextColor};">Authorised Signatory</div>
     </div>
   ` : '';
 
@@ -318,7 +322,7 @@ function buildDocumentHTML(params: {
   const termsSection = settings.showTermsConditions ? `
     <div style="border-bottom:1px solid ${theme.sectionBorderColor};position:relative;z-index:1;padding:8px 16px;font-size:10px;">
       <div style="font-weight:700;color:${theme.primaryColor};margin-bottom:3px;">Terms &amp; Conditions</div>
-      <div style="color:#555;line-height:1.5;white-space:pre-wrap;">
+      <div style="color:${bodyTextColor};line-height:1.5;white-space:pre-wrap;">
 ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
       </div>
     </div>
@@ -345,8 +349,8 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
         <div style="flex:1;padding:10px 16px;border-right:${hasShipTo ? `1px solid ${theme.sectionBorderColor}` : 'none'};">
           <div style="font-size:10px;font-weight:700;color:${theme.primaryColor};margin-bottom:4px;">Bill To</div>
           <div style="font-weight:700;font-size:12px;">${customer.name}</div>
-          ${settings.showBillingAddress && customer.billingAddress ? `<div style="color:#555;margin-top:2px;font-size:10.5px;">${customer.billingAddress}</div>` : ''}
-          ${(customer.village || customer.district) ? `<div style="color:#555;font-size:10.5px;">${[customer.village, customer.district].filter(Boolean).join(', ')}</div>` : ''}
+          ${settings.showBillingAddress && customer.billingAddress ? `<div style="color:${bodyTextColor};margin-top:2px;font-size:10.5px;">${customer.billingAddress}</div>` : ''}
+          ${(customer.village || customer.district) ? `<div style="color:${bodyTextColor};font-size:10.5px;">${[customer.village, customer.district].filter(Boolean).join(', ')}</div>` : ''}
           ${settings.showPhone && customer.mobile ? `<div style="margin-top:2px;font-size:10.5px;">Mobile <strong>${customer.mobile}</strong></div>` : ''}
           ${settings.showGstin && customer.gstNumber ? `<div style="font-size:10.5px;">GSTIN <strong>${customer.gstNumber}</strong></div>` : ''}
         </div>
@@ -354,7 +358,7 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
           <div style="flex:1;padding:10px 16px;">
             <div style="font-size:10px;font-weight:700;color:${theme.primaryColor};margin-bottom:4px;">Ship To</div>
             ${quotation.shipTo?.name ? `<div style="font-weight:700;font-size:12px;">${quotation.shipTo.name}</div>` : ''}
-            ${quotation.shipTo?.address ? `<div style="color:#555;margin-top:2px;font-size:10.5px;">${quotation.shipTo.address}</div>` : ''}
+            ${quotation.shipTo?.address ? `<div style="color:${bodyTextColor};margin-top:2px;font-size:10.5px;">${quotation.shipTo.address}</div>` : ''}
             ${settings.showPhone && quotation.shipTo?.mobile ? `<div style="margin-top:2px;font-size:10.5px;">Mobile <strong>${quotation.shipTo.mobile}</strong></div>` : ''}
             ${settings.showGstin && quotation.shipTo?.gstNumber ? `<div style="font-size:10.5px;">GSTIN <strong>${quotation.shipTo.gstNumber}</strong></div>` : ''}
           </div>
@@ -364,7 +368,7 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
       <!-- Product Table -->
       <table style="width:100%;border-collapse:collapse;position:relative;z-index:1;border-bottom:1px solid ${theme.sectionBorderColor};">
         <thead>
-          <tr style="background-color:${theme.tableHeaderBg};color:${theme.tableHeaderTextColor};border-bottom:1.5px solid ${theme.tableBorderColor};">
+          <tr style="background-color:${theme.tableHeaderBg};color:${tableHeaderTextColor};font-weight:600;border-bottom:1.5px solid ${theme.tableBorderColor};">
             <th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:32px;">No</th>
             <th style="padding:6px 8px;text-align:left;font-weight:700;font-size:10.5px;white-space:nowrap;">Items</th>
             ${settings.showTax ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">HSN No.</th>` : ''}
@@ -389,7 +393,7 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
           <div style="font-size:10px;font-weight:700;color:${theme.primaryColor};margin-bottom:5px;">Tax Summary</div>
           <table style="width:100%;border-collapse:collapse;font-size:10px;">
             <thead>
-              <tr style="background-color:${theme.tableHeaderBg};color:${theme.tableHeaderTextColor};">
+              <tr style="background-color:${theme.tableHeaderBg};color:${tableHeaderTextColor};font-weight:600;">
                 <th style="padding:3px 5px;text-align:left;font-weight:600;">HSN</th>
                 <th style="padding:3px 5px;text-align:right;font-weight:600;">Tax%</th>
                 <th style="padding:3px 5px;text-align:right;font-weight:600;">Taxable Amt</th>
@@ -404,12 +408,12 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
         </div>
         ` : ''}
         <div style="width:${settings.showTaxSummary !== false ? '220px' : '100%'};padding:10px 16px;flex-shrink:0;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:#666;">Sub Total</span><span>₹${fmt(totalTaxable)}</span></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:#666;">CGST</span><span>₹${fmt(totalCgst)}</span></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:#666;">SGST</span><span>₹${fmt(totalSgst)}</span></div>
-          ${roundOff !== 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:#666;">Round Off</span><span>₹${fmt(roundOff)}</span></div>` : ''}
-          <div style="display:flex;justify-content:space-between;border-top:1.5px solid ${theme.sectionBorderColor};padding-top:5px;margin-top:5px;font-size:13px;font-weight:800;"><span>Total</span><span style="color:${theme.primaryColor};">₹${fmt(roundedGrandTotal)}</span></div>
-          <div style="font-size:9px;color:#777;margin-top:4px;font-style:italic;line-height:1.4;">${numberToWords(roundedGrandTotal)}</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:${totalSectionColor};font-weight:600;">Sub Total</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalTaxable)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:${totalSectionColor};font-weight:600;">CGST</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalCgst)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:${totalSectionColor};font-weight:600;">SGST</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(totalSgst)}</span></div>
+          ${roundOff !== 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;"><span style="color:${totalSectionColor};font-weight:600;">Round Off</span><span style="color:${totalSectionColor};font-weight:500;">₹${fmt(roundOff)}</span></div>` : ''}
+          <div style="display:flex;justify-content:space-between;border-top:1.5px solid ${theme.sectionBorderColor};padding-top:5px;margin-top:5px;font-size:13px;font-weight:700;color:${totalSectionColor};"><span>Total</span><span style="color:${totalSectionColor};">₹${fmt(roundedGrandTotal)}</span></div>
+          <div style="font-size:9px;color:${totalSectionColor};margin-top:4px;font-style:italic;line-height:1.4;">${numberToWords(roundedGrandTotal)}</div>
         </div>
       </div>
 
