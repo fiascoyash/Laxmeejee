@@ -1,6 +1,24 @@
 import { useState } from 'react';
-import { QuotationTemplate } from '../types';
-import { Edit2, Trash2, Copy, Eye, Layout, Star, MoreVertical } from 'lucide-react';
+import { QuotationTemplate, TemplateCategory } from '../types';
+import { Edit2, Trash2, Copy, Eye, Layout, Star, MoreVertical, Crown, Sparkles } from 'lucide-react';
+
+const CATEGORY_LABELS: Record<TemplateCategory, string> = {
+  professional: 'Professional',
+  gst: 'GST Focused',
+  retail: 'Retail',
+  modern: 'Modern',
+  luxury: 'Luxury',
+  specialty: 'Specialty',
+};
+
+const CATEGORY_COLORS: Record<TemplateCategory, string> = {
+  professional: 'bg-gray-100 text-gray-700',
+  gst: 'bg-green-100 text-green-700',
+  retail: 'bg-orange-100 text-orange-700',
+  modern: 'bg-blue-100 text-blue-700',
+  luxury: 'bg-amber-100 text-amber-700',
+  specialty: 'bg-purple-100 text-purple-700',
+};
 
 interface Props {
   templates: QuotationTemplate[];
@@ -55,12 +73,33 @@ export function TemplateLibrary({
         {templates.map(template => (
           <div
             key={template.id}
-            className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+            className={`bg-white rounded-lg border overflow-hidden hover:shadow-md transition-shadow ${
+              template.isPremium ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-200'
+            }`}
           >
             {/* Template Preview Thumbnail */}
-            <div className="h-40 bg-gray-50 border-b flex items-center justify-center relative">
+            <div className={`h-40 border-b flex items-center justify-center relative ${
+              template.isPremium ? 'bg-gradient-to-br from-amber-50 to-yellow-50' : 'bg-gray-50'
+            }`}>
               <div className="text-4xl text-gray-300">
-                <Layout className="w-12 h-12 mx-auto" />
+                {template.isPremium ? (
+                  <Crown className="w-12 h-12 mx-auto text-amber-400" />
+                ) : (
+                  <Layout className="w-12 h-12 mx-auto" />
+                )}
+              </div>
+              {/* Badges */}
+              <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
+                {template.category && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[template.category]}`}>
+                    {CATEGORY_LABELS[template.category]}
+                  </span>
+                )}
+                {template.isPremium && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-500 text-white flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> Premium
+                  </span>
+                )}
               </div>
               {template.isDefault && (
                 <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded flex items-center gap-1">
@@ -158,7 +197,7 @@ export function TemplateLibrary({
               </div>
 
               <div className="text-xs text-gray-400 mt-3">
-                {template.blocks.length} blocks · Updated {new Date(template.updatedAt).toLocaleDateString()}
+                {(template.blocks || []).length} blocks · Updated {new Date(template.updatedAt).toLocaleDateString()}
               </div>
             </div>
           </div>

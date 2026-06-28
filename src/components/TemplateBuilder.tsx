@@ -1,16 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   QuotationTemplate, TemplateBlock, BlockType, BlockStyle, TableColumn,
-  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT
+  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES
 } from '../types';
 import { generateId, getDefaultProductColumns, calculateProductAmount, calculateTaxSummary } from '../utils/storage';
 import {
   Trash2, Plus, Save, Settings, Type, Image,
   Building2, User, FileText, Calendar, Table, CreditCard, PenTool, FileWarning, Truck,
   ChevronDown, GripVertical, LucideIcon, Square, Minus, MoveVertical, AlignJustify,
-  Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Undo2, Redo2, Copy, Keyboard, X
+  Lock, Unlock, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Undo2, Redo2, Copy, Keyboard, X, PanelLeftClose, PanelLeft, Eye, EyeOff, Palette
 } from 'lucide-react';
 import { useTemplateHistory } from '../hooks/useTemplateHistory';
+import { TemplateSettingsPanel } from './TemplateSettingsPanel';
+import { DocumentRenderer } from './DocumentRenderer';
 
 interface Props {
   template: QuotationTemplate;
@@ -69,13 +71,17 @@ const BLOCK_LABELS: Record<BlockType, string> = {
 const MM_TO_PX = 3.7795275591; // 1mm = 3.78px at 96 DPI
 
 export function TemplateBuilder({ template, companyProfile, sampleData, onSave, onClose }: Props) {
-  const [blocks, setBlocks] = useState<TemplateBlock[]>(template.blocks);
+  const [blocks, setBlocks] = useState<TemplateBlock[]>(template.blocks || []);
   const [productColumns, setProductColumns] = useState<TableColumn[]>(template.productColumns || getDefaultProductColumns());
+  const [templateSettings, setTemplateSettings] = useState<TemplateSettings>(template.settings || DEFAULT_TEMPLATE_SETTINGS);
+  const [themeId, setThemeId] = useState<ThemeId>((template as any).themeId || 'simple');
+  const [useFlowPreview, setUseFlowPreview] = useState(true); // Toggle between flow preview and block editor
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState(template.name);
   const [templateDescription, setTemplateDescription] = useState(template.description || '');
   const [showAddBlock, setShowAddBlock] = useState(false);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [draggingBlock, setDraggingBlock] = useState<string | null>(null);
   const [resizingBlock, setResizingBlock] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
@@ -101,7 +107,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
   // Push initial state to history
   useEffect(() => {
-    pushState({ blocks: template.blocks, productColumns: template.productColumns || getDefaultProductColumns() });
+    pushState({ blocks: template.blocks || [], productColumns: template.productColumns || getDefaultProductColumns() });
   }, []);
 
   // Apply undo/redo state
@@ -161,12 +167,15 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
       id: template.id || generateId(),
       name: templateName,
       description: templateDescription,
-      blocks,
+      category: template.category || 'professional',
+      themeId,
+      blocks: useFlowPreview ? [] : blocks, // Only save blocks if using legacy editor
       productColumns,
+      settings: templateSettings,
       updatedAt: new Date().toISOString(),
     };
     onSave(updatedTemplate);
-  }, [template, templateName, templateDescription, blocks, productColumns, onSave]);
+  }, [template, templateName, templateDescription, blocks, productColumns, templateSettings, themeId, useFlowPreview, onSave]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -841,6 +850,57 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               Table Columns
             </button>
           </div>
+          <div className="mt-2">
+            <button
+              onClick={() => setShowSettingsPanel(!showSettingsPanel)}
+              className={`w-full px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2 ${
+                showSettingsPanel
+                  ? 'bg-blue-600 text-white'
+                  : 'border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {showSettingsPanel ? <PanelLeft className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+              Template Settings
+            </button>
+          </div>
+
+          {/* Theme Selector */}
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Theme</label>
+            <select
+              value={themeId}
+              onChange={(e) => setThemeId(e.target.value as ThemeId)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+            >
+              {Object.values(INVOICE_THEMES).map(theme => (
+                <option key={theme.id} value={theme.id}>{theme.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Preview Mode Toggle */}
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => setUseFlowPreview(true)}
+              className={`flex-1 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-1.5 ${
+                useFlowPreview
+                  ? 'bg-green-600 text-white'
+                  : 'border border-gray-300 hover:bg-gray-50 text-gray-700'
+              }`}
+            >
+              <Eye className="w-4 h-4" /> Flow
+            </button>
+            <button
+              onClick={() => setUseFlowPreview(false)}
+              className={`flex-1 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-1.5 ${
+                !useFlowPreview
+                  ? 'bg-blue-600 text-white'
+                  : 'border border-gray-300 hover:bg-gray-50 text-gray-700'
+              }`}
+            >
+              <Palette className="w-4 h-4" /> Blocks
+            </button>
+          </div>
         </div>
 
         {/* Column Settings Panel */}
@@ -924,104 +984,134 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
       {/* Main Canvas Area */}
       <div className="flex-1 overflow-auto p-8 bg-gray-200 flex items-start justify-center">
-        <div
-          ref={(node) => {
-            containerRef.current = node;
-            canvasRef.current = node;
-          }}
-          tabIndex={0}
-          className="bg-white shadow-2xl relative outline-none"
-          style={{
-            width: A4_WIDTH * MM_TO_PX,
-            height: A4_HEIGHT * MM_TO_PX,
-          }}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          {/* A4 Grid Lines (subtle) */}
-          <div className="absolute inset-0 pointer-events-none opacity-10">
-            {[...Array(22)].map((_, i) => (
-              <div key={`v${i}`} className="absolute top-0 bottom-0 border-l border-gray-400" style={{ left: i * 10 * MM_TO_PX }} />
-            ))}
-            {[...Array(30)].map((_, i) => (
-              <div key={`h${i}`} className="absolute left-0 right-0 border-t border-gray-400" style={{ top: i * 10 * MM_TO_PX }} />
+        {useFlowPreview ? (
+          // Flow-based preview using DocumentRenderer
+          <div
+            className="bg-white shadow-2xl relative"
+            style={{
+              width: A4_WIDTH * MM_TO_PX,
+              minHeight: A4_HEIGHT * MM_TO_PX,
+            }}
+          >
+            <DocumentRenderer
+              themeId={themeId}
+              settings={templateSettings}
+              company={companyProfile}
+              customer={sampleData.customer}
+              quotation={sampleData.quotation}
+              products={sampleData.products}
+              docType="quotation"
+            />
+          </div>
+        ) : (
+          // Legacy block-based editor
+          <div
+            ref={(node) => {
+              containerRef.current = node;
+              canvasRef.current = node;
+            }}
+            tabIndex={0}
+            className="bg-white shadow-2xl relative outline-none"
+            style={{
+              width: A4_WIDTH * MM_TO_PX,
+              height: A4_HEIGHT * MM_TO_PX,
+            }}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            {/* A4 Grid Lines (subtle) */}
+            <div className="absolute inset-0 pointer-events-none opacity-10">
+              {[...Array(22)].map((_, i) => (
+                <div key={`v${i}`} className="absolute top-0 bottom-0 border-l border-gray-400" style={{ left: i * 10 * MM_TO_PX }} />
+              ))}
+              {[...Array(30)].map((_, i) => (
+                <div key={`h${i}`} className="absolute left-0 right-0 border-t border-gray-400" style={{ top: i * 10 * MM_TO_PX }} />
+              ))}
+            </div>
+
+            {/* Blocks */}
+            {blocks.filter(b => b.visible).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map(block => (
+              <div
+                key={block.id}
+                className={`absolute ${block.locked ? 'cursor-default' : 'cursor-move'} overflow-visible ${
+                  selectedBlock === block.id ? 'ring-2 ring-blue-500' : ''
+                } ${draggingBlock === block.id ? 'opacity-80' : ''}`}
+                style={{
+                  left: block.x * MM_TO_PX,
+                  top: block.y * MM_TO_PX,
+                  width: block.width * MM_TO_PX,
+                  height: block.height * MM_TO_PX,
+                }}
+                onMouseDown={(e) => handleMouseDown(e, block.id)}
+              >
+                <div className="w-full h-full overflow-hidden">
+                  {renderBlockContent(block)}
+                </div>
+
+                {/* Lock indicator */}
+                {block.locked && (
+                  <div className="absolute top-0 right-0 p-0.5 bg-amber-100 rounded-bl">
+                    <Lock className="w-3 h-3 text-amber-600" />
+                  </div>
+                )}
+
+                {/* Floating Action Toolbar */}
+                {selectedBlock === block.id && !draggingBlock && !resizingBlock && (
+                  <div
+                    className="absolute -top-10 left-0 flex gap-1 bg-white shadow-lg rounded-md p-1 border border-gray-200 z-50"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicateBlock(block.id);
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                      title="Duplicate Block"
+                    >
+                      <Copy className="w-3 h-3" /> Duplicate
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeBlock(block.id);
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors"
+                      title="Delete Block"
+                    >
+                      <Trash2 className="w-3 h-3" /> Delete
+                    </button>
+                  </div>
+                )}
+
+                {/* Resize Handle */}
+                {!block.locked && (
+                  <div
+                    className="resize-handle absolute bottom-0 right-0 w-3 h-3 bg-blue-500 cursor-se-resize opacity-0 hover:opacity-100"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      setResizingBlock(block.id);
+                    }}
+                  />
+                )}
+              </div>
             ))}
           </div>
-
-          {/* Blocks */}
-          {blocks.filter(b => b.visible).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map(block => (
-            <div
-              key={block.id}
-              className={`absolute ${block.locked ? 'cursor-default' : 'cursor-move'} overflow-visible ${
-                selectedBlock === block.id ? 'ring-2 ring-blue-500' : ''
-              } ${draggingBlock === block.id ? 'opacity-80' : ''}`}
-              style={{
-                left: block.x * MM_TO_PX,
-                top: block.y * MM_TO_PX,
-                width: block.width * MM_TO_PX,
-                height: block.height * MM_TO_PX,
-              }}
-              onMouseDown={(e) => handleMouseDown(e, block.id)}
-            >
-              <div className="w-full h-full overflow-hidden">
-                {renderBlockContent(block)}
-              </div>
-
-              {/* Lock indicator */}
-              {block.locked && (
-                <div className="absolute top-0 right-0 p-0.5 bg-amber-100 rounded-bl">
-                  <Lock className="w-3 h-3 text-amber-600" />
-                </div>
-              )}
-
-              {/* Floating Action Toolbar */}
-              {selectedBlock === block.id && !draggingBlock && !resizingBlock && (
-                <div
-                  className="absolute -top-10 left-0 flex gap-1 bg-white shadow-lg rounded-md p-1 border border-gray-200 z-50"
-                  onMouseDown={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      duplicateBlock(block.id);
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                    title="Duplicate Block"
-                  >
-                    <Copy className="w-3 h-3" /> Duplicate
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeBlock(block.id);
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors"
-                    title="Delete Block"
-                  >
-                    <Trash2 className="w-3 h-3" /> Delete
-                  </button>
-                </div>
-              )}
-
-              {/* Resize Handle */}
-              {!block.locked && (
-                <div
-                  className="resize-handle absolute bottom-0 right-0 w-3 h-3 bg-blue-500 cursor-se-resize opacity-0 hover:opacity-100"
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    setResizingBlock(block.id);
-                  }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
+        )}
       </div>
 
-      {/* Right Sidebar - Properties */}
-      <div className="w-64 bg-white border-l border-gray-200 p-4">
-        <h3 className="font-semibold text-gray-800 mb-4">Properties</h3>
+      {/* Right Sidebar - Properties or Settings */}
+      {showSettingsPanel ? (
+        <div className="w-72 border-l border-gray-200">
+          <TemplateSettingsPanel
+            settings={templateSettings}
+            onChange={setTemplateSettings}
+          />
+        </div>
+      ) : (
+        <div className="w-64 bg-white border-l border-gray-200 p-4">
+          <h3 className="font-semibold text-gray-800 mb-4">Properties</h3>
         {selectedBlock ? (
           <>
             {(() => {
@@ -1346,7 +1436,8 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

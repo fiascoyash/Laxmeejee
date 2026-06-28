@@ -1,5 +1,23 @@
-import { QuotationTemplate, A4_WIDTH, A4_HEIGHT, CompanyProfile } from '../types';
-import { Check, Layout, Star, ChevronRight } from 'lucide-react';
+import { QuotationTemplate, A4_WIDTH, A4_HEIGHT, CompanyProfile, TemplateCategory } from '../types';
+import { Check, Layout, Star, ChevronRight, Crown, Sparkles } from 'lucide-react';
+
+const CATEGORY_LABELS: Record<TemplateCategory, string> = {
+  professional: 'Professional',
+  gst: 'GST Focused',
+  retail: 'Retail',
+  modern: 'Modern',
+  luxury: 'Luxury',
+  specialty: 'Specialty',
+};
+
+const CATEGORY_COLORS: Record<TemplateCategory, string> = {
+  professional: 'bg-gray-100 text-gray-700',
+  gst: 'bg-green-100 text-green-700',
+  retail: 'bg-orange-100 text-orange-700',
+  modern: 'bg-blue-100 text-blue-700',
+  luxury: 'bg-amber-100 text-amber-700',
+  specialty: 'bg-purple-100 text-purple-700',
+};
 
 interface Props {
   templates: QuotationTemplate[];
@@ -96,9 +114,23 @@ function TemplateCard({
     <button
       onClick={onClick}
       className={`relative bg-white rounded-xl border-2 p-4 text-left transition-all hover:shadow-lg ${
-        isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'
+        isSelected ? 'border-blue-500 ring-2 ring-blue-200' : template.isPremium ? 'border-amber-300 hover:border-amber-400' : 'border-gray-200 hover:border-gray-300'
       }`}
     >
+      {/* Category badge */}
+      {template.category && (
+        <div className="absolute top-2 left-2 flex gap-1">
+          <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${CATEGORY_COLORS[template.category]}`}>
+            {CATEGORY_LABELS[template.category]}
+          </span>
+          {template.isPremium && (
+            <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-amber-500 text-white flex items-center gap-0.5">
+              <Sparkles className="w-2.5 h-2.5" /> Premium
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Selection indicator */}
       {isSelected && (
         <div className="absolute top-2 right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
@@ -107,14 +139,16 @@ function TemplateCard({
       )}
 
       {/* Default badge */}
-      {isDefault && !isSelected && (
+      {isDefault && !isSelected && !template.isPremium && (
         <div className="absolute top-2 right-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full flex items-center gap-1">
           <Star className="w-3 h-3" /> Default
         </div>
       )}
 
       {/* Mini preview */}
-      <div className="h-32 bg-gray-50 rounded-lg mb-3 overflow-hidden relative">
+      <div className={`h-32 rounded-lg mb-3 overflow-hidden relative ${
+        template.isPremium ? 'bg-gradient-to-br from-amber-50 to-yellow-50' : 'bg-gray-50'
+      }`}>
         <div
           className="bg-white shadow-sm absolute transform origin-top-left scale-[0.4]"
           style={{
@@ -122,7 +156,7 @@ function TemplateCard({
             height: A4_HEIGHT * MM_TO_PX,
           }}
         >
-          {template.blocks.filter(b => b.visible).map(block => (
+          {(template.blocks || []).filter(b => b.visible).map(block => (
             <div
               key={block.id}
               className="absolute overflow-hidden"
@@ -169,7 +203,7 @@ function TemplateCard({
       )}
 
       <div className="mt-2 text-xs text-gray-400">
-        {template.blocks.length} blocks
+        {(template.blocks || []).length} blocks
       </div>
     </button>
   );
