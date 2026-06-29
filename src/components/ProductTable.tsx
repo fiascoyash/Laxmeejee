@@ -47,22 +47,24 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
 
   const settings = templateSettings || DEFAULT_TEMPLATE_SETTINGS;
 
-  // SINGLE SOURCE OF TRUTH: Template schema productColumns
-  // If schema.productColumns exists, use it. Otherwise fall back to settings-based visibility.
-  const activeColumns = useMemo(() => {
-    // PRIORITY 1: Use template schema columns if available
+  // Build the FULL master list of all available columns from schema/settings
+  // Always includes ALL built-in columns so they are available for toggling.
+  const masterColumns = useMemo(() => {
+    const allColumns = Object.values(getBuiltinColumns());
+
     if (schema?.productColumns && schema.productColumns.length > 0) {
-      // Merge with built-in column definitions to ensure proper rendering
-      const builtin = getBuiltinColumns();
-      return schema.productColumns.map(col => {
-        // Use built-in column as base if available, otherwise use schema column
-        const base = builtin[col.key] || col;
-        return { ...base, ...col };
+      const schemaMap = new Map(schema.productColumns.map(c => [c.key, c]));
+      return allColumns.map(col => {
+        const schemaCol = schemaMap.get(col.key);
+        if (schemaCol) {
+          // Column is in schema: use schema visibility
+          return { ...col, ...schemaCol, visible: schemaCol.visible !== false };
+        }
+        // Column is NOT in schema: hidden by default but available for toggling
+        return { ...col, visible: false };
       });
     }
 
-    // PRIORITY 2: Fall back to settings-based visibility
-    const allColumns = Object.values(getBuiltinColumns());
     return allColumns.map(col => {
       const settingMap: Record<string, boolean> = {
         description: settings.showDescription,
@@ -73,13 +75,26 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
         batchNumber: settings.showBatchNumber,
         expiryDate: settings.showExpiryDate,
       };
-
       if (col.key in settingMap) {
         return { ...col, visible: settingMap[col.key] ?? col.visible };
       }
       return col;
     });
   }, [schema, settings]);
+
+  // Overlay user toggled visibility on top of master columns
+  const activeColumns = useMemo(() => {
+    if (columns && columns.length > 0) {
+      const userVis = new Map(columns.map(c => [c.key, c.visible]));
+      return masterColumns.map(col => {
+        if (userVis.has(col.key)) {
+          return { ...col, visible: userVis.get(col.key) };
+        }
+        return col;
+      });
+    }
+    return masterColumns;
+  }, [columns, masterColumns]);
 
   const visibleColumns = activeColumns.filter(c => c.visible).sort((a, b) => a.order - b.order);
 
@@ -88,11 +103,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     onColumnsChange(activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } : c));
   };
 
-  // Get visible column keys from schema
+  // Get visible column keys from activeColumns (single source of truth)
   const getVisibleColumnKeys = (): Set<string> => {
-    if (schema?.productColumns) {
-      return new Set(schema.productColumns.map(c => c.key));
-    }
     return new Set(activeColumns.filter(c => c.visible).map(c => c.key));
   };
 

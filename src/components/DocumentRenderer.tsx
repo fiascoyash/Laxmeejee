@@ -130,16 +130,24 @@ export function DocumentRenderer({
   const gstMode = quotation.gstMode ?? 'inclusive';
 
   // SINGLE SOURCE OF TRUTH: Check if a column should be visible
-  // Priority: 1) Schema columns, 2) Settings flags
+  // Priority: 1) User-toggled columns (quotation/invoice.productColumns), 2) Schema columns, 3) Settings flags
   const isColumnVisible = (columnKey: string): boolean => {
-    // Priority 1: Check schema columns if available
+    // Priority 1: User-toggled columns (quotation/invoice.productColumns)
+    const userColumns = docType === 'invoice' ? invoice?.productColumns : quotation.productColumns;
+    if (userColumns && userColumns.length > 0) {
+      const userCol = userColumns.find(c => c.key === columnKey);
+      if (userCol) {
+        return userCol.visible !== false; // default to true if not specified
+      }
+    }
+    // Priority 2: Check schema columns if available
     if (schema?.productColumns) {
       const schemaCol = schema.productColumns.find(c => c.key === columnKey);
       if (schemaCol) {
-        return schemaCol.visible !== false; // default to true if not specified
+        return schemaCol.visible !== false;
       }
     }
-    // Priority 2: Fall back to settings flags
+    // Priority 3: Fall back to settings flags
     const settingsMap: Record<string, boolean> = {
       hsnCode: settings.showTax,
       sacCode: settings.showTax,
