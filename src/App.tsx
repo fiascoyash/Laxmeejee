@@ -345,8 +345,11 @@ function App() {
     }
   };
 
-  // Start new invoice
+  // Start new invoice - uses selected template schema
   const startNewInvoice = () => {
+    const template = selectedTemplateId ? storage.getTemplateById(selectedTemplateId) : storage.getDefaultTemplate();
+    const schemaColumns = template?.schema?.productColumns || getDefaultProductColumns();
+
     const newInvoice: Invoice = {
       id: generateId(),
       invoiceNumber: generateInvoiceNumber(),
@@ -361,9 +364,9 @@ function App() {
       roundOff: 0,
       grandTotal: 0,
       status: 'Draft',
-      selectedTemplateId: selectedTemplateId || undefined,
-      productColumns: getDefaultProductColumns(),
-      gstMode: 'inclusive',
+      selectedTemplateId: selectedTemplateId || template?.id,
+      productColumns: schemaColumns,
+      gstMode: template?.schema?.defaultGstMode || 'inclusive',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -864,6 +867,7 @@ function App() {
                 onGstModeChange={setGstMode}
                 customFields={selectedTemplate?.schema?.productFields || []}
                 templateSettings={selectedTemplate?.settings}
+                schema={selectedTemplate?.schema}
               />
 
               {/* Dynamic Fields based on Template Settings */}

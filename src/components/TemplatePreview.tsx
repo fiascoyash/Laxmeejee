@@ -58,6 +58,7 @@ export function TemplatePreview({ template, company, customer, quotation, produc
               quotation={quotation}
               products={products}
               docType="quotation"
+              schema={template.schema}
             />
           </div>
         </div>

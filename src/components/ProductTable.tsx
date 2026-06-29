@@ -1,4 +1,4 @@
-import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS } from '../types';
+import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema } from '../types';
 import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, calculateGrandTotalAmount, roundTo2 } from '../utils/storage';
 import { Plus, Trash2, Package, ChevronDown, Settings2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
@@ -15,21 +15,55 @@ interface Props {
   customFields?: TemplateField[];
   // Template settings - controls which columns are visible
   templateSettings?: TemplateSettings;
+  // Template schema - defines industry-specific columns (SINGLE SOURCE OF TRUTH)
+  schema?: TemplateSchema;
 }
 
-export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings }: Props) {
+// Built-in columns for standard fields
+const getBuiltinColumns = (): Record<string, TableColumn> => ({
+  sno: { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+  name: { id: 'col_name', key: 'name', label: 'Product Name', width: 25, visible: true, order: 1 },
+  description: { id: 'col_description', key: 'description', label: 'Description', width: 15, visible: true, order: 2 },
+  hsnCode: { id: 'col_hsn', key: 'hsnCode', label: 'HSN', width: 10, visible: true, order: 3 },
+  sacCode: { id: 'col_sac', key: 'sacCode', label: 'SAC', width: 10, visible: true, order: 3 },
+  batchNumber: { id: 'col_batch', key: 'batchNumber', label: 'Batch No.', width: 10, visible: true, order: 4 },
+  expiryDate: { id: 'col_expiry', key: 'expiryDate', label: 'Expiry', width: 10, visible: true, order: 5 },
+  mrp: { id: 'col_mrp', key: 'mrp', label: 'MRP', width: 10, visible: true, order: 6 },
+  gstPercent: { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 7 },
+  quantity: { id: 'col_qty', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 8 },
+  unit: { id: 'col_unit', key: 'unit', label: 'Unit', width: 6, visible: true, order: 9 },
+  unitPrice: { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 10 },
+  discount: { id: 'col_discount', key: 'discount', label: 'Disc%', width: 8, visible: true, order: 11 },
+  amount: { id: 'col_amount', key: 'amount', label: 'Amount', width: 12, visible: true, order: 12 },
+  wattage: { id: 'col_wattage', key: 'wattage', label: 'Wattage', width: 10, visible: true, order: 3 },
+  partNumber: { id: 'col_partnum', key: 'partNumber', label: 'Part No.', width: 12, visible: true, order: 3 },
+  vehicleModel: { id: 'col_vehicle', key: 'vehicleModel', label: 'Vehicle', width: 14, visible: true, order: 4 },
+  warrantyMonths: { id: 'col_warranty', key: 'warrantyMonths', label: 'Warranty', width: 10, visible: true, order: 5 },
+});
+
+export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
   const settings = templateSettings || DEFAULT_TEMPLATE_SETTINGS;
 
-  // Merge columns with template settings visibility
+  // SINGLE SOURCE OF TRUTH: Template schema productColumns
+  // If schema.productColumns exists, use it. Otherwise fall back to settings-based visibility.
   const activeColumns = useMemo(() => {
-    const baseColumns = columns && columns.length > 0 ? columns : getDefaultProductColumns();
+    // PRIORITY 1: Use template schema columns if available
+    if (schema?.productColumns && schema.productColumns.length > 0) {
+      // Merge with built-in column definitions to ensure proper rendering
+      const builtin = getBuiltinColumns();
+      return schema.productColumns.map(col => {
+        // Use built-in column as base if available, otherwise use schema column
+        const base = builtin[col.key] || col;
+        return { ...base, ...col };
+      });
+    }
 
-    // Update visibility based on template settings
-    return baseColumns.map(col => {
-      // Map template settings to column keys
+    // PRIORITY 2: Fall back to settings-based visibility
+    const allColumns = Object.values(getBuiltinColumns());
+    return allColumns.map(col => {
       const settingMap: Record<string, boolean> = {
         description: settings.showDescription,
         quantity: settings.showQuantity,
@@ -40,12 +74,12 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
         expiryDate: settings.showExpiryDate,
       };
 
-      if (col.key in settingMap && settingMap[col.key] !== undefined) {
-        return { ...col, visible: settingMap[col.key] };
+      if (col.key in settingMap) {
+        return { ...col, visible: settingMap[col.key] ?? col.visible };
       }
       return col;
     });
-  }, [columns, settings]);
+  }, [schema, settings]);
 
   const visibleColumns = activeColumns.filter(c => c.visible).sort((a, b) => a.order - b.order);
 
@@ -54,18 +88,35 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     onColumnsChange(activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } : c));
   };
 
+  // Get visible column keys from schema
+  const getVisibleColumnKeys = (): Set<string> => {
+    if (schema?.productColumns) {
+      return new Set(schema.productColumns.map(c => c.key));
+    }
+    return new Set(activeColumns.filter(c => c.visible).map(c => c.key));
+  };
+
+  const visibleKeys = getVisibleColumnKeys();
+
   const addProduct = () => {
     const newProduct: Product = {
       id: generateId(),
       name: '',
-      description: '',
+      description: visibleKeys.has('description') ? '' : undefined,
       hsnCode: '',
       gstPercent: 18,
       quantity: 1,
       unitPrice: 0,
-      batchNumber: '',
-      expiryDate: '',
-      discount: 0,
+      // Initialize schema-specific fields
+      batchNumber: visibleKeys.has('batchNumber') ? '' : undefined,
+      expiryDate: visibleKeys.has('expiryDate') ? '' : undefined,
+      mrp: visibleKeys.has('mrp') ? 0 : undefined,
+      discount: visibleKeys.has('discount') ? 0 : undefined,
+      wattage: visibleKeys.has('wattage') ? 0 : undefined,
+      partNumber: visibleKeys.has('partNumber') ? '' : undefined,
+      vehicleModel: visibleKeys.has('vehicleModel') ? '' : undefined,
+      warrantyMonths: visibleKeys.has('warrantyMonths') ? 0 : undefined,
+      sacCode: visibleKeys.has('sacCode') ? '' : undefined,
       customFields: {},
     };
     onChange([...products, newProduct]);
@@ -75,14 +126,21 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     const newProduct: Product = {
       id: generateId(),
       name: catalogItem.name,
-      description: '',
+      description: visibleKeys.has('description') ? '' : undefined,
       hsnCode: catalogItem.hsnCode,
       gstPercent: catalogItem.gstPercent,
       quantity: 1,
       unitPrice: catalogItem.defaultPrice,
-      batchNumber: '',
-      expiryDate: '',
-      discount: 0,
+      // Initialize schema-specific fields
+      batchNumber: visibleKeys.has('batchNumber') ? '' : undefined,
+      expiryDate: visibleKeys.has('expiryDate') ? '' : undefined,
+      mrp: visibleKeys.has('mrp') ? 0 : undefined,
+      discount: visibleKeys.has('discount') ? 0 : undefined,
+      wattage: visibleKeys.has('wattage') ? 0 : undefined,
+      partNumber: visibleKeys.has('partNumber') ? '' : undefined,
+      vehicleModel: visibleKeys.has('vehicleModel') ? '' : undefined,
+      warrantyMonths: visibleKeys.has('warrantyMonths') ? 0 : undefined,
+      sacCode: visibleKeys.has('sacCode') ? '' : undefined,
       customFields: {},
     };
     onChange([...products, newProduct]);
@@ -121,22 +179,23 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       case 'sno': return null;
       case 'name':
         return (
-          <div className="flex flex-col gap-1.5">
-            <input
-              type="text"
-              value={product.name}
-              onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Product/Service name"
-            />
-            <textarea
-              value={product.description || ''}
-              onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm resize-y"
-              placeholder="Description (optional) — supports multi-line"
-              rows={2}
-            />
-          </div>
+          <input
+            type="text"
+            value={product.name}
+            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Product/Service name"
+          />
+        );
+      case 'description':
+        return (
+          <textarea
+            value={product.description || ''}
+            onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm resize-y min-h-16"
+            placeholder="Description..."
+            rows={2}
+          />
         );
       case 'hsnCode':
       case 'sacCode':

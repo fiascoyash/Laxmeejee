@@ -1,4 +1,4 @@
-import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn, GstMode, ShipTo } from '../types';
+import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn, GstMode, ShipTo, TemplateSchema } from '../types';
 import { CustomerDetails } from './CustomerDetails';
 import { ProductTable } from './ProductTable';
 import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, FileText } from 'lucide-react';
@@ -112,7 +112,7 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <CustomerDetails customer={invoice.customer} onChange={updateCustomer} shipTo={invoice.shipTo} onShipToChange={updateShipTo} />
+      <CustomerDetails customer={invoice.customer} onChange={updateCustomer} shipTo={invoice.shipTo} onShipToChange={updateShipTo} customFields={selectedTemplate?.schema?.customerFields || []} />
 
       {/* Product table (reusing ProductTable component) */}
       <ProductTable
@@ -123,6 +123,9 @@ export function InvoiceForm({
         onColumnsChange={updateProductColumns}
         gstMode={invoice.gstMode || 'inclusive'}
         onGstModeChange={updateGstMode}
+        templateSettings={selectedTemplate?.settings}
+        schema={selectedTemplate?.schema}
+        customFields={selectedTemplate?.schema?.productFields || []}
       />
 
       {/* Dynamic Fields based on Template Settings */}

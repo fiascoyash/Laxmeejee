@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   QuotationTemplate, TemplateBlock, BlockType, TableColumn,
-  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, BlockZone
+  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, BlockZone, TypographyElementId
 } from '../types';
 import { generateId, getDefaultProductColumns } from '../utils/storage';
 import {
@@ -132,6 +132,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [selectedZone, setSelectedZone] = useState<BlockZone | null>(null);
+  const [selectedTypographyElement, setSelectedTypographyElement] = useState<TypographyElementId | undefined>(undefined);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const isUndoRedoRef = useRef(false);
@@ -618,6 +619,9 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             onZoneClick={handleZoneClick}
             onBlockClick={(id) => { if (id) setSelectedBlock(id); else setSelectedBlock(null); }}
             selectedBlockId={selectedBlock ?? undefined}
+            onTypographyElementClick={setSelectedTypographyElement}
+            selectedTypographyElementId={selectedTypographyElement}
+            schema={template.schema}
           />
         </div>
       </div>
@@ -628,6 +632,8 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           <TemplateSettingsPanel
             settings={templateSettings}
             onChange={setTemplateSettings}
+            selectedTypographyElement={selectedTypographyElement}
+            onTypographyElementSelect={setSelectedTypographyElement}
           />
         </div>
       ) : (

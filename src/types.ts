@@ -286,6 +286,76 @@ export interface TableColumn {
 export type TemplateCategory = 'professional' | 'gst' | 'retail' | 'modern' | 'luxury' | 'specialty';
 
 // Template Settings - Dynamic toggles like myBillBook
+// Typography element IDs for element-level control
+export type TypographyElementId =
+  | 'company_name'
+  | 'company_address'
+  | 'company_gstin'
+  | 'company_phone'
+  | 'company_email'
+  | 'doc_title'
+  | 'original_for_recipient'
+  | 'quotation_number_label'
+  | 'quotation_number_value'
+  | 'quotation_date_label'
+  | 'quotation_date_value'
+  | 'invoice_number_label'
+  | 'invoice_number_value'
+  | 'invoice_date_label'
+  | 'invoice_date_value'
+  | 'due_date_label'
+  | 'due_date_value'
+  | 'po_number_label'
+  | 'po_number_value'
+  | 'eway_bill_label'
+  | 'eway_bill_value'
+  | 'vehicle_number_label'
+  | 'vehicle_number_value'
+  | 'bill_to_label'
+  | 'bill_to_name'
+  | 'bill_to_address'
+  | 'bill_to_phone'
+  | 'bill_to_gstin'
+  | 'ship_to_label'
+  | 'ship_to_name'
+  | 'ship_to_address'
+  | 'ship_to_phone'
+  | 'ship_to_gstin'
+  | 'table_header'
+  | 'product_row'
+  | 'product_description'
+  | 'tax_summary_label'
+  | 'tax_summary_row'
+  | 'subtotal_label'
+  | 'subtotal_value'
+  | 'cgst_label'
+  | 'cgst_value'
+  | 'sgst_label'
+  | 'sgst_value'
+  | 'round_off_label'
+  | 'round_off_value'
+  | 'grand_total_label'
+  | 'grand_total_value'
+  | 'amount_in_words'
+  | 'notes_label'
+  | 'notes_value'
+  | 'bank_details_label'
+  | 'bank_details_content'
+  | 'signature_label'
+  | 'terms_label'
+  | 'terms_content'
+  | 'footer_strip'
+  | 'custom_block';
+
+// Typography metadata for individual elements
+export interface TypographyElementMeta {
+  id: TypographyElementId;
+  fontSize: number;
+  fontWeight: number;
+  color: string;
+  usesGlobal: boolean;
+}
+
 export interface TemplateSettings {
   // Invoice Details
   showPoNumber: boolean;
@@ -336,6 +406,10 @@ export interface TemplateSettings {
   bodyFontWeight: number;
   tableFontWeight: number;
   grandTotalFontWeight: number;
+  // NEW: Global Default Font Size
+  globalDefaultFontSize: number;
+  // NEW: Element-level typography overrides
+  typographyOverrides: Partial<Record<TypographyElementId, TypographyElementMeta>>;
 }
 
 export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
@@ -380,6 +454,71 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   bodyFontWeight: 500,
   tableFontWeight: 600,
   grandTotalFontWeight: 700,
+  // NEW defaults
+  globalDefaultFontSize: 12,
+  typographyOverrides: {},
+};
+
+// Default typography values for each element (used when resetting)
+export const DEFAULT_TYPOGRAPHY_VALUES: Record<TypographyElementId, { fontSize: number; fontWeight: number; color: string }> = {
+  company_name: { fontSize: 28, fontWeight: 700, color: '#000000' },
+  company_address: { fontSize: 10, fontWeight: 400, color: '#000000' },
+  company_gstin: { fontSize: 10, fontWeight: 700, color: '#000000' },
+  company_phone: { fontSize: 10, fontWeight: 400, color: '#000000' },
+  company_email: { fontSize: 10, fontWeight: 400, color: '#000000' },
+  doc_title: { fontSize: 22, fontWeight: 700, color: '#000000' },
+  original_for_recipient: { fontSize: 7.5, fontWeight: 400, color: '#000000' },
+  quotation_number_label: { fontSize: 8.5, fontWeight: 400, color: '#111111' },
+  quotation_number_value: { fontSize: 11, fontWeight: 700, color: '#000000' },
+  quotation_date_label: { fontSize: 8.5, fontWeight: 400, color: '#111111' },
+  quotation_date_value: { fontSize: 11, fontWeight: 700, color: '#000000' },
+  invoice_number_label: { fontSize: 8.5, fontWeight: 400, color: '#111111' },
+  invoice_number_value: { fontSize: 11, fontWeight: 700, color: '#000000' },
+  invoice_date_label: { fontSize: 8.5, fontWeight: 400, color: '#111111' },
+  invoice_date_value: { fontSize: 11, fontWeight: 700, color: '#000000' },
+  due_date_label: { fontSize: 8.5, fontWeight: 400, color: '#111111' },
+  due_date_value: { fontSize: 11, fontWeight: 700, color: '#000000' },
+  po_number_label: { fontSize: 8.5, fontWeight: 400, color: '#111111' },
+  po_number_value: { fontSize: 11, fontWeight: 700, color: '#000000' },
+  eway_bill_label: { fontSize: 8.5, fontWeight: 400, color: '#111111' },
+  eway_bill_value: { fontSize: 11, fontWeight: 700, color: '#000000' },
+  vehicle_number_label: { fontSize: 8.5, fontWeight: 400, color: '#111111' },
+  vehicle_number_value: { fontSize: 11, fontWeight: 700, color: '#000000' },
+  bill_to_label: { fontSize: 14, fontWeight: 700, color: '#000000' },
+  bill_to_name: { fontSize: 12, fontWeight: 700, color: '#000000' },
+  bill_to_address: { fontSize: 14, fontWeight: 400, color: '#000000' },
+  bill_to_phone: { fontSize: 10.5, fontWeight: 400, color: '#000000' },
+  bill_to_gstin: { fontSize: 10.5, fontWeight: 400, color: '#000000' },
+  ship_to_label: { fontSize: 14, fontWeight: 700, color: '#000000' },
+  ship_to_name: { fontSize: 12, fontWeight: 700, color: '#000000' },
+  ship_to_address: { fontSize: 14, fontWeight: 400, color: '#000000' },
+  ship_to_phone: { fontSize: 10.5, fontWeight: 400, color: '#000000' },
+  ship_to_gstin: { fontSize: 10.5, fontWeight: 400, color: '#000000' },
+  table_header: { fontSize: 10.5, fontWeight: 700, color: '#000000' },
+  product_row: { fontSize: 13, fontWeight: 500, color: '#000000' },
+  product_description: { fontSize: 10, fontWeight: 400, color: '#000000' },
+  tax_summary_label: { fontSize: 13, fontWeight: 600, color: '#000000' },
+  tax_summary_row: { fontSize: 11, fontWeight: 400, color: '#000000' },
+  subtotal_label: { fontSize: 16, fontWeight: 600, color: '#000000' },
+  subtotal_value: { fontSize: 16, fontWeight: 500, color: '#000000' },
+  cgst_label: { fontSize: 16, fontWeight: 600, color: '#000000' },
+  cgst_value: { fontSize: 16, fontWeight: 500, color: '#000000' },
+  sgst_label: { fontSize: 16, fontWeight: 600, color: '#000000' },
+  sgst_value: { fontSize: 16, fontWeight: 500, color: '#000000' },
+  round_off_label: { fontSize: 16, fontWeight: 600, color: '#000000' },
+  round_off_value: { fontSize: 16, fontWeight: 500, color: '#000000' },
+  grand_total_label: { fontSize: 26, fontWeight: 700, color: '#000000' },
+  grand_total_value: { fontSize: 26, fontWeight: 700, color: '#000000' },
+  amount_in_words: { fontSize: 9, fontWeight: 400, color: '#000000' },
+  notes_label: { fontSize: 10.5, fontWeight: 700, color: '#000000' },
+  notes_value: { fontSize: 10.5, fontWeight: 400, color: '#000000' },
+  bank_details_label: { fontSize: 14, fontWeight: 700, color: '#000000' },
+  bank_details_content: { fontSize: 10.5, fontWeight: 400, color: '#000000' },
+  signature_label: { fontSize: 9, fontWeight: 400, color: '#000000' },
+  terms_label: { fontSize: 10, fontWeight: 700, color: '#000000' },
+  terms_content: { fontSize: 10, fontWeight: 400, color: '#000000' },
+  footer_strip: { fontSize: 8.5, fontWeight: 400, color: '#AAAAAA' },
+  custom_block: { fontSize: 10, fontWeight: 400, color: '#000000' },
 };
 
 // ─── Invoice Theme System ────────────────────────────────────────────────────

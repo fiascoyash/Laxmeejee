@@ -8,13 +8,15 @@
  *  - Every theme is applied via inline styles; layout never changes between themes.
  *  - Identical markup is used for both preview and PDF capture (WYSIWYG).
  *  - Custom blocks can be inserted into predefined dynamic zones.
+ *  - Every text element is controllable via typography system (element-level or global).
  */
 
 import React from 'react';
 import {
   CompanyProfile, Customer, Quotation, Product,
   TemplateSettings, Invoice, InvoiceTheme, INVOICE_THEMES, ThemeId,
-  TemplateBlock, BlockZone,
+  TemplateBlock, BlockZone, TypographyElementId, DEFAULT_TYPOGRAPHY_VALUES,
+  TemplateSchema, TableColumn,
 } from '../types';
 import {
   calculateProductAmount, calculateTaxSummary,
@@ -44,6 +46,12 @@ interface Props {
   selectedBlockId?: string;
   /** Whether to show zone drop indicators */
   showZones?: boolean;
+  /** Called when a typography element is clicked (for typography editing) */
+  onTypographyElementClick?: (elementId: TypographyElementId) => void;
+  /** ID of currently selected typography element */
+  selectedTypographyElementId?: TypographyElementId;
+  /** Template schema - defines industry-specific columns (SINGLE SOURCE OF TRUTH) */
+  schema?: TemplateSchema;
 }
 
 const fmt = (n: number) =>
@@ -114,31 +122,125 @@ export function DocumentRenderer({
   onBlockClick,
   selectedBlockId,
   showZones = false,
+  onTypographyElementClick,
+  selectedTypographyElementId,
+  schema,
 }: Props) {
   const theme: InvoiceTheme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES.simple;
   const gstMode = quotation.gstMode ?? 'inclusive';
 
+  // SINGLE SOURCE OF TRUTH: Check if a column should be visible
+  // Priority: 1) Schema columns, 2) Settings flags
+  const isColumnVisible = (columnKey: string): boolean => {
+    // Priority 1: Check schema columns if available
+    if (schema?.productColumns) {
+      const schemaCol = schema.productColumns.find(c => c.key === columnKey);
+      if (schemaCol) {
+        return schemaCol.visible !== false; // default to true if not specified
+      }
+    }
+    // Priority 2: Fall back to settings flags
+    const settingsMap: Record<string, boolean> = {
+      hsnCode: settings.showTax,
+      sacCode: settings.showTax,
+      batchNumber: settings.showBatchNumber,
+      expiryDate: settings.showExpiryDate,
+      mrp: false, // MRP only via schema
+      quantity: settings.showQuantity,
+      unit: settings.showUnit,
+      discount: settings.showDiscount,
+      gstPercent: settings.showTax,
+      description: settings.showDescription,
+      wattage: false, // Wattage only via schema
+      partNumber: false, // Part number only via schema
+      vehicleModel: false, // Vehicle model only via schema
+      warrantyMonths: false, // Warranty only via schema
+    };
+    return settingsMap[columnKey] ?? false;
+  };
+
+  // Global default font size
+  const globalDefaultFontSize = settings.globalDefaultFontSize ?? 12;
+
+  // Helper function to get typography style for an element
+  // Priority: 1) Element override (usesGlobal=false), 2) Global default, 3) DEFAULT_TYPOGRAPHY_VALUES
+  const getTypographyStyle = (
+    elementId: TypographyElementId,
+    fallback: { fontSize: number; fontWeight: number; color: string }
+  ): React.CSSProperties => {
+    const override = settings.typographyOverrides?.[elementId];
+    const defaults = DEFAULT_TYPOGRAPHY_VALUES[elementId] || fallback;
+
+    // If element has custom override (usesGlobal=false), use that
+    // Otherwise use global default for fontSize, defaults for fontWeight/color
+    const fontSize = override?.usesGlobal === false
+      ? (override.fontSize ?? defaults.fontSize)
+      : globalDefaultFontSize;
+
+    const fontWeight = override?.usesGlobal === false
+      ? (override.fontWeight ?? defaults.fontWeight)
+      : defaults.fontWeight;
+
+    const color = override?.usesGlobal === false
+      ? (override.color ?? defaults.color)
+      : defaults.color;
+
+    return {
+      fontSize: `${fontSize}px`,
+      fontWeight,
+      color,
+    };
+  };
+
   // Typography colors (user-customizable via Template Settings → Typography)
-  const headerTextColor = settings.headerTextColor ?? '#000000';
+  // Note: These are kept for theme-specific styling, element-level control uses getTypographyStyle
   const bodyTextColor = settings.bodyTextColor ?? '#000000';
   const tableHeaderTextColor = settings.tableHeaderTextColor ?? '#000000';
   const totalSectionColor = settings.totalSectionColor ?? '#000000';
-  // Typography font sizes (px)
-  const companyNameFontSize = settings.companyNameFontSize ?? 28;
-  const companyDetailsFontSize = settings.companyDetailsFontSize ?? 14;
-  const documentTitleFontSize = settings.documentTitleFontSize ?? 22;
-  const customerDetailsFontSize = settings.customerDetailsFontSize ?? 14;
-  const tableHeaderFontSize = settings.tableHeaderFontSize ?? 14;
-  const productRowFontSize = settings.productRowFontSize ?? 13;
-  const taxSummaryFontSize = settings.taxSummaryFontSize ?? 13;
-  const totalSectionFontSize = settings.totalSectionFontSize ?? 16;
-  const grandTotalFontSize = settings.grandTotalFontSize ?? 26;
-  const termsFontSize = settings.termsFontSize ?? 12;
-  // Typography font weights
-  const headerFontWeight = settings.headerFontWeight ?? 700;
-  const bodyFontWeight = settings.bodyFontWeight ?? 500;
-  const tableFontWeight = settings.tableFontWeight ?? 600;
+  // Typography font weights (for grand total styling)
   const grandTotalFontWeight = settings.grandTotalFontWeight ?? 700;
+
+  // Helper component for clickable typography elements
+  const T = ({
+    id,
+    children,
+    style,
+    as: Component = 'span',
+  }: {
+    id: TypographyElementId;
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+    as?: 'span' | 'div' | 'td' | 'th';
+  }) => {
+    const isSelected = selectedTypographyElementId === id;
+    const handleClick = onTypographyElementClick
+      ? (e: React.MouseEvent) => {
+          e.stopPropagation();
+          onTypographyElementClick(id);
+        }
+      : undefined;
+
+    const typographyStyle = getTypographyStyle(id, { fontSize: 12, fontWeight: 400, color: '#000000' });
+
+    const elementStyle: React.CSSProperties = {
+      ...typographyStyle,
+      ...style,
+      cursor: onTypographyElementClick ? 'pointer' : undefined,
+      backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : style?.backgroundColor,
+      outline: isSelected ? '2px dashed #3B82F6' : undefined,
+      outlineOffset: '2px',
+    };
+
+    return (
+      <Component
+        style={elementStyle}
+        onClick={handleClick}
+        data-typography-id={id}
+      >
+        {children}
+      </Component>
+    );
+  };
 
   const taxSummary = calculateTaxSummary(products, gstMode);
   const totalTaxable = roundTo2(
@@ -166,7 +268,7 @@ export function DocumentRenderer({
 
   const outerStyle: React.CSSProperties = {
     fontFamily: "'Helvetica Neue', Arial, sans-serif",
-    fontSize: '11px',
+    fontSize: `${globalDefaultFontSize}px`,
     color: bodyTextColor,
     backgroundColor: '#FFFFFF',
     position: 'relative',
@@ -208,13 +310,13 @@ export function DocumentRenderer({
         case 'bank_details':
           return (
             <>
-              <div style={{ fontSize: `${companyDetailsFontSize}px`, fontWeight: headerFontWeight, color: theme.primaryColor, marginBottom: '4px' }}>
+              <T id="bank_details_label" style={{ color: theme.primaryColor, marginBottom: '4px' }}>
                 Bank Details
-              </div>
-              {company.bankName && <div style={{ fontSize: '10.5px' }}>Bank: <strong>{company.bankName}</strong></div>}
-              {company.bankAccount && <div style={{ fontSize: '10.5px' }}>A/c: <strong>{company.bankAccount}</strong></div>}
-              {company.bankIfsc && <div style={{ fontSize: '10.5px' }}>IFSC: <strong>{company.bankIfsc}</strong></div>}
-              {company.bankBranch && <div style={{ fontSize: '10.5px' }}>Branch: {company.bankBranch}</div>}
+              </T>
+              {company.bankName && <T id="bank_details_content" as="div">Bank: <strong>{company.bankName}</strong></T>}
+              {company.bankAccount && <T id="bank_details_content" as="div">A/c: <strong>{company.bankAccount}</strong></T>}
+              {company.bankIfsc && <T id="bank_details_content" as="div">IFSC: <strong>{company.bankIfsc}</strong></T>}
+              {company.bankBranch && <T id="bank_details_content" as="div">Branch: {company.bankBranch}</T>}
             </>
           );
 
@@ -226,76 +328,76 @@ export function DocumentRenderer({
               ) : (
                 <div style={{ height: '45px' }} />
               )}
-              <div style={{ borderTop: `1px solid ${theme.sectionBorderColor}`, paddingTop: '4px', fontSize: '9px', color: bodyTextColor }}>
+              <T id="signature_label" style={{ borderTop: `1px solid ${theme.sectionBorderColor}`, paddingTop: '4px' }}>
                 Authorised Signatory
-              </div>
+              </T>
             </div>
           );
 
         case 'terms_conditions':
           return (
             <>
-              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
                 Terms &amp; Conditions
-              </div>
-              <div style={{ color: bodyTextColor, lineHeight: 1.5, fontSize: '10px', whiteSpace: 'pre-wrap' }}>
+              </T>
+              <T id="terms_content" as="div" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                 {block.content || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
-              </div>
+              </T>
             </>
           );
 
         case 'footer_notes':
           return (
-            <div style={{ fontSize: '10px', textAlign: 'center', color: bodyTextColor, whiteSpace: 'pre-wrap' }}>
+            <T id="custom_block" as="div" style={{ textAlign: 'center', whiteSpace: 'pre-wrap' }}>
               {block.content || 'Thank you for your business!'}
-            </div>
+            </T>
           );
 
         case 'warranty':
           return (
             <>
-              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
                 Warranty
-              </div>
-              <div style={{ color: bodyTextColor, lineHeight: 1.5, fontSize: '10px', whiteSpace: 'pre-wrap' }}>
+              </T>
+              <T id="terms_content" as="div" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                 {block.content || 'Product warranty: 12 months from date of purchase.\nWarranty covers manufacturing defects only.'}
-              </div>
+              </T>
             </>
           );
 
         case 'transport_details':
           return (
             <>
-              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
                 Transport Details
-              </div>
-              <div style={{ color: bodyTextColor, lineHeight: 1.5, fontSize: '10px' }}>
+              </T>
+              <T id="terms_content" as="div" style={{ lineHeight: 1.5 }}>
                 {block.content || 'Transport: To be arranged by buyer'}
-              </div>
+              </T>
             </>
           );
 
         case 'delivery_details':
           return (
             <>
-              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
                 Delivery Details
-              </div>
-              <div style={{ color: bodyTextColor, lineHeight: 1.5, fontSize: '10px' }}>
+              </T>
+              <T id="terms_content" as="div" style={{ lineHeight: 1.5 }}>
                 {block.content || 'Delivery: Within 7-10 working days\nDelivery charges extra as applicable'}
-              </div>
+              </T>
             </>
           );
 
         case 'installation_details':
           return (
             <>
-              <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px', fontSize: '10px' }}>
+              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
                 Installation Details
-              </div>
-              <div style={{ color: '#555', lineHeight: 1.5, fontSize: '10px' }}>
+              </T>
+              <T id="terms_content" as="div" style={{ lineHeight: 1.5 }}>
                 {block.content || 'Installation: To be done by our certified technician\nInstallation charges included in the quote'}
-              </div>
+              </T>
             </>
           );
 
@@ -307,9 +409,9 @@ export function DocumentRenderer({
         case 'text_block':
         default:
           return (
-            <div style={{ fontSize: '10px', color: bodyTextColor, whiteSpace: 'pre-wrap' }}>
+            <T id="custom_block" as="div" style={{ whiteSpace: 'pre-wrap' }}>
               {block.content || 'Custom content'}
-            </div>
+            </T>
           );
       }
     })();
@@ -436,36 +538,37 @@ export function DocumentRenderer({
         />
       )}
       <div style={{ textAlign: align }}>
-        <div
+        <T
+          id="company_name"
           style={{
-            fontSize: `${companyNameFontSize}px`,
-            fontWeight: headerFontWeight,
-            color: headerTextColor,
             lineHeight: 1.15,
             letterSpacing: '-0.2px',
           }}
         >
           {company.companyName || 'Company Name'}
-        </div>
+        </T>
         {company.address && (
-          <div style={{ fontSize: '10px', marginTop: '3px' }}>{company.address}</div>
+          <T id="company_address" as="div" style={{ marginTop: '3px' }}>
+            {company.address}
+          </T>
         )}
         {settings.showGstin && company.gstNumber && (
-          <div style={{ fontSize: '10px', marginTop: '3px' }}>
-            GSTIN&nbsp;
-            <strong style={{ letterSpacing: '0.3px' }}>{company.gstNumber}</strong>
+          <div style={{ marginTop: '3px' }}>
+            <T id="company_gstin">
+              GSTIN&nbsp;<strong style={{ letterSpacing: '0.3px' }}>{company.gstNumber}</strong>
+            </T>
           </div>
         )}
         {settings.showPhone && company.phone && (
-          <div style={{ fontSize: '10px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: align === 'center' ? 'center' : 'flex-start' }}>
-            <span>📞</span> {company.phone}
+          <div style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: align === 'center' ? 'center' : 'flex-start' }}>
+            <span>📞</span> <T id="company_phone">{company.phone}</T>
             {company.email && (
-              <><span style={{ margin: '0 4px' }}>✉</span>{company.email}</>
+              <><span style={{ margin: '0 4px' }}>✉</span><T id="company_email">{company.email}</T></>
             )}
           </div>
         )}
         {!settings.showPhone && company.email && (
-          <div style={{ fontSize: '10px', marginTop: '2px' }}>✉ {company.email}</div>
+          <div style={{ marginTop: '2px' }}>✉ <T id="company_email">{company.email}</T></div>
         )}
       </div>
     </div>
@@ -473,19 +576,19 @@ export function DocumentRenderer({
 
   const DocTypeBlock = (
     <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '12px' }}>
-      <div
+      <T
+        id="doc_title"
         style={{
-          fontSize: `${documentTitleFontSize}px`,
-          fontWeight: headerFontWeight,
           color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
           letterSpacing: '1px',
         }}
       >
         {docLabel}
-      </div>
-      <div
+      </T>
+      <T
+        id="original_for_recipient"
+        as="div"
         style={{
-          fontSize: '7.5px',
           border: `1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor}`,
           padding: '1px 7px',
           marginTop: '3px',
@@ -495,7 +598,7 @@ export function DocumentRenderer({
         }}
       >
         ORIGINAL FOR RECIPIENT
-      </div>
+      </T>
     </div>
   );
 
@@ -512,23 +615,22 @@ export function DocumentRenderer({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ flex: 1 }} />
           <div style={{ textAlign: 'center' }}>
-            <div
+            <T
+              id="doc_title"
               style={{
-                fontSize: `${documentTitleFontSize}px`,
-                fontWeight: headerFontWeight,
                 color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
                 letterSpacing: '1px',
                 marginBottom: '6px',
               }}
             >
               {docLabel}
-            </div>
+            </T>
             <CompanyInfoBlock align="center" />
           </div>
           <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-            <div
+            <T
+              id="original_for_recipient"
               style={{
-                fontSize: '7.5px',
                 border: `1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor}`,
                 padding: '1px 7px',
                 color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
@@ -537,7 +639,7 @@ export function DocumentRenderer({
               }}
             >
               ORIGINAL FOR RECIPIENT
-            </div>
+            </T>
           </div>
         </div>
       ) : headerAlign === 'right' ? (
@@ -566,6 +668,19 @@ export function DocumentRenderer({
   );
 
   // ── SECTION 2: Invoice Meta ────────────────────────────────────────────────
+  const MetaCell = ({ labelId, valueId, label, value, highlight = false }: {
+    labelId: TypographyElementId;
+    valueId: TypographyElementId;
+    label: string;
+    value: string;
+    highlight?: boolean;
+  }) => (
+    <div>
+      <T id={labelId} style={{ marginBottom: '2px' }}>{label}</T>
+      <T id={valueId} style={{ color: highlight ? theme.primaryColor : 'inherit' }}>{value}</T>
+    </div>
+  );
+
   const MetaSection = (
     <div
       style={{
@@ -577,22 +692,32 @@ export function DocumentRenderer({
         backgroundColor: '#FFFFFF',
       }}
     >
-      <MetaCell label={docType === 'invoice' ? 'Invoice No.' : 'Quotation No.'} value={docNumber} theme={theme} />
-      <MetaCell label={docType === 'invoice' ? 'Invoice Date' : 'Quotation Date'} value={docDate} theme={theme} />
+      <MetaCell
+        labelId={docType === 'invoice' ? 'invoice_number_label' : 'quotation_number_label'}
+        valueId={docType === 'invoice' ? 'invoice_number_value' : 'quotation_number_value'}
+        label={docType === 'invoice' ? 'Invoice No.' : 'Quotation No.'}
+        value={docNumber}
+      />
+      <MetaCell
+        labelId={docType === 'invoice' ? 'invoice_date_label' : 'quotation_date_label'}
+        valueId={docType === 'invoice' ? 'invoice_date_value' : 'quotation_date_value'}
+        label={docType === 'invoice' ? 'Invoice Date' : 'Quotation Date'}
+        value={docDate}
+      />
       {settings.showDueDate && dueDate && (
-        <MetaCell label="Due Date" value={dueDate} theme={theme} highlight />
+        <MetaCell labelId="due_date_label" valueId="due_date_value" label="Due Date" value={dueDate} highlight />
       )}
       {settings.showDueDate && !dueDate && (
-        <MetaCell label="Due Date" value="—" theme={theme} />
+        <MetaCell labelId="due_date_label" valueId="due_date_value" label="Due Date" value="—" />
       )}
       {settings.showPoNumber && (
-        <MetaCell label="PO Number" value="—" theme={theme} />
+        <MetaCell labelId="po_number_label" valueId="po_number_value" label="PO Number" value="—" />
       )}
       {settings.showEwayBill && (
-        <MetaCell label="E-Way Bill" value="—" theme={theme} />
+        <MetaCell labelId="eway_bill_label" valueId="eway_bill_value" label="E-Way Bill" value="—" />
       )}
       {settings.showVehicleNumber && (
-        <MetaCell label="Vehicle No." value="—" theme={theme} />
+        <MetaCell labelId="vehicle_number_label" valueId="vehicle_number_value" label="Vehicle No." value="—" />
       )}
     </div>
   );
@@ -614,28 +739,28 @@ export function DocumentRenderer({
           borderRight: hasShipTo ? `1px solid ${theme.sectionBorderColor}` : 'none',
         }}
       >
-        <div style={{ fontSize: `${companyDetailsFontSize}px`, fontWeight: headerFontWeight, color: theme.primaryColor, marginBottom: '4px' }}>
+        <T id="bill_to_label" style={{ color: theme.primaryColor, marginBottom: '4px' }}>
           Bill To
-        </div>
-        <div style={{ fontWeight: 700, fontSize: '12px' }}>{customer.name}</div>
+        </T>
+        <T id="bill_to_name" as="div">{customer.name}</T>
         {settings.showBillingAddress && customer.billingAddress && (
-          <div style={{ color: bodyTextColor, marginTop: '2px', fontSize: `${customerDetailsFontSize}px` }}>
+          <T id="bill_to_address" as="div" style={{ marginTop: '2px' }}>
             {customer.billingAddress}
-          </div>
+          </T>
         )}
         {(customer.village || customer.district) && (
-          <div style={{ color: bodyTextColor, fontSize: `${customerDetailsFontSize}px` }}>
+          <T id="bill_to_address" as="div">
             {[customer.village, customer.district].filter(Boolean).join(', ')}
-          </div>
+          </T>
         )}
         {settings.showPhone && customer.mobile && (
-          <div style={{ marginTop: '2px', fontSize: '10.5px' }}>
-            Mobile <strong>{customer.mobile}</strong>
+          <div style={{ marginTop: '2px' }}>
+            Mobile <strong><T id="bill_to_phone">{customer.mobile}</T></strong>
           </div>
         )}
         {settings.showGstin && customer.gstNumber && (
-          <div style={{ fontSize: '10.5px' }}>
-            GSTIN <strong>{customer.gstNumber}</strong>
+          <div>
+            GSTIN <strong><T id="bill_to_gstin">{customer.gstNumber}</T></strong>
           </div>
         )}
       </div>
@@ -643,25 +768,25 @@ export function DocumentRenderer({
       {/* Ship To */}
       {hasShipTo && (
         <div style={{ flex: 1, padding: '10px 16px' }}>
-          <div style={{ fontSize: `${companyDetailsFontSize}px`, fontWeight: headerFontWeight, color: theme.primaryColor, marginBottom: '4px' }}>
+          <T id="ship_to_label" style={{ color: theme.primaryColor, marginBottom: '4px' }}>
             Ship To
-          </div>
+          </T>
           {quotation.shipTo?.name && (
-            <div style={{ fontWeight: 700, fontSize: '12px' }}>{quotation.shipTo.name}</div>
+            <T id="ship_to_name" as="div">{quotation.shipTo.name}</T>
           )}
           {quotation.shipTo?.address && (
-            <div style={{ color: bodyTextColor, marginTop: '2px', fontSize: `${customerDetailsFontSize}px` }}>
+            <T id="ship_to_address" as="div" style={{ marginTop: '2px' }}>
               {quotation.shipTo.address}
-            </div>
+            </T>
           )}
           {settings.showPhone && quotation.shipTo?.mobile && (
-            <div style={{ marginTop: '2px', fontSize: '10.5px' }}>
-              Mobile <strong>{quotation.shipTo.mobile}</strong>
+            <div style={{ marginTop: '2px' }}>
+              Mobile <strong><T id="ship_to_phone">{quotation.shipTo.mobile}</T></strong>
             </div>
           )}
           {settings.showGstin && quotation.shipTo?.gstNumber && (
-            <div style={{ fontSize: '10.5px' }}>
-              GSTIN <strong>{quotation.shipTo.gstNumber}</strong>
+            <div>
+              GSTIN <strong><T id="ship_to_gstin">{quotation.shipTo.gstNumber}</T></strong>
             </div>
           )}
         </div>
@@ -685,21 +810,82 @@ export function DocumentRenderer({
           style={{
             backgroundColor: theme.tableHeaderBg,
             color: tableHeaderTextColor,
-            fontWeight: tableFontWeight,
-            fontSize: `${tableHeaderFontSize}px`,
+            fontWeight: 600,
             borderBottom: `1.5px solid ${theme.tableBorderColor}`,
           }}
         >
-          <Th style={{ width: '32px' }}>No</Th>
-          <Th style={{ textAlign: 'left' }}>Items</Th>
-          {settings.showTax && <Th style={{ width: '72px' }}>HSN No.</Th>}
-          {settings.showBatchNumber && <Th style={{ width: '72px' }}>Batch No.</Th>}
-          {settings.showExpiryDate && <Th style={{ width: '80px' }}>Expiry</Th>}
-          {settings.showQuantity && <Th style={{ width: '54px' }}>Qty.</Th>}
-          <Th style={{ width: '76px' }}>Rate</Th>
-          {settings.showDiscount && <Th style={{ width: '70px' }}>Disc.</Th>}
-          {settings.showTax && <Th style={{ width: '76px' }}>Tax</Th>}
-          <Th style={{ width: '84px' }}>Total</Th>
+          <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap', width: '32px' }}>
+            <T id="table_header">No</T>
+          </th>
+          <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap' }}>
+            <T id="table_header">Items</T>
+          </th>
+          {isColumnVisible('hsnCode') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+              <T id="table_header">HSN No.</T>
+            </th>
+          )}
+          {isColumnVisible('sacCode') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+              <T id="table_header">SAC</T>
+            </th>
+          )}
+          {isColumnVisible('wattage') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+              <T id="table_header">Wattage</T>
+            </th>
+          )}
+          {isColumnVisible('partNumber') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+              <T id="table_header">Part No.</T>
+            </th>
+          )}
+          {isColumnVisible('vehicleModel') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '80px' }}>
+              <T id="table_header">Vehicle</T>
+            </th>
+          )}
+          {isColumnVisible('mrp') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+              <T id="table_header">MRP</T>
+            </th>
+          )}
+          {isColumnVisible('batchNumber') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+              <T id="table_header">Batch No.</T>
+            </th>
+          )}
+          {isColumnVisible('expiryDate') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '80px' }}>
+              <T id="table_header">Expiry</T>
+            </th>
+          )}
+          {isColumnVisible('warrantyMonths') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+              <T id="table_header">Warranty</T>
+            </th>
+          )}
+          {isColumnVisible('quantity') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '54px' }}>
+              <T id="table_header">Qty.</T>
+            </th>
+          )}
+          <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '76px' }}>
+            <T id="table_header">Rate</T>
+          </th>
+          {isColumnVisible('discount') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '70px' }}>
+              <T id="table_header">Disc.</T>
+            </th>
+          )}
+          {isColumnVisible('gstPercent') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '76px' }}>
+              <T id="table_header">Tax</T>
+            </th>
+          )}
+          <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '84px' }}>
+            <T id="table_header">Total</T>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -720,55 +906,98 @@ export function DocumentRenderer({
                 borderBottom: `1px solid ${theme.tableBorderColor}`,
               }}
             >
-              <Td style={{ color: bodyTextColor, textAlign: 'center', fontSize: `${productRowFontSize}px` }}>{i + 1}</Td>
-              <Td style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: bodyFontWeight, fontSize: `${productRowFontSize}px` }}>{product.name}</div>
-                {settings.showDescription && product.description?.trim() && (
-                  <div style={{ fontSize: `${Math.max(8, productRowFontSize - 3)}px`, color: bodyTextColor, marginTop: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+              <td style={{ padding: '6px 8px', textAlign: 'center', verticalAlign: 'top' }}>
+                <T id="product_row">{i + 1}</T>
+              </td>
+              <td style={{ padding: '6px 8px', textAlign: 'left', verticalAlign: 'top' }}>
+                <T id="product_row" as="div">{product.name}</T>
+                {isColumnVisible('description') && product.description?.trim() && (
+                  <T id="product_description" as="div" style={{ marginTop: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
                     {product.description}
-                  </div>
+                  </T>
                 )}
-              </Td>
-              {settings.showTax && (
-                <Td style={{ color: bodyTextColor, fontSize: `${productRowFontSize}px` }}>{product.hsnCode || '—'}</Td>
+              </td>
+              {isColumnVisible('hsnCode') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.hsnCode || '—'}</T>
+                </td>
               )}
-              {settings.showBatchNumber && (
-                <Td style={{ color: bodyTextColor, fontSize: `${productRowFontSize}px` }}>{product.batchNumber || '—'}</Td>
+              {isColumnVisible('sacCode') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.sacCode || '—'}</T>
+                </td>
               )}
-              {settings.showExpiryDate && (
-                <Td style={{ color: bodyTextColor, fontSize: `${productRowFontSize}px` }}>{product.expiryDate || '—'}</Td>
+              {isColumnVisible('wattage') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.wattage ? `${product.wattage}W` : '—'}</T>
+                </td>
               )}
-              {settings.showQuantity && (
-                <Td style={{ color: theme.primaryColor }}>
-                  {product.quantity}
-                  {settings.showUnit && (
-                    <span style={{ fontSize: '9px', color: bodyTextColor, marginLeft: '2px' }}>PCS</span>
+              {isColumnVisible('partNumber') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.partNumber || '—'}</T>
+                </td>
+              )}
+              {isColumnVisible('vehicleModel') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.vehicleModel || '—'}</T>
+                </td>
+              )}
+              {isColumnVisible('mrp') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.mrp ? `Rs. ${product.mrp.toLocaleString('en-IN')}` : '—'}</T>
+                </td>
+              )}
+              {isColumnVisible('batchNumber') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.batchNumber || '—'}</T>
+                </td>
+              )}
+              {isColumnVisible('expiryDate') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.expiryDate || '—'}</T>
+                </td>
+              )}
+              {isColumnVisible('warrantyMonths') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.warrantyMonths ? `${product.warrantyMonths} mo` : '—'}</T>
+                </td>
+              )}
+              {isColumnVisible('quantity') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top', color: theme.primaryColor }}>
+                  <T id="product_row">{product.quantity}</T>
+                  {isColumnVisible('unit') && (
+                    <span style={{ marginLeft: '2px' }}>PCS</span>
                   )}
-                </Td>
+                </td>
               )}
-              <Td>{product.unitPrice.toLocaleString('en-IN')}</Td>
-              {settings.showDiscount && <Td style={{ color: bodyTextColor, fontSize: `${productRowFontSize}px` }}>{product.discount ?? 0}</Td>}
-              {settings.showTax && (
-                <Td>
-                  <div>{taxAmount.toLocaleString('en-IN')}</div>
-                  <div style={{ fontSize: '9px', color: bodyTextColor }}>({product.gstPercent}%)</div>
-                </Td>
+              <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <T id="product_row">{product.unitPrice.toLocaleString('en-IN')}</T>
+              </td>
+              {isColumnVisible('discount') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <T id="product_row">{product.discount ?? 0}%</T>
+                </td>
               )}
-              <Td style={{ fontWeight: 600 }}>
-                {amount.toLocaleString('en-IN')}
-              </Td>
+              {isColumnVisible('gstPercent') && (
+                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                  <div><T id="product_row">{taxAmount.toLocaleString('en-IN')}</T></div>
+                  <div style={{ fontSize: '9px' }}>({product.gstPercent}%)</div>
+                </td>
+              )}
+              <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top', fontWeight: 600 }}>
+                <T id="product_row">{amount.toLocaleString('en-IN')}</T>
+              </td>
             </tr>
           );
         })}
         {products.length === 0 && (
           <tr>
             <td
-              colSpan={8}
+              colSpan={15}
               style={{
                 textAlign: 'center',
                 padding: '20px',
                 color: '#aaa',
-                fontSize: '11px',
               }}
             >
               No items added
@@ -797,15 +1026,15 @@ export function DocumentRenderer({
             borderRight: `1px solid ${theme.sectionBorderColor}`,
           }}
         >
-          <div style={{ fontSize: `${taxSummaryFontSize}px`, fontWeight: tableFontWeight, color: theme.primaryColor, marginBottom: '5px' }}>
+          <T id="tax_summary_label" style={{ color: theme.primaryColor, marginBottom: '5px' }}>
             Tax Summary
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: `${Math.max(8, taxSummaryFontSize - 2)}px` }}>
+          </T>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: theme.tableHeaderBg, color: tableHeaderTextColor }}>
                 {['HSN', 'Tax%', 'Taxable Amt', 'CGST', 'SGST'].map(h => (
                   <th key={h} style={{ padding: '3px 5px', textAlign: h === 'HSN' ? 'left' : 'right', fontWeight: 600 }}>
-                    {h}
+                    <T id="tax_summary_row">{h}</T>
                   </th>
                 ))}
               </tr>
@@ -815,11 +1044,11 @@ export function DocumentRenderer({
                 const [hsn, rate] = key.split('_');
                 return (
                   <tr key={key} style={{ borderTop: `1px solid ${theme.tableBorderColor}` }}>
-                    <td style={{ padding: '2px 5px' }}>{hsn}</td>
-                    <td style={{ padding: '2px 5px', textAlign: 'right' }}>{rate}%</td>
-                    <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.taxableAmount)}</td>
-                    <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.cgstAmount)}</td>
-                    <td style={{ padding: '2px 5px', textAlign: 'right' }}>{fmt(data.sgstAmount)}</td>
+                    <td style={{ padding: '2px 5px' }}><T id="tax_summary_row">{hsn}</T></td>
+                    <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{rate}%</T></td>
+                    <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.taxableAmount)}</T></td>
+                    <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.cgstAmount)}</T></td>
+                    <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.sgstAmount)}</T></td>
                   </tr>
                 );
               })}
@@ -830,11 +1059,23 @@ export function DocumentRenderer({
 
       {/* Grand Total */}
       <div style={{ width: showTaxSummary ? '220px' : '100%', padding: '10px 16px', flexShrink: 0 }}>
-        <TotalRow label="Sub Total" value={`₹${fmt(totalTaxable)}`} color={totalSectionColor} fontSize={totalSectionFontSize} />
-        <TotalRow label="CGST" value={`₹${fmt(totalCgst)}`} color={totalSectionColor} fontSize={totalSectionFontSize} />
-        <TotalRow label="SGST" value={`₹${fmt(totalSgst)}`} color={totalSectionColor} fontSize={totalSectionFontSize} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+          <T id="subtotal_label" style={{ fontWeight: 600 }}>Sub Total</T>
+          <T id="subtotal_value">₹{fmt(totalTaxable)}</T>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+          <T id="cgst_label" style={{ fontWeight: 600 }}>CGST</T>
+          <T id="cgst_value">₹{fmt(totalCgst)}</T>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+          <T id="sgst_label" style={{ fontWeight: 600 }}>SGST</T>
+          <T id="sgst_value">₹{fmt(totalSgst)}</T>
+        </div>
         {roundOff !== 0 && (
-          <TotalRow label="Round Off" value={`₹${fmt(roundOff)}`} color={totalSectionColor} fontSize={totalSectionFontSize} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <T id="round_off_label" style={{ fontWeight: 600 }}>Round Off</T>
+            <T id="round_off_value">₹{fmt(roundOff)}</T>
+          </div>
         )}
         <div
           style={{
@@ -843,26 +1084,23 @@ export function DocumentRenderer({
             borderTop: `1.5px solid ${theme.sectionBorderColor}`,
             paddingTop: '5px',
             marginTop: '5px',
-            fontSize: `${grandTotalFontSize}px`,
-            fontWeight: grandTotalFontWeight,
-            color: totalSectionColor,
           }}
         >
-          <span>Total</span>
-          <span style={{ color: totalSectionColor }}>₹{fmt(roundedGrandTotal)}</span>
+          <T id="grand_total_label" style={{ fontWeight: grandTotalFontWeight, color: totalSectionColor }}>Total</T>
+          <T id="grand_total_value" style={{ fontWeight: grandTotalFontWeight, color: totalSectionColor }}>₹{fmt(roundedGrandTotal)}</T>
         </div>
-        <div style={{ fontSize: '9px', color: totalSectionColor, marginTop: '4px', fontStyle: 'italic', lineHeight: 1.4 }}>
+        <T id="amount_in_words" as="div" style={{ marginTop: '4px', fontStyle: 'italic', lineHeight: 1.4 }}>
           {numberToWords(roundedGrandTotal)}
-        </div>
+        </T>
       </div>
     </div>
   );
 
   // ── SECTION 6: Notes ──────────────────────────────────────────────────────
   const NotesSection = settings.showNotes ? (
-    <div style={{ ...sec, padding: '8px 16px', fontSize: '10.5px' }}>
-      <span style={{ fontWeight: 700, color: theme.primaryColor }}>Notes: </span>
-      <span style={{ color: bodyTextColor }}>{quotation.notes || 'Thank you for your business!'}</span>
+    <div style={{ ...sec, padding: '8px 16px' }}>
+      <T id="notes_label" style={{ color: theme.primaryColor }}>Notes: </T>
+      <T id="notes_value">{quotation.notes || 'Thank you for your business!'}</T>
     </div>
   ) : null;
 
@@ -888,27 +1126,27 @@ export function DocumentRenderer({
                 : 'none',
           }}
         >
-          <div style={{ fontSize: `${companyDetailsFontSize}px`, fontWeight: headerFontWeight, color: theme.primaryColor, marginBottom: '4px' }}>
+          <T id="bank_details_label" style={{ color: theme.primaryColor, marginBottom: '4px' }}>
             Bank Details
-          </div>
+          </T>
           {company.bankName && (
-            <div style={{ fontSize: '10.5px' }}>
-              Bank: <strong>{company.bankName}</strong>
+            <div>
+              Bank: <strong><T id="bank_details_content">{company.bankName}</T></strong>
             </div>
           )}
           {company.bankAccount && (
-            <div style={{ fontSize: '10.5px' }}>
-              A/c: <strong>{company.bankAccount}</strong>
+            <div>
+              A/c: <strong><T id="bank_details_content">{company.bankAccount}</T></strong>
             </div>
           )}
           {company.bankIfsc && (
-            <div style={{ fontSize: '10.5px' }}>
-              IFSC: <strong>{company.bankIfsc}</strong>
+            <div>
+              IFSC: <strong><T id="bank_details_content">{company.bankIfsc}</T></strong>
             </div>
           )}
           {company.bankBranch && (
-            <div style={{ fontSize: '10.5px' }}>
-              Branch: {company.bankBranch}
+            <div>
+              Branch: <T id="bank_details_content">{company.bankBranch}</T>
             </div>
           )}
         </div>
@@ -948,15 +1186,13 @@ export function DocumentRenderer({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '9px',
-                color: bodyTextColor,
                 borderRadius: '2px',
               }}
             >
-              QR Code
+              <T id="custom_block">QR Code</T>
             </div>
           )}
-          <div style={{ fontSize: '8.5px', color: bodyTextColor, marginTop: '3px' }}>Scan to Pay</div>
+          <T id="custom_block" as="div" style={{ marginTop: '3px' }}>Scan to Pay</T>
         </div>
       )}
 
@@ -990,11 +1226,9 @@ export function DocumentRenderer({
             style={{
               borderTop: `1px solid ${theme.sectionBorderColor}`,
               paddingTop: '4px',
-              fontSize: '9px',
-              color: bodyTextColor,
             }}
           >
-            Authorised Signatory
+            <T id="signature_label">Authorised Signatory</T>
           </div>
         </div>
       )}
@@ -1007,15 +1241,14 @@ export function DocumentRenderer({
       style={{
         ...sec,
         padding: '8px 16px',
-        fontSize: '10px',
       }}
     >
-      <div style={{ fontWeight: 700, color: theme.primaryColor, marginBottom: '3px' }}>
+      <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
         Terms &amp; Conditions
-      </div>
-      <div style={{ color: bodyTextColor, lineHeight: 1.5, whiteSpace: 'pre-wrap', fontSize: `${termsFontSize}px` }}>
+      </T>
+      <T id="terms_content" as="div" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
         {quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.'}
-      </div>
+      </T>
     </div>
   ) : null;
 
@@ -1026,18 +1259,18 @@ export function DocumentRenderer({
         ...secNoBorder,
         padding: '5px 16px',
         textAlign: 'center',
-        fontSize: '8.5px',
-        color: '#aaa',
         borderTop: `1px solid ${theme.sectionBorderColor}`,
       }}
     >
-      Computer-generated document. No signature required.
+      <T id="footer_strip" style={{ color: '#aaa' }}>
+        Computer-generated document. No signature required.
+      </T>
     </div>
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────
   return (
-    <div style={outerStyle} id="document-renderer-root">
+    <div style={outerStyle} id="document-renderer-root" onClick={() => onTypographyElementClick?.('custom_block')}>
       {settings.showWatermark && <Watermark text={company.companyName || 'DRAFT'} />}
       {theme.cornerDecorations && <CornerDecos color={theme.primaryColor} />}
 
@@ -1087,95 +1320,5 @@ export function DocumentRenderer({
 
       {FooterStrip}
     </div>
-  );
-}
-
-// ─── Small helper sub-components ─────────────────────────────────────────────
-function MetaCell({
-  label,
-  value,
-  theme,
-  highlight = false,
-}: {
-  label: string;
-  value: string;
-  theme: InvoiceTheme;
-  highlight?: boolean;
-}) {
-  return (
-    <div>
-      <div style={{ fontSize: '8.5px', color: '#111111', marginBottom: '2px' }}>{label}</div>
-      <div
-        style={{
-          fontWeight: 700,
-          fontSize: '11px',
-          color: highlight ? theme.primaryColor : 'inherit',
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function TotalRow({ label, value, color = '#000000', fontSize = 16 }: { label: string; value: string; color?: string; fontSize?: number }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        marginBottom: '3px',
-        fontSize: `${fontSize}px`,
-        fontWeight: 500,
-      }}
-    >
-      <span style={{ color, fontWeight: 600 }}>{label}</span>
-      <span style={{ color, fontWeight: 500 }}>{value}</span>
-    </div>
-  );
-}
-
-function Th({
-  children,
-  style,
-}: {
-  children?: React.ReactNode;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <th
-      style={{
-        padding: '6px 8px',
-        textAlign: 'right',
-        fontWeight: 700,
-        fontSize: '10.5px',
-        whiteSpace: 'nowrap',
-        ...style,
-      }}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  style,
-}: {
-  children?: React.ReactNode;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <td
-      style={{
-        padding: '6px 8px',
-        textAlign: 'right',
-        fontSize: '10.5px',
-        verticalAlign: 'top',
-        ...style,
-      }}
-    >
-      {children}
-    </td>
   );
 }

@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
-import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, TemplateBlock, TableColumn, Invoice, GstMode, ThemeId, DEFAULT_TEMPLATE_SETTINGS, INVOICE_THEMES } from '../types';
+import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, TemplateBlock, TableColumn, Invoice, GstMode, ThemeId, DEFAULT_TEMPLATE_SETTINGS, INVOICE_THEMES, TemplateSchema } from '../types';
 import { calculateProductAmount, calculateTaxSummary, calculateRoundOff, numberToWords, roundTo2, calculateGrandTotalAmount } from './storage';
 import { resolvePlaceholders } from './placeholders';
 
@@ -24,10 +24,11 @@ export const exportTemplatePDF = async (
 ) => {
   const themeId = (template as any).themeId as ThemeId | undefined;
   const settings = template.settings ?? DEFAULT_TEMPLATE_SETTINGS;
+  const schema = template.schema;
 
   // Use new WYSIWYG export for theme-based templates
   if (themeId) {
-    await exportFlowBasedPDF(themeId, settings, company, customer, quotation, products, documentType, invoice, gstMode);
+    await exportFlowBasedPDF(themeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
     return;
   }
 
@@ -48,7 +49,8 @@ const exportFlowBasedPDF = async (
   products: Product[],
   documentType: DocumentType,
   invoice?: Invoice,
-  gstMode: GstMode = 'inclusive'
+  gstMode: GstMode = 'inclusive',
+  schema?: TemplateSchema
 ) => {
   // Create a temporary container for rendering
   const container = document.createElement('div');
@@ -97,6 +99,7 @@ const exportFlowBasedPDF = async (
     docDate,
     dueDate,
     hasShipTo,
+    schema,
   });
 
   // Wait for images to load
@@ -155,10 +158,40 @@ function buildDocumentHTML(params: {
   docDate: string;
   dueDate?: string;
   hasShipTo: boolean;
+  schema?: TemplateSchema;
 }): string {
-  const { theme, themeId, settings, company, customer, quotation, products, taxSummary, totalTaxable, totalCgst, totalSgst, roundOff, roundedGrandTotal, docLabel, docNumber, docDate, dueDate, hasShipTo } = params;
+  const { theme, themeId, settings, company, customer, quotation, products, taxSummary, totalTaxable, totalCgst, totalSgst, roundOff, roundedGrandTotal, docLabel, docNumber, docDate, dueDate, hasShipTo, schema } = params;
   const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const gstMode = quotation.gstMode ?? 'inclusive';
+
+  // SINGLE SOURCE OF TRUTH: Check if a column should be visible
+  const isColumnVisible = (columnKey: string): boolean => {
+    // Priority 1: Check schema columns if available
+    if (schema?.productColumns) {
+      const schemaCol = schema.productColumns.find(c => c.key === columnKey);
+      if (schemaCol) {
+        return schemaCol.visible !== false;
+      }
+    }
+    // Priority 2: Fall back to settings flags
+    const settingsMap: Record<string, boolean> = {
+      hsnCode: settings.showTax,
+      sacCode: settings.showTax,
+      batchNumber: settings.showBatchNumber,
+      expiryDate: settings.showExpiryDate,
+      mrp: false,
+      quantity: settings.showQuantity,
+      unit: settings.showUnit,
+      discount: settings.showDiscount,
+      gstPercent: settings.showTax,
+      description: settings.showDescription,
+      wattage: false,
+      partNumber: false,
+      vehicleModel: false,
+      warrantyMonths: false,
+    };
+    return settingsMap[columnKey] ?? false;
+  };
 
   const outerBorder = theme.outerBorder ? `border: ${theme.outerBorderWidth}px solid ${theme.primaryColor};` : '';
   const cornerDecos = theme.cornerDecorations ? `
@@ -265,14 +298,20 @@ function buildDocumentHTML(params: {
     return `
       <tr style="background-color:${rowBg};border-bottom:1px solid ${theme.tableBorderColor};">
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${i + 1}</td>
-        <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:${bodyFontWeight};font-size:${productRowFontSize}px;">${p.name}</div>${settings.showDescription && p.description && p.description.trim() ? `<div style="font-size:${Math.max(8, productRowFontSize - 3)}px;color:${bodyTextColor};margin-top:2px;white-space:pre-wrap;line-height:1.4;">${p.description}</div>` : ''}</td>
-        ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.hsnCode || '—'}</td>` : ''}
-        ${settings.showBatchNumber ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.batchNumber || '—'}</td>` : ''}
-        ${settings.showExpiryDate ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.expiryDate || '—'}</td>` : ''}
-        ${settings.showQuantity ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${theme.primaryColor};">${p.quantity}${settings.showUnit ? '<span style="font-size:9px;color:${bodyTextColor};margin-left:2px;">PCS</span>' : ''}</td>` : ''}
+        <td style="padding:6px 8px;text-align:left;font-size:10.5px;vertical-align:top;"><div style="font-weight:${bodyFontWeight};font-size:${productRowFontSize}px;">${p.name}</div>${isColumnVisible('description') && p.description && p.description.trim() ? `<div style="font-size:${Math.max(8, productRowFontSize - 3)}px;color:${bodyTextColor};margin-top:2px;white-space:pre-wrap;line-height:1.4;">${p.description}</div>` : ''}</td>
+        ${isColumnVisible('hsnCode') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.hsnCode || '—'}</td>` : ''}
+        ${isColumnVisible('sacCode') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.sacCode || '—'}</td>` : ''}
+        ${isColumnVisible('wattage') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.wattage ? p.wattage + 'W' : '—'}</td>` : ''}
+        ${isColumnVisible('partNumber') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.partNumber || '—'}</td>` : ''}
+        ${isColumnVisible('vehicleModel') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.vehicleModel || '—'}</td>` : ''}
+        ${isColumnVisible('mrp') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.mrp ? 'Rs. ' + p.mrp.toLocaleString('en-IN') : '—'}</td>` : ''}
+        ${isColumnVisible('batchNumber') ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.batchNumber || '—'}</td>` : ''}
+        ${isColumnVisible('expiryDate') ? `<td style="padding:6px 8px;text-align:center;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.expiryDate || '—'}</td>` : ''}
+        ${isColumnVisible('warrantyMonths') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.warrantyMonths ? p.warrantyMonths + ' mo' : '—'}</td>` : ''}
+        ${isColumnVisible('quantity') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${theme.primaryColor};">${p.quantity}${isColumnVisible('unit') ? '<span style="font-size:9px;color:${bodyTextColor};margin-left:2px;">PCS</span>' : ''}</td>` : ''}
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;">${p.unitPrice.toLocaleString('en-IN')}</td>
-        ${settings.showDiscount ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.discount ?? 0}</td>` : ''}
-        ${settings.showTax ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;"><div>${taxAmount.toLocaleString('en-IN')}</div><div style="font-size:9px;color:${bodyTextColor};">(${p.gstPercent}%)</div></td>` : ''}
+        ${isColumnVisible('discount') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;color:${bodyTextColor};font-size:${productRowFontSize}px;">${p.discount ?? 0}%</td>` : ''}
+        ${isColumnVisible('gstPercent') ? `<td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;"><div>${taxAmount.toLocaleString('en-IN')}</div><div style="font-size:9px;color:${bodyTextColor};">(${p.gstPercent}%)</div></td>` : ''}
         <td style="padding:6px 8px;text-align:right;font-size:10.5px;vertical-align:top;font-weight:600;">${amount.toLocaleString('en-IN')}</td>
       </tr>
     `;
@@ -385,18 +424,24 @@ ${quotation.terms || '1. Goods once sold will not be taken back or exchanged.\n2
           <tr style="background-color:${theme.tableHeaderBg};color:${tableHeaderTextColor};font-weight:${tableFontWeight};font-size:${tableHeaderFontSize}px;border-bottom:1.5px solid ${theme.tableBorderColor};">
             <th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:32px;">No</th>
             <th style="padding:6px 8px;text-align:left;font-weight:700;font-size:10.5px;white-space:nowrap;">Items</th>
-            ${settings.showTax ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">HSN No.</th>` : ''}
-            ${settings.showBatchNumber ? `<th style="padding:6px 8px;text-align:center;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">Batch No.</th>` : ''}
-            ${settings.showExpiryDate ? `<th style="padding:6px 8px;text-align:center;font-weight:700;font-size:10.5px;white-space:nowrap;width:80px;">Expiry</th>` : ''}
-            ${settings.showQuantity ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:54px;">Qty.</th>` : ''}
+            ${isColumnVisible('hsnCode') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">HSN No.</th>` : ''}
+            ${isColumnVisible('sacCode') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">SAC</th>` : ''}
+            ${isColumnVisible('wattage') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">Wattage</th>` : ''}
+            ${isColumnVisible('partNumber') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">Part No.</th>` : ''}
+            ${isColumnVisible('vehicleModel') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:80px;">Vehicle</th>` : ''}
+            ${isColumnVisible('mrp') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">MRP</th>` : ''}
+            ${isColumnVisible('batchNumber') ? `<th style="padding:6px 8px;text-align:center;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">Batch No.</th>` : ''}
+            ${isColumnVisible('expiryDate') ? `<th style="padding:6px 8px;text-align:center;font-weight:700;font-size:10.5px;white-space:nowrap;width:80px;">Expiry</th>` : ''}
+            ${isColumnVisible('warrantyMonths') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:72px;">Warranty</th>` : ''}
+            ${isColumnVisible('quantity') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:54px;">Qty.</th>` : ''}
             <th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:76px;">Rate</th>
-            ${settings.showDiscount ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:70px;">Disc.</th>` : ''}
-            ${settings.showTax ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:76px;">Tax</th>` : ''}
+            ${isColumnVisible('discount') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:70px;">Disc.</th>` : ''}
+            ${isColumnVisible('gstPercent') ? `<th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:76px;">Tax</th>` : ''}
             <th style="padding:6px 8px;text-align:right;font-weight:700;font-size:10.5px;white-space:nowrap;width:84px;">Total</th>
           </tr>
         </thead>
         <tbody>
-          ${productRows || '<tr><td colspan="8" style="text-align:center;padding:20px;color:#aaa;font-size:11px;">No items added</td></tr>'}
+          ${productRows || '<tr><td colspan="15" style="text-align:center;padding:20px;color:#aaa;font-size:11px;">No items added</td></tr>'}
         </tbody>
       </table>
 
