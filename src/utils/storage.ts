@@ -802,8 +802,12 @@ export const roundTo2 = (value: number): number => {
   return Math.round(value * 100) / 100;
 };
 
-// Calculate base amount (quantity * unitPrice)
+// Calculate base amount (quantity * unitPrice) or return manual override
 export const calculateProductAmount = (product: Product): number => {
+  // If manual override is set, use that value
+  if (product.isManualAmount && product.manualAmount !== undefined) {
+    return roundTo2(product.manualAmount);
+  }
   return roundTo2(product.quantity * product.unitPrice);
 };
 

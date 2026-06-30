@@ -50,6 +50,9 @@ export interface Product {
   warrantyMonths?: number;   // Warranty period
   wattage?: number;          // For solar templates
   sacCode?: string;          // For services templates
+  // Manual amount override
+  manualAmount?: number;     // User-specified amount (overrides calculated)
+  isManualAmount?: boolean;  // Flag to track if amount was manually set
   // Dynamic custom fields from template schema
   customFields?: Record<string, string | number | boolean>;
 }

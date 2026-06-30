@@ -239,7 +239,12 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             type="number"
             min="1"
             value={product.quantity}
-            onChange={(e) => updateProduct(product.id, 'quantity', Number(e.target.value))}
+            onChange={(e) => {
+              // Reset manual amount when quantity changes
+              onChange(products.map(p =>
+                p.id === product.id ? { ...p, quantity: Number(e.target.value), isManualAmount: false } : p
+              ));
+            }}
             className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-center"
           />
         );
@@ -250,15 +255,33 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             min="0"
             step="0.01"
             value={product.unitPrice}
-            onChange={(e) => updateProduct(product.id, 'unitPrice', Number(e.target.value))}
+            onChange={(e) => {
+              // Reset manual amount when rate changes
+              onChange(products.map(p =>
+                p.id === product.id ? { ...p, unitPrice: Number(e.target.value), isManualAmount: false } : p
+              ));
+            }}
             className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-right"
           />
         );
       case 'amount':
+        const displayAmount = product.isManualAmount && product.manualAmount !== undefined
+          ? product.manualAmount
+          : calculateProductAmount(product);
         return (
-          <span className="text-right font-medium text-gray-800 block">
-            Rs. {calculateProductAmount(product).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={displayAmount}
+            onChange={(e) => {
+              const manualValue = Number(e.target.value);
+              onChange(products.map(p =>
+                p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true } : p
+              ));
+            }}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-right font-medium"
+          />
         );
       case 'batchNumber':
         return (
