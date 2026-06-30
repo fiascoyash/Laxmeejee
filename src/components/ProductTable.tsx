@@ -1,7 +1,7 @@
 import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema } from '../types';
 import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, calculateGrandTotalAmount, roundTo2 } from '../utils/storage';
 import { Plus, Trash2, Package, ChevronDown, Settings2 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 interface Props {
   products: Product[];
@@ -44,8 +44,27 @@ const getBuiltinColumns = (): Record<string, TableColumn> => ({
 export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const columnSettingsRef = useRef<HTMLDivElement>(null);
+  const catalogRef = useRef<HTMLDivElement>(null);
 
   const settings = templateSettings || DEFAULT_TEMPLATE_SETTINGS;
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSettingsRef.current && !columnSettingsRef.current.contains(event.target as Node)) {
+        setShowColumnSettings(false);
+      }
+      if (catalogRef.current && !catalogRef.current.contains(event.target as Node)) {
+        setShowCatalog(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Build the FULL master list of all available columns from schema/settings
   // Always includes ALL built-in columns so they are available for toggling.
@@ -448,7 +467,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
           Products / Services
         </h3>
         <div className="flex gap-2">
-          <div className="relative">
+          <div className="relative" ref={columnSettingsRef}>
             <button
               onClick={() => setShowColumnSettings(!showColumnSettings)}
               className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2 text-sm"
@@ -478,7 +497,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               </div>
             )}
           </div>
-          <div className="relative">
+          <div className="relative" ref={catalogRef}>
             <button
               onClick={() => setShowCatalog(!showCatalog)}
               className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 text-sm"

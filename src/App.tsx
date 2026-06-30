@@ -72,6 +72,7 @@ function App() {
   const [editingTemplate, setEditingTemplate] = useState<QuotationTemplate | null>(null);
   const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
   const [previewingTemplate, setPreviewingTemplate] = useState<QuotationTemplate | null>(null);
+  const [previewType, setPreviewType] = useState<'quotation' | 'invoice'>('quotation');
 
   // Load data on mount
   useEffect(() => {
@@ -85,6 +86,66 @@ function App() {
       setSelectedTemplateId(defaultTemplate.id);
     }
   }, []);
+
+  // ESC key handler to close active modals/screens (layer by layer)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        // Close highest active layer first (preview modal)
+        if (previewingTemplate) {
+          setPreviewingTemplate(null);
+          setPreviewType('quotation');
+          return;
+        }
+        // Close template builder
+        if (showTemplateBuilder) {
+          setShowTemplateBuilder(false);
+          setEditingTemplate(null);
+          return;
+        }
+        // Close company profile modal
+        if (showCompanyProfile) {
+          setShowCompanyProfile(false);
+          return;
+        }
+        // Close edit invoice screen
+        if (editingInvoice) {
+          setEditingInvoice(null);
+          setView('invoiceList');
+          return;
+        }
+        // Close edit quotation screen (if on 'new' view with editingQuotationId)
+        if (view === 'new' && editingQuotationId) {
+          resetForm();
+          setView('home');
+          return;
+        }
+        // Close new quotation screen (if on 'new' view without editing)
+        if (view === 'new') {
+          resetForm();
+          setView('home');
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [previewingTemplate, showTemplateBuilder, showCompanyProfile, editingInvoice, view, editingQuotationId]);
+
+  // Navigate to a view, clearing any edit states
+  const navigateTo = (targetView: View) => {
+    // Clear all edit states when navigating
+    setEditingInvoice(null);
+    // If leaving quotation form, reset it
+    if (view === 'new' || view === 'selectTemplate') {
+      resetForm();
+    }
+    setView(targetView);
+    setSidebarOpen(false);
+  };
 
   // Save company profile
   const handleSaveCompanyProfile = (profile: CompanyProfile) => {
@@ -341,6 +402,7 @@ function App() {
       const templateWithColumns = editingInvoice.productColumns
         ? { ...template, productColumns: editingInvoice.productColumns }
         : template;
+      setPreviewType('invoice');
       setPreviewingTemplate(templateWithColumns);
     }
   };
@@ -374,9 +436,9 @@ function App() {
     setView('editInvoice');
   };
 
-  // Get sample data for template preview
+  // Get sample data for template preview (only used for TemplateBuilder preview, not form preview)
   const getSampleData = () => ({
-    customer: customer.name ? customer : {
+    customer: {
       name: 'Sample Customer',
       billingAddress: '123 Main Street',
       mobile: '9876543210',
@@ -386,9 +448,9 @@ function App() {
     },
     quotation: {
       id: 'sample',
-      quotationNumber: quotationNumber || 'QT-2024-0001',
-      date: quotationDate || new Date().toISOString().split('T')[0],
-      customer: customer.name ? customer : {
+      quotationNumber: 'QT-2024-0001',
+      date: new Date().toISOString().split('T')[0],
+      customer: {
         name: 'Sample Customer',
         billingAddress: '123 Main Street',
         mobile: '9876543210',
@@ -396,13 +458,13 @@ function App() {
         village: 'Sample Village',
         gstNumber: '',
       },
-      shipTo: shipTo.name ? shipTo : {
+      shipTo: {
         name: 'Sample Ship To',
         address: '456 Delivery Road',
         mobile: '9876543210',
         gstNumber: '',
       },
-      products: products.length > 0 ? products : [
+      products: [
         { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
         { id: '2', name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
       ],
@@ -413,17 +475,48 @@ function App() {
       grandTotal: 177200,
       createdAt: new Date().toISOString(),
       selectedTemplateId: selectedTemplateId || undefined,
-      // Include dynamic fields from form state
-      notes: quotation.notes,
-      signature: quotation.signature,
-      paymentQr: quotation.paymentQr,
-      terms: quotation.terms,
+      notes: '',
+      signature: '',
+      paymentQr: '',
+      terms: '',
     } as Quotation,
-    products: products.length > 0 ? products : [
+    products: [
       { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
       { id: '2', name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
     ],
   });
+
+  // Build quotation object from current form state (for Preview and PDF export)
+  const buildCurrentQuotation = (): Quotation => {
+    const taxSummary = calculateTaxSummary(products, gstMode);
+    const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+    const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+    const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+    const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
+    const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
+
+    return {
+      id: editingQuotationId || 'preview',
+      quotationNumber: quotationNumber || 'QT-PREVIEW',
+      date: quotationDate,
+      customer,
+      shipTo,
+      products,
+      totalAmount,
+      totalCgst,
+      totalSgst,
+      roundOff,
+      grandTotal: roundedGrandTotal,
+      createdAt: editingQuotationId ? quotations.find(q => q.id === editingQuotationId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
+      selectedTemplateId: selectedTemplateId || undefined,
+      productColumns,
+      gstMode,
+      notes: quotation.notes,
+      signature: quotation.signature,
+      paymentQr: quotation.paymentQr,
+      terms: quotation.terms,
+    };
+  };
 
   // Get current template
   const getCurrentTemplate = (): QuotationTemplate | undefined => {
@@ -556,6 +649,7 @@ function App() {
   const handlePreviewCurrentQuotation = () => {
     const template = getCurrentTemplate();
     if (template) {
+      setPreviewType('quotation');
       setPreviewingTemplate(template);
     }
   };
@@ -567,7 +661,7 @@ function App() {
     targetView: View;
   }) => (
     <button
-      onClick={() => { setView(targetView); setSidebarOpen(false); }}
+      onClick={() => navigateTo(targetView)}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
         currentView === targetView
           ? 'bg-blue-600 text-white'
@@ -675,7 +769,7 @@ function App() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <button
-                onClick={() => setView('home')}
+                onClick={() => navigateTo('home')}
                 className="hover:text-blue-600 transition-colors"
               >
                 Dashboard
@@ -724,7 +818,7 @@ function App() {
                 </button>
 
                 <button
-                  onClick={() => setView('list')}
+                  onClick={() => navigateTo('list')}
                   className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-400 hover:shadow-lg transition-all group"
                 >
                   <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-500 transition-colors">
@@ -735,7 +829,7 @@ function App() {
                 </button>
 
                 <button
-                  onClick={() => setView('invoiceList')}
+                  onClick={() => navigateTo('invoiceList')}
                   className="bg-white rounded-xl border border-gray-200 p-6 hover:border-amber-400 hover:shadow-lg transition-all group"
                 >
                   <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-500 transition-colors">
@@ -746,7 +840,7 @@ function App() {
                 </button>
 
                 <button
-                  onClick={() => setView('templates')}
+                  onClick={() => navigateTo('templates')}
                   className="bg-white rounded-xl border border-gray-200 p-6 hover:border-purple-400 hover:shadow-lg transition-all group"
                 >
                   <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-500 transition-colors">
@@ -803,7 +897,7 @@ function App() {
               selectedTemplateId={selectedTemplateId}
               onSelect={handleSelectTemplate}
               onContinue={handleTemplateContinue}
-              onManageTemplates={() => setView('templates')}
+              onManageTemplates={() => navigateTo('templates')}
               companyProfile={companyProfile}
             />
           )}
@@ -1066,7 +1160,7 @@ function App() {
                   Blank Invoice
                 </button>
                 <button
-                  onClick={() => setView('list')}
+                  onClick={() => navigateTo('list')}
                   className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   From Quotation
@@ -1160,7 +1254,7 @@ function App() {
                   </button>
 
                   <button
-                    onClick={() => setView('templates')}
+                    onClick={() => navigateTo('templates')}
                     className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
@@ -1174,7 +1268,7 @@ function App() {
                   </button>
 
                   <button
-                    onClick={() => setView('catalog')}
+                    onClick={() => navigateTo('catalog')}
                     className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
@@ -1247,10 +1341,33 @@ function App() {
         <TemplatePreview
           template={previewingTemplate}
           company={companyProfile}
-          customer={customer.name ? customer : getSampleData().customer}
-          quotation={getSampleData().quotation}
-          products={products.length > 0 ? products : getSampleData().products}
-          onClose={() => setPreviewingTemplate(null)}
+          customer={previewType === 'invoice' && editingInvoice ? editingInvoice.customer : customer}
+          quotation={previewType === 'invoice' && editingInvoice ? {
+            id: editingInvoice.id,
+            quotationNumber: editingInvoice.invoiceNumber,
+            date: editingInvoice.date,
+            customer: editingInvoice.customer,
+            shipTo: editingInvoice.shipTo,
+            products: editingInvoice.products,
+            totalAmount: editingInvoice.totalAmount,
+            totalCgst: editingInvoice.totalCgst,
+            totalSgst: editingInvoice.totalSgst,
+            roundOff: editingInvoice.roundOff,
+            grandTotal: editingInvoice.grandTotal,
+            createdAt: editingInvoice.createdAt,
+            selectedTemplateId: editingInvoice.selectedTemplateId,
+            productColumns: editingInvoice.productColumns,
+            gstMode: editingInvoice.gstMode,
+            notes: editingInvoice.notes,
+            signature: editingInvoice.signature,
+            paymentQr: editingInvoice.paymentQr,
+            terms: editingInvoice.terms,
+          } as Quotation : buildCurrentQuotation()}
+          products={previewType === 'invoice' && editingInvoice ? editingInvoice.products : products}
+          onClose={() => { setPreviewingTemplate(null); setPreviewType('quotation'); }}
+          documentType={previewType}
+          invoice={previewType === 'invoice' ? editingInvoice! : undefined}
+          gstMode={previewType === 'invoice' && editingInvoice ? editingInvoice.gstMode || 'inclusive' : gstMode}
         />
       )}
     </div>

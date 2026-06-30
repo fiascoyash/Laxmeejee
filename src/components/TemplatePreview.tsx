@@ -1,6 +1,6 @@
-import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, DEFAULT_TEMPLATE_SETTINGS, ThemeId } from '../types';
+import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, DEFAULT_TEMPLATE_SETTINGS, ThemeId, Invoice, GstMode } from '../types';
 import { X, FileDown } from 'lucide-react';
-import { exportTemplatePDF } from '../utils/templatePdfExport';
+import { exportTemplatePDF, DocumentType } from '../utils/templatePdfExport';
 import { DocumentRenderer } from './DocumentRenderer';
 
 interface Props {
@@ -10,13 +10,16 @@ interface Props {
   quotation: Quotation;
   products: Product[];
   onClose: () => void;
+  documentType?: DocumentType;
+  invoice?: Invoice;
+  gstMode?: GstMode;
 }
 
 const MM_TO_PX = 3.7795275591;
 
-export function TemplatePreview({ template, company, customer, quotation, products, onClose }: Props) {
+export function TemplatePreview({ template, company, customer, quotation, products, onClose, documentType = 'quotation', invoice, gstMode = 'inclusive' }: Props) {
   const handleExportPDF = () => {
-    exportTemplatePDF(template, company, customer, quotation, products);
+    exportTemplatePDF(template, company, customer, quotation, products, documentType, invoice, gstMode);
   };
 
   // Use the new flow-based DocumentRenderer
@@ -57,8 +60,9 @@ export function TemplatePreview({ template, company, customer, quotation, produc
               customer={customer}
               quotation={quotation}
               products={products}
-              docType="quotation"
+              docType={documentType}
               schema={template.schema}
+              invoice={invoice}
             />
           </div>
         </div>
