@@ -17,8 +17,8 @@ interface SettingToggleProps {
 
 function SettingToggle({ label, checked, onChange }: SettingToggleProps) {
   return (
-    <label className="flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded-md cursor-pointer transition-colors">
-      <span className="text-sm text-gray-700">{label}</span>
+    <label className="flex items-center justify-between py-2 px-3 hover:bg-slate-50 rounded-md cursor-pointer transition-colors">
+      <span className="text-sm text-slate-700">{label}</span>
       <div className="relative">
         <input
           type="checkbox"
@@ -26,7 +26,7 @@ function SettingToggle({ label, checked, onChange }: SettingToggleProps) {
           onChange={(e) => onChange(e.target.checked)}
           className="sr-only peer"
         />
-        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
       </div>
     </label>
   );
@@ -43,10 +43,10 @@ function SettingsSection({ icon, title, children, defaultOpen = true }: SectionP
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-gray-200 last:border-b-0">
+    <div className="border-b border-slate-200 last:border-b-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-slate-50 transition-colors"
       >
         {icon}
         <span className="text-sm font-semibold text-gray-800 flex-1 text-left">{title}</span>
@@ -224,7 +224,7 @@ export function TemplateSettingsPanel({
   return (
     <div className="bg-white h-full flex flex-col">
       {/* Header */}
-      <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="p-3 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Settings2 className="w-4 h-4 text-blue-600" />
           <h3 className="font-semibold text-gray-800">Template Settings</h3>
@@ -245,11 +245,11 @@ export function TemplateSettingsPanel({
           title="Header Layout"
         >
           <div className="py-2 px-3">
-            <label className="block text-sm text-gray-700 mb-1.5">Header Position</label>
+            <label className="block text-sm text-slate-700 mb-1.5">Header Position</label>
             <select
               value={settings.headerAlignment}
               onChange={(e) => updateSetting('headerAlignment', e.target.value as 'left' | 'center' | 'right')}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+              className="w-full px-2 py-1.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
             >
               <option value="left">Left</option>
               <option value="center">Center</option>
@@ -365,7 +365,7 @@ export function TemplateSettingsPanel({
           <div className="py-2 px-3 space-y-4">
             {/* Global Default Font Size */}
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Global Font Size (All Text)
               </label>
               <div className="flex items-center gap-3">
@@ -383,7 +383,7 @@ export function TemplateSettingsPanel({
                   max={72}
                   value={settings.globalDefaultFontSize ?? 12}
                   onChange={(e) => updateSetting('globalDefaultFontSize', Number(e.target.value))}
-                  className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm text-center"
+                  className="w-16 px-2 py-1 border border-slate-300 rounded-md text-sm text-center"
                 />
                 <span className="text-xs text-gray-500">px</span>
               </div>
@@ -395,7 +395,7 @@ export function TemplateSettingsPanel({
             {/* Reset Typography Button */}
             <button
               onClick={resetTypography}
-              className="w-full px-3 py-2 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm text-gray-700 transition-colors"
+              className="w-full px-3 py-2 flex items-center justify-center gap-2 bg-slate-100 hover:bg-gray-200 rounded-md text-sm text-slate-700 transition-colors"
             >
               <RotateCcw className="w-4 h-4" />
               Reset All Typography
@@ -410,7 +410,7 @@ export function TemplateSettingsPanel({
                   </h4>
                   <button
                     onClick={() => onTypographyElementSelect?.(undefined)}
-                    className="text-xs text-gray-500 hover:text-gray-700"
+                    className="text-xs text-gray-500 hover:text-slate-700"
                   >
                     Clear Selection
                   </button>
@@ -422,7 +422,7 @@ export function TemplateSettingsPanel({
                     type="checkbox"
                     checked={selectedElementValues.usesGlobal}
                     onChange={(e) => toggleElementUsesGlobal(selectedTypographyElement, e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300"
+                    className="w-4 h-4 rounded border-slate-300"
                   />
                   <span className="text-xs text-gray-600">Use global font size ({settings.globalDefaultFontSize ?? 12}px)</span>
                 </label>
@@ -447,7 +447,7 @@ export function TemplateSettingsPanel({
                           max={72}
                           value={selectedElementValues.fontSize}
                           onChange={(e) => updateElementTypography(selectedTypographyElement, 'fontSize', Number(e.target.value))}
-                          className="w-14 px-1 py-0.5 border border-gray-300 rounded-md text-xs text-center"
+                          className="w-14 px-1 py-0.5 border border-slate-300 rounded-md text-xs text-center"
                         />
                         <span className="text-xs text-gray-500">px</span>
                       </div>
@@ -458,7 +458,7 @@ export function TemplateSettingsPanel({
                       <select
                         value={selectedElementValues.fontWeight}
                         onChange={(e) => updateElementTypography(selectedTypographyElement, 'fontWeight', Number(e.target.value))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        className="w-full px-2 py-1 border border-slate-300 rounded-md text-sm"
                       >
                         <option value={300}>Light (300)</option>
                         <option value={400}>Normal (400)</option>
@@ -475,13 +475,13 @@ export function TemplateSettingsPanel({
                           type="color"
                           value={selectedElementValues.color}
                           onChange={(e) => updateElementTypography(selectedTypographyElement, 'color', e.target.value)}
-                          className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                          className="w-8 h-8 border border-slate-300 rounded cursor-pointer"
                         />
                         <input
                           type="text"
                           value={selectedElementValues.color}
                           onChange={(e) => updateElementTypography(selectedTypographyElement, 'color', e.target.value)}
-                          className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm font-mono"
+                          className="flex-1 px-2 py-1 border border-slate-300 rounded-md text-sm font-mono"
                         />
                       </div>
                     </div>
@@ -492,7 +492,7 @@ export function TemplateSettingsPanel({
 
             {/* Instructions when nothing selected */}
             {!selectedTypographyElement && (
-              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-center">
                 <p className="text-xs text-gray-600 mb-2">
                   Click any text in the preview to customize it individually.
                 </p>
@@ -556,7 +556,7 @@ export function TemplateSettingsPanel({
       </div>
 
       {/* Footer info */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50">
+      <div className="p-3 border-t border-slate-200 bg-slate-50">
         <p className="text-xs text-gray-500">
           Click text in preview for element-level typography control.
         </p>

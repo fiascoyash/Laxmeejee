@@ -15,10 +15,10 @@ export function QuotationList({ quotations, onEdit, onDelete, onDuplicate, onCon
 
   if (quotations.length === 0) {
     return (
-      <div className="text-center py-16 bg-white rounded-lg shadow-sm border border-gray-200">
-        <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-        <h3 className="text-lg font-medium text-gray-800 mb-2">No Quotations Yet</h3>
-        <p className="text-gray-500">Create your first quotation to get started.</p>
+      <div className="text-center py-16 bg-white rounded-lg shadow-sm border border-slate-200">
+        <FileText className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+        <h3 className="text-lg font-medium text-slate-800 mb-2">No Quotations Yet</h3>
+        <p className="text-slate-500">Create your first quotation to get started.</p>
       </div>
     );
   }
@@ -29,7 +29,7 @@ export function QuotationList({ quotations, onEdit, onDelete, onDuplicate, onCon
         {quotations.map(quotation => (
           <div
             key={quotation.id}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
+            className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
@@ -37,16 +37,16 @@ export function QuotationList({ quotations, onEdit, onDelete, onDuplicate, onCon
                   <h3 className="font-bold text-blue-600">{quotation.quotationNumber}</h3>
                   <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">{quotation.date}</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-600">
                   <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-gray-400" />
+                    <User className="w-4 h-4 text-slate-400" />
                     <span>{quotation.customer.name || 'Unnamed Customer'}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <Calendar className="w-4 h-4 text-slate-400" />
                     <span>{quotation.products.length} products</span>
                   </div>
-                  <div className="font-bold text-gray-800">
+                  <div className="font-bold text-slate-800">
                     Rs. {quotation.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
                 </div>
@@ -54,35 +54,35 @@ export function QuotationList({ quotations, onEdit, onDelete, onDuplicate, onCon
               <div className="flex gap-2">
                 <button
                   onClick={() => setPreviewQuotation(quotation)}
-                  className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   title="Preview"
                 >
                   <Eye className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => onEdit(quotation)}
-                  className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                  className="p-2 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                   title="Edit"
                 >
                   <Edit className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => onConvertToInvoice(quotation)}
-                  className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                  className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                   title="Convert to Invoice"
                 >
                   <FileInput className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => onDuplicate(quotation.id)}
-                  className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                  className="p-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                   title="Duplicate"
                 >
                   <Copy className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => onDelete(quotation.id)}
-                  className="p-2 text-gray-500 hover:text-red-600 hover:bg-red- hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-2 text-slate-500 hover:text-red-600 hover:bg-red- hover:bg-red-50 rounded-lg transition-colors"
                   title="Delete"
                 >
                   <Trash2 className="w-5 h-5" />
@@ -105,9 +105,9 @@ function QuotationPreview({ quotation, onClose }: { quotation: Quotation; onClos
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b bg-gray-50">
-          <h2 className="text-lg font-bold text-gray-800">Quotation Preview: {quotation.quotationNumber}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
+        <div className="flex justify-between items-center p-4 border-b bg-slate-50">
+          <h2 className="text-lg font-bold text-slate-800">Quotation Preview: {quotation.quotationNumber}</h2>
+          <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -115,18 +115,18 @@ function QuotationPreview({ quotation, onClose }: { quotation: Quotation; onClos
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h4 className="font-semibold text-gray-700 mb-2">Customer Details</h4>
-                <p className="text-gray-800 font-medium">{quotation.customer.name}</p>
-                <p className="text-sm text-gray-600">{quotation.customer.mobile}</p>
-                <p className="text-sm text-gray-600">{quotation.customer.village}, {quotation.customer.district}</p>
+                <h4 className="font-semibold text-slate-700 mb-2">Customer Details</h4>
+                <p className="text-slate-800 font-medium">{quotation.customer.name}</p>
+                <p className="text-sm text-slate-600">{quotation.customer.mobile}</p>
+                <p className="text-sm text-slate-600">{quotation.customer.village}, {quotation.customer.district}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600">Date: {quotation.date}</p>
-                <p className="text-sm text-gray-600">Products: {quotation.products.length}</p>
+                <p className="text-sm text-slate-600">Date: {quotation.date}</p>
+                <p className="text-sm text-slate-600">Products: {quotation.products.length}</p>
               </div>
             </div>
             <table className="w-full text-sm border-collapse border border-gray-300">
-              <thead className="bg-gray-100">
+              <thead className="bg-slate-100">
                 <tr>
                   <th className="border border-gray-300 px-2 py-1 text-left">Product</th>
                   <th className="border border-gray-300 px-2 py-1 text-center">HSN</th>

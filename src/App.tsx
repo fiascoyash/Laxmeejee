@@ -14,7 +14,7 @@ import { InvoiceForm } from './components/InvoiceForm';
 import { InvoiceList } from './components/InvoiceList';
 import { NumberingSettingsPanel } from './components/NumberingSettings';
 import { exportTemplatePDF } from './utils/templatePdfExport';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard } from 'lucide-react';
 
 type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice';
 
@@ -74,6 +74,9 @@ function App() {
   const [previewingTemplate, setPreviewingTemplate] = useState<QuotationTemplate | null>(null);
   const [previewType, setPreviewType] = useState<'quotation' | 'invoice'>('quotation');
 
+  // Keyboard shortcuts modal state
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+
   // Load data on mount
   useEffect(() => {
     setQuotations(storage.getQuotations);
@@ -87,10 +90,164 @@ function App() {
     }
   }, []);
 
+  // Global keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyboardShortcuts = (event: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return;
+      }
+
+      const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+      const isAlt = event.altKey;
+
+      // Ctrl+N → New Quotation
+      if (isCtrlOrCmd && event.key === 'n') {
+        event.preventDefault();
+        startNewQuotation();
+        return;
+      }
+
+      // Ctrl+I → New Invoice
+      if (isCtrlOrCmd && event.key === 'i') {
+        event.preventDefault();
+        startNewInvoice();
+        return;
+      }
+
+      // Ctrl+S → Save
+      if (isCtrlOrCmd && event.key === 's') {
+        event.preventDefault();
+        if (view === 'new') {
+          saveQuotation();
+        } else if (view === 'editInvoice') {
+          saveInvoice();
+        }
+        return;
+      }
+
+      // Ctrl+P → Preview
+      if (isCtrlOrCmd && event.key === 'p') {
+        event.preventDefault();
+        if (view === 'new' && selectedTemplateId) {
+          const template = storage.getTemplateById(selectedTemplateId);
+          if (template) setPreviewingTemplate(template);
+        } else if (view === 'editInvoice') {
+          previewInvoice();
+        }
+        return;
+      }
+
+      // Ctrl+E → Export PDF
+      if (isCtrlOrCmd && event.key === 'e') {
+        event.preventDefault();
+        if (view === 'new' && selectedTemplateId) {
+          const template = storage.getTemplateById(selectedTemplateId);
+          if (template && customer.name && products.length > 0) {
+            const taxSummary = calculateTaxSummary(products, gstMode);
+            const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+            const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+            const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+            const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
+            const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
+            const quotationData: Quotation = {
+              id: editingQuotationId || 'temp',
+              quotationNumber,
+              date: quotationDate,
+              customer,
+              shipTo,
+              products,
+              totalAmount,
+              totalCgst,
+              totalSgst,
+              roundOff,
+              grandTotal: roundedGrandTotal,
+              createdAt: new Date().toISOString(),
+              selectedTemplateId,
+              productColumns,
+              gstMode,
+              notes: quotation.notes,
+              signature: quotation.signature,
+              paymentQr: quotation.paymentQr,
+              terms: quotation.terms,
+            };
+            exportTemplatePDF(template, companyProfile, customer, quotationData, products, 'quotation');
+          }
+        } else if (view === 'editInvoice') {
+          exportInvoicePDF();
+        }
+        return;
+      }
+
+      // Ctrl+H → Quotation History
+      if (isCtrlOrCmd && event.key === 'h') {
+        event.preventDefault();
+        navigateTo('list');
+        return;
+      }
+
+      // Ctrl+J → Invoice History
+      if (isCtrlOrCmd && event.key === 'j') {
+        event.preventDefault();
+        navigateTo('invoiceList');
+        return;
+      }
+
+      // Ctrl+T → Templates
+      if (isCtrlOrCmd && event.key === 't') {
+        event.preventDefault();
+        navigateTo('templates');
+        return;
+      }
+
+      // Ctrl+D → Dashboard
+      if (isCtrlOrCmd && event.key === 'd') {
+        event.preventDefault();
+        navigateTo('home');
+        return;
+      }
+
+      // Alt+A → Add product row
+      if (isAlt && event.key === 'a') {
+        event.preventDefault();
+        if (view === 'new' || view === 'editInvoice') {
+          const newProduct: Product = {
+            id: generateId(),
+            name: '',
+            hsnCode: '',
+            gstPercent: 18,
+            quantity: 1,
+            unitPrice: 0,
+          };
+          if (view === 'new') {
+            setProducts([...products, newProduct]);
+          } else if (editingInvoice) {
+            setEditingInvoice({
+              ...editingInvoice,
+              products: [...editingInvoice.products, newProduct],
+            });
+          }
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboardShortcuts);
+    return () => {
+      window.removeEventListener('keydown', handleKeyboardShortcuts);
+    };
+  }, [view, selectedTemplateId, customer, products, gstMode, editingInvoice, editingQuotationId, quotationNumber, quotationDate, shipTo, productColumns, quotation]);
+
   // ESC key handler to close active modals/screens (layer by layer)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // Close keyboard shortcuts modal first
+        if (showShortcutsModal) {
+          setShowShortcutsModal(false);
+          return;
+        }
         // Close highest active layer first (preview modal)
         if (previewingTemplate) {
           setPreviewingTemplate(null);
@@ -126,6 +283,11 @@ function App() {
           setView('home');
           return;
         }
+        // Navigate to Dashboard from any other page
+        if (view !== 'home') {
+          setView('home');
+          return;
+        }
       }
     };
 
@@ -133,7 +295,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [previewingTemplate, showTemplateBuilder, showCompanyProfile, editingInvoice, view, editingQuotationId]);
+  }, [showShortcutsModal, previewingTemplate, showTemplateBuilder, showCompanyProfile, editingInvoice, view, editingQuotationId]);
 
   // Navigate to a view, clearing any edit states
   const navigateTo = (targetView: View) => {
@@ -662,14 +824,14 @@ function App() {
   }) => (
     <button
       onClick={() => navigateTo(targetView)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
         currentView === targetView
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-600 hover:bg-gray-100'
+          ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
       }`}
     >
       <Icon className="w-5 h-5" />
-      {label}
+      <span className="font-medium">{label}</span>
     </button>
   );
 
@@ -679,25 +841,25 @@ function App() {
     : storage.getDefaultTemplate();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {/* Mobile Header */}
-      <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
+      <header className="lg:hidden bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-40">
         <div className="flex items-center justify-between">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-gray-100"
+            className="p-2 rounded-lg hover:bg-slate-100"
           >
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <Sun className="w-6 h-6 text-amber-500" />
-            <span className="font-bold text-gray-800">Solar Quotation</span>
+            <Sun className="w-6 h-6 text-emerald-500" />
+            <span className="font-bold text-slate-800">Laxmeejee</span>
           </div>
           <button
             onClick={() => setShowCompanyProfile(true)}
-            className="p-2 rounded-lg hover:bg-gray-100"
+            className="p-2 rounded-lg hover:bg-slate-100"
           >
-            <Settings className="w-5 h-5 text-gray-600" />
+            <Settings className="w-5 h-5 text-slate-600" />
           </button>
         </div>
       </header>
@@ -712,72 +874,63 @@ function App() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 z-50 transform transition-transform lg:translate-x-0 ${
+        className={`fixed top-0 left-0 h-full w-64 bg-slate-900 text-white flex flex-col shadow-xl z-50 transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                <Sun className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="font-bold text-gray-800">GST Quotation</h1>
-                <p className="text-xs text-gray-500">for Solar Business</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-1 rounded hover:bg-gray-100"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+        <div className="p-6 border-b border-slate-700">
+          <h1 className="text-2xl font-bold text-white tracking-tight">Laxmeejee</h1>
+          <p className="text-slate-400 text-sm mt-1">GST Invoice System</p>
         </div>
 
-        <nav className="p-4 space-y-1">
-          <NavItem icon={Home} label="Dashboard" currentView={view} targetView="home" />
-          <NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" />
-          <NavItem icon={List} label="Quotation History" currentView={view} targetView="list" />
-          <div className="pt-2 mt-2 border-t border-gray-100">
-            <p className="px-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Invoices</p>
-            <NavItem icon={Receipt} label="New Invoice" currentView={view} targetView="newInvoice" />
-            <NavItem icon={Receipt} label="Invoice History" currentView={view} targetView="invoiceList" />
+        <nav className="flex-1 py-6 overflow-y-auto">
+          <ul className="space-y-1 px-3">
+            <li><NavItem icon={Home} label="Dashboard" currentView={view} targetView="home" /></li>
+            <li><NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" /></li>
+            <li><NavItem icon={List} label="Quotation History" currentView={view} targetView="list" /></li>
+          </ul>
+          <div className="mt-4 px-3">
+            <p className="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Invoices</p>
+            <ul className="space-y-1">
+              <li><NavItem icon={Receipt} label="New Invoice" currentView={view} targetView="newInvoice" /></li>
+              <li><NavItem icon={Receipt} label="Invoice History" currentView={view} targetView="invoiceList" /></li>
+            </ul>
           </div>
-          <div className="pt-2 mt-2 border-t border-gray-100">
-            <NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" />
-            <NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" />
-            <NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" />
-          </div>
+          <ul className="mt-4 space-y-1 px-3">
+            <li><NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" /></li>
+            <li><NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" /></li>
+            <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" /></li>
+          </ul>
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-          {companyProfile.companyName && (
-            <div className="text-center text-xs text-gray-500 mb-2">{companyProfile.companyName}</div>
-          )}
-          <div className="text-center text-xs text-gray-400">
-            All data stored locally
-          </div>
+        <div className="p-4 border-t border-slate-700">
+          <button
+            onClick={() => setShowShortcutsModal(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-xs"
+          >
+            <Keyboard className="w-4 h-4" />
+            <span>Keyboard Shortcuts</span>
+          </button>
+          <p className="text-slate-500 text-xs mt-2 px-3">Press ESC to go to Dashboard</p>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="lg:ml-64 min-h-screen">
         {/* Desktop Header */}
-        <header className="hidden lg:block bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-30">
+        <header className="hidden lg:block bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-30">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
               <button
                 onClick={() => navigateTo('home')}
-                className="hover:text-blue-600 transition-colors"
+                className="hover:text-emerald-600 transition-colors"
               >
                 Dashboard
               </button>
               {view !== 'home' && (
                 <>
                   <ChevronRight className="w-4 h-4" />
-                  <span className="text-gray-800 font-medium capitalize">
+                  <span className="text-slate-800 font-medium capitalize">
                     {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view}
                   </span>
                 </>
@@ -786,7 +939,7 @@ function App() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowCompanyProfile(true)}
-                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
+                className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
               >
                 <Building2 className="w-4 h-4" />
                 Company Profile
@@ -801,73 +954,73 @@ function App() {
           {view === 'home' && (
             <div className="max-w-6xl mx-auto space-y-6">
               <div className="text-center mb-8">
-                <h2 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-2">Welcome to GST Quotation Maker</h2>
-                <p className="text-gray-500">Create professional GST-compliant quotations for your solar business</p>
+                <h2 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-2">Dashboard</h2>
+                <p className="text-slate-500">Welcome to Laxmeejee GST Invoice System</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button
                   onClick={startNewQuotation}
-                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-blue-400 hover:shadow-lg transition-all group"
+                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-blue-400 transition-all group"
                 >
                   <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500 transition-colors">
                     <FileText className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors" />
                   </div>
-                  <h3 className="font-semibold text-gray-800 mb-1">New Quotation</h3>
-                  <p className="text-sm text-gray-500">Create a new quotation</p>
+                  <h3 className="font-semibold text-slate-800 mb-1">New Quotation</h3>
+                  <p className="text-sm text-slate-500">Create a new quotation</p>
                 </button>
 
                 <button
                   onClick={() => navigateTo('list')}
-                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-400 hover:shadow-lg transition-all group"
+                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-emerald-400 transition-all group"
                 >
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-500 transition-colors">
-                    <List className="w-6 h-6 text-green-600 group-hover:text-white transition-colors" />
+                  <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-emerald-500 transition-colors">
+                    <List className="w-6 h-6 text-emerald-600 group-hover:text-white transition-colors" />
                   </div>
-                  <h3 className="font-semibold text-gray-800 mb-1">Quotation History</h3>
-                  <p className="text-sm text-gray-500">{quotations.length} quotations saved</p>
+                  <h3 className="font-semibold text-slate-800 mb-1">Quotation History</h3>
+                  <p className="text-sm text-slate-500">{quotations.length} quotations saved</p>
                 </button>
 
                 <button
                   onClick={() => navigateTo('invoiceList')}
-                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-amber-400 hover:shadow-lg transition-all group"
+                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-amber-400 transition-all group"
                 >
                   <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-500 transition-colors">
                     <Receipt className="w-6 h-6 text-amber-600 group-hover:text-white transition-colors" />
                   </div>
-                  <h3 className="font-semibold text-gray-800 mb-1">Invoice History</h3>
-                  <p className="text-sm text-gray-500">{invoices.length} invoices</p>
+                  <h3 className="font-semibold text-slate-800 mb-1">Invoice History</h3>
+                  <p className="text-sm text-slate-500">{invoices.length} invoices</p>
                 </button>
 
                 <button
                   onClick={() => navigateTo('templates')}
-                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-purple-400 hover:shadow-lg transition-all group"
+                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-purple-400 transition-all group"
                 >
                   <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-500 transition-colors">
                     <Layout className="w-6 h-6 text-purple-600 group-hover:text-white transition-colors" />
                   </div>
-                  <h3 className="font-semibold text-gray-800 mb-1">Templates</h3>
-                  <p className="text-sm text-gray-500">{templates.length} templates</p>
+                  <h3 className="font-semibold text-slate-800 mb-1">Templates</h3>
+                  <p className="text-sm text-slate-500">{templates.length} templates</p>
                 </button>
               </div>
 
               {/* Recent Quotations */}
               {quotations.length > 0 && (
                 <div className="mt-8">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Quotations</h3>
+                  <h3 className="text-lg font-semibold text-slate-800 mb-4">Recent Quotations</h3>
                   <div className="space-y-3">
                     {quotations.slice(0, 3).map(q => (
                       <div
                         key={q.id}
-                        className="bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-between hover:shadow-sm transition-shadow cursor-pointer"
+                        className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer"
                         onClick={() => editQuotation(q)}
                       >
                         <div>
-                          <span className="font-medium text-blue-600">{q.quotationNumber}</span>
-                          <span className="text-gray-400 mx-2">|</span>
-                          <span className="text-gray-600">{q.customer.name}</span>
+                          <span className="font-medium text-emerald-600">{q.quotationNumber}</span>
+                          <span className="text-slate-400 mx-2">|</span>
+                          <span className="text-slate-600">{q.customer.name}</span>
                         </div>
-                        <span className="font-medium text-gray-800">Rs. {q.grandTotal.toLocaleString()}</span>
+                        <span className="font-medium text-slate-800">Rs. {q.grandTotal.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -876,12 +1029,12 @@ function App() {
 
               {/* Quick Setup */}
               {!companyProfile.companyName && (
-                <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-blue-800 mb-2">Get Started</h3>
-                  <p className="text-blue-600 mb-4">Complete your company profile to create professional quotations.</p>
+                <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-emerald-800 mb-2">Get Started</h3>
+                  <p className="text-emerald-600 mb-4">Complete your company profile to create professional quotations.</p>
                   <button
                     onClick={() => setShowCompanyProfile(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
                   >
                     Setup Company Profile
                   </button>
@@ -1100,6 +1253,7 @@ function App() {
                 <button
                   onClick={handlePreviewCurrentQuotation}
                   className="px-4 py-2 border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50 transition-colors flex items-center justify-center gap-2 order-3 sm:order-2"
+                  title="Preview (Ctrl+P)"
                 >
                   <Eye className="w-4 h-4" />
                   Preview
@@ -1107,6 +1261,7 @@ function App() {
                 <button
                   onClick={exportPDF}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2 order-1 sm:order-3"
+                  title="Export PDF (Ctrl+E)"
                 >
                   <FileDown className="w-4 h-4" />
                   Export PDF
@@ -1114,6 +1269,7 @@ function App() {
                 <button
                   onClick={saveQuotation}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 order-4"
+                  title="Save (Ctrl+S)"
                 >
                   <Save className="w-4 h-4" />
                   {editingQuotationId ? 'Update' : 'Save'} Quotation
@@ -1312,6 +1468,85 @@ function App() {
           onSave={handleSaveCompanyProfile}
           onClose={() => setShowCompanyProfile(false)}
         />
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcutsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowShortcutsModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-4 border-b border-slate-200">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Keyboard className="w-5 h-5" />
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => setShowShortcutsModal(false)}
+                className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Navigation</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">New Quotation</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+N</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">New Invoice</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+I</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Quotation History</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+H</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Invoice History</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+J</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Templates</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+T</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Dashboard</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+D</kbd>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 pt-2 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Save</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+S</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Preview</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+P</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Export PDF</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Ctrl+E</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Add Product</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Alt+A</kbd>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 pt-2 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">General</p>
+                <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm">
+                  <span className="text-slate-700">Go Back / Dashboard</span>
+                  <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">ESC</kbd>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Template Builder Modal */}

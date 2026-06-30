@@ -365,19 +365,19 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   return (
     <div className="fixed inset-0 bg-gray-900/90 z-50 flex">
       {/* Left Sidebar - Tools */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+      <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-full">
         <div className="p-4 border-b">
           <input
             type="text"
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md font-semibold text-lg"
+            className="w-full px-3 py-2 border border-slate-300 rounded-md font-semibold text-lg"
             placeholder="Template Name"
           />
           <textarea
             value={templateDescription}
             onChange={(e) => setTemplateDescription(e.target.value)}
-            className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md text-sm resize-none"
+            className="w-full mt-2 px-3 py-2 border border-slate-300 rounded-md text-sm resize-none"
             rows={2}
             placeholder="Template description..."
           />
@@ -390,8 +390,8 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               disabled={!canUndo}
               className={`flex-1 px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${
                 canUndo
-                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
-                  : 'bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-200'
+                  ? 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+                  : 'bg-slate-50 text-gray-300 cursor-not-allowed border border-slate-200'
               }`}
               title="Undo (Ctrl+Z)"
             >
@@ -405,8 +405,8 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               disabled={!canRedo}
               className={`flex-1 px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${
                 canRedo
-                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
-                  : 'bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-200'
+                  ? 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+                  : 'bg-slate-50 text-gray-300 cursor-not-allowed border border-slate-200'
               }`}
               title="Redo (Ctrl+Y)"
             >
@@ -417,7 +417,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               className={`px-2 py-1.5 rounded-md text-sm transition-colors ${
                 showShortcutsHelp
                   ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
+                  : 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
               }`}
               title="Keyboard Shortcuts"
             >
@@ -425,14 +425,14 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             </button>
           </div>
           {showShortcutsHelp && (
-            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs">
+            <div className="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
               <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold text-gray-700">Keyboard Shortcuts</span>
+                <span className="font-semibold text-slate-700">Keyboard Shortcuts</span>
                 <button onClick={() => setShowShortcutsHelp(false)} className="p-0.5 hover:bg-gray-200 rounded">
-                  <X className="w-3 h-3 text-gray-500" />
+                  <X className="w-3 h-3 text-slate-500" />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-gray-600">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-slate-600">
                 <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+Z</kbd> Undo</span>
                 <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+D</kbd> Duplicate</span>
                 <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+Y</kbd> Redo</span>
@@ -447,11 +447,11 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
         </div>
 
         <div className="p-4 border-b">
-          <h3 className="font-semibold text-gray-800 mb-2">Add Custom Block</h3>
+          <h3 className="font-semibold text-slate-800 mb-2">Add Custom Block</h3>
           <div className="relative">
             <button
               onClick={() => setShowAddBlock(!showAddBlock)}
-              className="w-full px-3 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center gap-2"
+              className="w-full px-3 py-2 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" /> Add Block
               <ChevronDown className="w-4 h-4" />
@@ -460,7 +460,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           <div className="mt-3">
             <button
               onClick={() => setShowColumnSettings(!showColumnSettings)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm flex items-center justify-center gap-2 hover:bg-gray-50"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm flex items-center justify-center gap-2 hover:bg-slate-50"
             >
               <Settings className="w-4 h-4" />
               Table Columns
@@ -471,8 +471,8 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               onClick={() => setShowSettingsPanel(!showSettingsPanel)}
               className={`w-full px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2 ${
                 showSettingsPanel
-                  ? 'bg-blue-600 text-white'
-                  : 'border border-gray-300 hover:bg-gray-50'
+                  ? 'bg-emerald-600 text-white'
+                  : 'border border-slate-300 hover:bg-slate-50'
               }`}
             >
               {showSettingsPanel ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
@@ -481,11 +481,11 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           </div>
 
           <div className="mt-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Theme</label>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Theme</label>
             <select
               value={themeId}
               onChange={(e) => setThemeId(e.target.value as ThemeId)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+              className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm"
             >
               {Object.values(INVOICE_THEMES).map(theme => (
                 <option key={theme.id} value={theme.id}>{theme.name}</option>
@@ -496,7 +496,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
         {/* Column Settings Panel */}
         {showColumnSettings && (
-          <div className="p-4 bg-gray-50 border-b max-h-64 overflow-y-auto">
+          <div className="p-4 bg-slate-50 border-b max-h-64 overflow-y-auto">
             <div className="flex justify-between items-center mb-2">
               <h4 className="font-medium text-sm">Product Table Columns</h4>
               <button
@@ -519,7 +519,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             <div className="space-y-1">
               {[...productColumns].sort((a, b) => a.order - b.order).map(col => (
                 <div key={col.id} className="flex items-center gap-1 bg-white p-1 rounded border text-xs">
-                  <GripVertical className="w-3 h-3 text-gray-400 cursor-move" />
+                  <GripVertical className="w-3 h-3 text-slate-400 cursor-move" />
                   <input
                     type="checkbox"
                     checked={col.visible}
@@ -546,9 +546,9 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
         {/* Blocks List */}
         <div className="flex-1 overflow-y-auto p-4">
-          <h3 className="font-semibold text-gray-800 mb-2">Custom Blocks</h3>
+          <h3 className="font-semibold text-slate-800 mb-2">Custom Blocks</h3>
           {blocks.length === 0 ? (
-            <div className="text-sm text-gray-500 text-center py-4">
+            <div className="text-sm text-slate-500 text-center py-4">
               No custom blocks added yet. Click "Add Block" or click a zone in the preview.
             </div>
           ) : (
@@ -565,13 +565,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                   <div
                     key={block.id}
                     className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                      selectedBlock === block.id ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-100'
+                      selectedBlock === block.id ? 'bg-blue-100 border-blue-300' : 'hover:bg-slate-100'
                     }`}
                     onClick={() => setSelectedBlock(block.id)}
                   >
-                    <Icon className="w-4 h-4 text-gray-500" />
+                    <Icon className="w-4 h-4 text-slate-500" />
                     <span className="text-sm flex-1 truncate">{BLOCK_LABELS[block.type]}</span>
-                    <span className="text-xs text-gray-400">{zoneLabels(block.zone)}</span>
+                    <span className="text-xs text-slate-400">{zoneLabels(block.zone)}</span>
                   </div>
                 );
               })}
@@ -580,16 +580,16 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
         </div>
 
         {/* Actions */}
-        <div className="p-4 border-t bg-gray-50 space-y-2">
+        <div className="p-4 border-t bg-slate-50 space-y-2">
           <button
             onClick={handleSave}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center gap-2"
+            className="w-full px-4 py-2 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2"
           >
             <Save className="w-4 h-4" /> Save Template
           </button>
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md"
+            className="w-full px-4 py-2 border border-slate-300 rounded-md"
           >
             Close
           </button>
@@ -628,7 +628,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
       {/* Right Sidebar - Block Properties or Settings Panel */}
       {showSettingsPanel ? (
-        <div className="w-72 border-l border-gray-200">
+        <div className="w-72 border-l border-slate-200">
           <TemplateSettingsPanel
             settings={templateSettings}
             onChange={setTemplateSettings}
@@ -637,19 +637,19 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           />
         </div>
       ) : (
-        <div className="w-64 bg-white border-l border-gray-200 p-4">
-          <h3 className="font-semibold text-gray-800 mb-4">Properties</h3>
+        <div className="w-64 bg-white border-l border-slate-200 p-4">
+          <h3 className="font-semibold text-slate-800 mb-4">Properties</h3>
           {selectedBlockData ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Block Type</label>
-                <div className="px-3 py-2 bg-gray-100 rounded text-sm">
+                <label className="block text-xs font-medium text-slate-600 mb-1">Block Type</label>
+                <div className="px-3 py-2 bg-slate-100 rounded text-sm">
                   {BLOCK_LABELS[selectedBlockData.type]}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Zone</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Zone</label>
                 <select
                   value={selectedBlockData.zone}
                   onChange={(e) => updateBlockZone(selectedBlockData.id, e.target.value as BlockZone)}
@@ -664,13 +664,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               <div className="flex gap-2">
                 <button
                   onClick={() => moveBlockInZone(selectedBlockData.id, 'up')}
-                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-gray-50"
+                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50"
                 >
                   <ArrowUp className="w-3 h-3" /> Up
                 </button>
                 <button
                   onClick={() => moveBlockInZone(selectedBlockData.id, 'down')}
-                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-gray-50"
+                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50"
                 >
                   <ArrowDown className="w-3 h-3" /> Down
                 </button>
@@ -694,7 +694,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
               {['text_block', 'terms_conditions', 'warranty', 'transport_details', 'delivery_details', 'installation_details', 'footer_notes'].includes(selectedBlockData.type) && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Content</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Content</label>
                   <textarea
                     value={selectedBlockData.content || ''}
                     onChange={(e) => updateBlockContent(selectedBlockData.id, e.target.value)}
@@ -707,7 +707,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               <div className="flex gap-2">
                 <button
                   onClick={() => duplicateBlock(selectedBlockData.id)}
-                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-gray-50"
+                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50"
                 >
                   <Copy className="w-3 h-3" /> Duplicate
                 </button>
@@ -720,7 +720,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               </div>
             </div>
           ) : (
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-slate-500">
               <p>Select a block to edit its properties.</p>
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-xs text-blue-700">
@@ -741,7 +741,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           <div className="bg-white rounded-lg shadow-xl w-[600px] max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold">Add Custom Block</h2>
-              <button onClick={() => setShowAddBlock(false)} className="p-1 hover:bg-gray-100 rounded">
+              <button onClick={() => setShowAddBlock(false)} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -749,11 +749,11 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             <div className="p-4 max-h-[65vh] overflow-y-auto">
               {/* Zone Selection - Grouped by type */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Insert Into Zone</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Insert Into Zone</label>
 
                 {/* Horizontal Flow Zones */}
                 <div className="mb-3">
-                  <div className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Full Width Sections</div>
+                  <div className="text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Full Width Sections</div>
                   <div className="grid grid-cols-2 gap-2">
                     {ZONE_GROUPS.horizontal.map(zone => (
                       <button
@@ -762,7 +762,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         className={`p-2.5 border rounded-lg text-left transition-colors ${
                           selectedZone === zone
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'hover:border-gray-300 hover:bg-gray-50'
+                            : 'hover:border-slate-300 hover:bg-slate-50'
                         }`}
                       >
                         <div className="text-sm font-medium">{ZONE_LABELS[zone]}</div>
@@ -773,7 +773,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
                 {/* Split Zones */}
                 <div>
-                  <div className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Split Columns (Side by Side)</div>
+                  <div className="text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Split Columns (Side by Side)</div>
                   <div className="grid grid-cols-3 gap-2">
                     {ZONE_GROUPS.split.map(zone => (
                       <button
@@ -782,7 +782,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                         className={`p-2 border rounded-lg text-left transition-colors ${
                           selectedZone === zone
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'hover:border-gray-300 hover:bg-gray-50'
+                            : 'hover:border-slate-300 hover:bg-slate-50'
                         }`}
                       >
                         <div className="text-xs font-medium">{ZONE_LABELS[zone]}</div>
@@ -796,7 +796,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
               {selectedZone && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">Select Block Type</label>
+                    <label className="block text-sm font-medium text-slate-700">Select Block Type</label>
                     <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
                       Zone: {ZONE_LABELS[selectedZone]}
                     </span>
@@ -810,8 +810,8 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                           onClick={() => addBlock(type, selectedZone)}
                           className="flex items-center gap-3 p-3 border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors text-left"
                         >
-                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                            <Icon className="w-5 h-5 text-gray-600" />
+                          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                            <Icon className="w-5 h-5 text-slate-600" />
                           </div>
                           <div>
                             <div className="font-medium text-sm">{BLOCK_LABELS[type]}</div>

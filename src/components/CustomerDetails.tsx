@@ -64,7 +64,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
         <select
           value={value as string}
           onChange={(e) => updateCustomField(field.key, e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
         >
           <option value="">Select {field.label}...</option>
           {field.options.map(opt => (
@@ -79,7 +79,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
         <textarea
           value={value as string}
           onChange={(e) => updateCustomField(field.key, e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           rows={2}
           placeholder={field.placeholder}
         />
@@ -92,7 +92,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
           type="date"
           value={value as string}
           onChange={(e) => updateCustomField(field.key, e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
         />
       );
     }
@@ -103,7 +103,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
           type="number"
           value={value as number}
           onChange={(e) => updateCustomField(field.key, Number(e.target.value))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           placeholder={field.placeholder}
         />
       );
@@ -115,87 +115,87 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
         type="text"
         value={value as string}
         onChange={(e) => updateCustomField(field.key, e.target.value)}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
         placeholder={field.placeholder}
       />
     );
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Bill To Section */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
             <User className="w-5 h-5 text-blue-600" />
             Bill To
           </h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Customer Name</label>
               <input
                 type="text"
                 value={customer.name}
                 onChange={(e) => onChange({ ...customer, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="Enter customer name"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+              <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                 <Phone className="w-4 h-4" /> Mobile
               </label>
               <input
                 type="tel"
                 value={customer.mobile}
                 onChange={(e) => onChange({ ...customer, mobile: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="10-digit mobile number"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">GST Number (Optional)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">GST Number (Optional)</label>
               <input
                 type="text"
                 value={customer.gstNumber || ''}
                 onChange={(e) => onChange({ ...customer, gstNumber: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="GSTIN number"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                   <MapPinned className="w-4 h-4" /> Village
                 </label>
                 <input
                   type="text"
                   value={customer.village}
                   onChange={(e) => onChange({ ...customer, village: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Village/Town"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                   <MapPin className="w-4 h-4" /> District
                 </label>
                 <input
                   type="text"
                   value={customer.district}
                   onChange={(e) => onChange({ ...customer, district: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="District"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Billing Address</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Billing Address</label>
               <textarea
                 value={customer.billingAddress}
                 onChange={(e) => onChange({ ...customer, billingAddress: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 rows={2}
                 placeholder="Full address with pincode"
               />
@@ -204,7 +204,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
             {/* Custom fields from template schema */}
             {customFields.filter(f => f.location === 'customer').map(field => (
               <div key={field.id}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   {field.label}
                   {field.required && <span className="text-red-500 ml-1">*</span>}
                 </label>
@@ -217,7 +217,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
         {/* Ship To Section */}
         {onShipToChange && (
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
               <Truck className="w-5 h-5 text-green-600" />
               Ship To
             </h3>
@@ -227,55 +227,55 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                   type="checkbox"
                   checked={sameAsBillTo}
                   onChange={(e) => handleSameAsBillToChange(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                 />
-                <span className="text-sm text-gray-700 flex items-center gap-1">
+                <span className="text-sm text-slate-700 flex items-center gap-1">
                   <Copy className="w-4 h-4" /> Same as Bill To
                 </span>
               </label>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Receiver Name</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Receiver Name</label>
                 <input
                   type="text"
                   value={actualShipTo.name}
                   onChange={(e) => handleShipToChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   placeholder="Enter receiver name"
                   disabled={sameAsBillTo}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                   <Phone className="w-4 h-4" /> Mobile
                 </label>
                 <input
                   type="tel"
                   value={actualShipTo.mobile}
                   onChange={(e) => handleShipToChange('mobile', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   placeholder="10-digit mobile number"
                   disabled={sameAsBillTo}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">GST Number (Optional)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">GST Number (Optional)</label>
                 <input
                   type="text"
                   value={actualShipTo.gstNumber || ''}
                   onChange={(e) => handleShipToChange('gstNumber', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   placeholder="GSTIN number"
                   disabled={sameAsBillTo}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Address</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Delivery Address</label>
                 <textarea
                   value={actualShipTo.address}
                   onChange={(e) => handleShipToChange('address', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   rows={2}
                   placeholder="Full delivery address with pincode"
                   disabled={sameAsBillTo}
