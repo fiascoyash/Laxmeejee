@@ -1,7 +1,7 @@
 import {
   CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn,
-  Invoice, NumberingSettings, GstMode,
-  DEFAULT_TEMPLATE_SETTINGS, TemplateSchema
+  Invoice, NumberingSettings, GstMode, CustomerData,
+  DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UnitType, IndustryType, ExpiryStatus, UNIT_OPTIONS
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   TEMPLATES: 'solar_quotation_templates',
   INVOICES: 'solar_invoices',
   NUMBERING: 'solar_numbering_settings',
+  CUSTOMERS: 'solar_customers',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -242,6 +243,55 @@ export const storage = {
   getInvoiceById: (id: string): Invoice | undefined => {
     return storage.getInvoices().find(i => i.id === id);
   },
+
+  // Customers (Party Management)
+  getCustomers: (): CustomerData[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  saveCustomer: (customer: CustomerData): void => {
+    const customers = storage.getCustomers();
+    const existingIndex = customers.findIndex(c => c.id === customer.id);
+    if (existingIndex >= 0) {
+      customers[existingIndex] = { ...customer, updatedAt: new Date().toISOString() };
+    } else {
+      customers.unshift(customer);
+    }
+    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+  },
+
+  deleteCustomer: (id: string): void => {
+    const customers = storage.getCustomers().filter(c => c.id !== id);
+    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+  },
+
+  getCustomerById: (id: string): CustomerData | undefined => {
+    return storage.getCustomers().find(c => c.id === id);
+  },
+
+  getCustomerByMobile: (mobile: string): CustomerData | undefined => {
+    return storage.getCustomers().find(c => c.mobile === mobile);
+  },
+
+  searchCustomers: (query: string): CustomerData[] => {
+    const customers = storage.getCustomers();
+    const lowerQuery = query.toLowerCase();
+    return customers.filter(c =>
+      c.name.toLowerCase().includes(lowerQuery) ||
+      c.mobile.includes(query) ||
+      (c.gstNumber && c.gstNumber.toLowerCase().includes(lowerQuery))
+    );
+  },
+
+  getRecentCustomers: (limit: number = 5): CustomerData[] => {
+    const customers = storage.getCustomers();
+    return customers.slice(0, limit);
+  },
+
+  isCustomerExists: (mobile: string): boolean => {
+    return storage.getCustomers().some(c => c.mobile === mobile);
+  },
 };
 
 export const generateId = (): string => {
@@ -312,17 +362,18 @@ export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
 };
 
 const getDefaultProducts = (): ProductCatalogItem[] => {
+  const now = new Date().toISOString();
   return [
-    { id: generateId(), name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, defaultPrice: 12000, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'Solar Panel 550W', hsnCode: '8541', gstPercent: 18, defaultPrice: 18000, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, defaultPrice: 35000, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'Solar Inverter 5kW', hsnCode: '8504', gstPercent: 18, defaultPrice: 55000, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'Solar Battery 150Ah', hsnCode: '8507', gstPercent: 18, defaultPrice: 22000, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'Solar Structure (Per kW)', hsnCode: '7610', gstPercent: 18, defaultPrice: 8000, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'DCDB Box', hsnCode: '8537', gstPercent: 18, defaultPrice: 3500, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'ACDB Box', hsnCode: '8537', gstPercent: 18, defaultPrice: 4500, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'Cable 4 sq mm (Per Meter)', hsnCode: '8544', gstPercent: 18, defaultPrice: 45, createdAt: new Date().toISOString() },
-    { id: generateId(), name: 'Earthing Kit', hsnCode: '8536', gstPercent: 18, defaultPrice: 5000, createdAt: new Date().toISOString() },
+    // Solar Products
+    { id: generateId(), name: 'Solar Panel 335W', sku: 'SP-335', category: 'Solar', unit: 'piece', purchasePrice: 10000, sellingPrice: 12000, gstPercent: 18, hsnCode: '8541', stockQuantity: 50, minStockAlert: 10, brand: 'Waaree', wattage: 335, industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Solar Panel 550W', sku: 'SP-550', category: 'Solar', unit: 'piece', purchasePrice: 15000, sellingPrice: 18000, gstPercent: 18, hsnCode: '8541', stockQuantity: 30, minStockAlert: 5, brand: 'Waaree', wattage: 550, industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Solar Inverter 3kW', sku: 'SI-3K', category: 'Solar', unit: 'piece', purchasePrice: 28000, sellingPrice: 35000, gstPercent: 18, hsnCode: '8504', stockQuantity: 10, minStockAlert: 3, brand: 'Luminous', industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Solar Battery 150Ah', sku: 'SB-150', category: 'Solar', unit: 'piece', purchasePrice: 18000, sellingPrice: 22000, gstPercent: 18, hsnCode: '8507', stockQuantity: 15, minStockAlert: 5, brand: 'Exide', industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'DCDB Box', sku: 'DCDB-001', category: 'Solar', unit: 'piece', purchasePrice: 2500, sellingPrice: 3500, gstPercent: 18, hsnCode: '8537', stockQuantity: 20, minStockAlert: 5, industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'ACDB Box', sku: 'ACDB-001', category: 'Solar', unit: 'piece', purchasePrice: 3500, sellingPrice: 4500, gstPercent: 18, hsnCode: '8537', stockQuantity: 15, minStockAlert: 5, industryType: 'solar', createdAt: now, updatedAt: now },
+    // Medical Products (Example)
+    { id: generateId(), name: 'Paracetamol 500mg', sku: 'MED-P500', category: 'Medicine', unit: 'strip', purchasePrice: 15, sellingPrice: 20, gstPercent: 5, hsnCode: '3004', stockQuantity: 100, minStockAlert: 20, brand: 'Cipla', batchNumber: 'BTH001', expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], industryType: 'medical', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Azithromycin 500mg', sku: 'MED-A500', category: 'Medicine', unit: 'strip', purchasePrice: 50, sellingPrice: 65, gstPercent: 5, hsnCode: '3004', stockQuantity: 50, minStockAlert: 10, brand: 'Sun Pharma', batchNumber: 'BTH002', expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], industryType: 'medical', createdAt: now, updatedAt: now },
   ];
 };
 
@@ -888,6 +939,75 @@ export const calculateRoundOff = (rawTotal: number): { roundOff: number; rounded
   const roundedGrandTotal = Math.round(rawTotal);
   const roundOff = roundTo2(roundedGrandTotal - rawTotal);
   return { roundOff, roundedGrandTotal };
+};
+
+// ─── Expiry and Stock Helper Functions ─────────────────────────────────────
+
+// Calculate expiry status based on expiry date
+export const getExpiryStatus = (expiryDate?: string): ExpiryStatus => {
+  if (!expiryDate) return 'safe';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiry = new Date(expiryDate);
+  expiry.setHours(0, 0, 0, 0);
+
+  const diffTime = expiry.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return 'expired';
+  if (diffDays <= 30) return 'expiring_soon';
+  return 'safe';
+};
+
+// Get expiry status label
+export const getExpiryStatusLabel = (status: ExpiryStatus): string => {
+  switch (status) {
+    case 'expired': return 'Expired';
+    case 'expiring_soon': return 'Expiring Soon';
+    default: return 'Safe';
+  }
+};
+
+// Check if product is low stock
+export const isLowStock = (product: ProductCatalogItem): boolean => {
+  if (product.minStockAlert === undefined || product.minStockAlert === null) return false;
+  return product.stockQuantity <= product.minStockAlert;
+};
+
+// Get days until expiry
+export const getDaysUntilExpiry = (expiryDate?: string): number | null => {
+  if (!expiryDate) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiry = new Date(expiryDate);
+  expiry.setHours(0, 0, 0, 0);
+
+  const diffTime = expiry.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
+// Generate unique SKU
+export const generateSku = (name: string): string => {
+  const prefix = name.substring(0, 3).toUpperCase();
+  const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${prefix}-${suffix}`;
+};
+
+// Get default unit based on industry type
+export const getDefaultUnit = (industryType?: IndustryType): UnitType => {
+  switch (industryType) {
+    case 'medical': return 'strip';
+    case 'solar': return 'piece';
+    case 'automobile': return 'piece';
+    case 'hardware': return 'piece';
+    case 'cement': return 'bag';
+    case 'services': return 'hour';
+    default: return 'piece';
+  }
 };
 
 export const numberToWords = (num: number): string => {

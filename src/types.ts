@@ -10,7 +10,146 @@ export interface CompanyProfile {
   bankIfsc: string;
   bankBranch: string;
   signature: string;
+  // Business Type
+  businessType?: BusinessType;
 }
+
+// Business Types for Company Profile
+export type BusinessType =
+  | 'general'
+  | 'retail_garments'
+  | 'pharmacy_medical'
+  | 'jewellery'
+  | 'education'
+  | 'restaurant_hotel'
+  | 'electronics_mobile'
+  | 'automobile'
+  | 'service'
+  | 'hardware_cement'
+  | 'custom';
+
+// Business Type Options for Dropdown
+export const BUSINESS_TYPE_OPTIONS: { value: BusinessType; label: string }[] = [
+  { value: 'general', label: 'General Business' },
+  { value: 'retail_garments', label: 'Retail / Garments' },
+  { value: 'pharmacy_medical', label: 'Pharmacy / Medical' },
+  { value: 'jewellery', label: 'Jewellery Store' },
+  { value: 'education', label: 'School / College / Education' },
+  { value: 'restaurant_hotel', label: 'Restaurant / Hotel' },
+  { value: 'electronics_mobile', label: 'Electronics / Mobile' },
+  { value: 'automobile', label: 'Automobile / Spare Parts' },
+  { value: 'service', label: 'Service Business' },
+  { value: 'hardware_cement', label: 'Hardware / Cement' },
+  { value: 'custom', label: 'Custom Business' },
+];
+
+// Business Type Dynamic Field Definitions
+export interface BusinessTypeFieldConfig {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'date';
+  required?: boolean;
+  options?: { value: string; label: string }[];
+  placeholder?: string;
+}
+
+// Business Type Field Configurations - maps business types to their additional fields
+export const BUSINESS_TYPE_FIELDS: Record<BusinessType, BusinessTypeFieldConfig[]> = {
+  general: [],
+  retail_garments: [
+    { key: 'size', label: 'Size', type: 'text', placeholder: 'e.g., S, M, L, XL' },
+    { key: 'color', label: 'Color', type: 'text', placeholder: 'e.g., Red, Blue' },
+    { key: 'barcode', label: 'Barcode', type: 'text', placeholder: 'Product barcode' },
+    { key: 'brand', label: 'Brand', type: 'text', placeholder: 'Brand name' },
+  ],
+  pharmacy_medical: [
+    { key: 'batchNumber', label: 'Batch Number', type: 'text', required: true, placeholder: 'Batch no.' },
+    { key: 'expiryDate', label: 'Expiry Date', type: 'date', required: true },
+    { key: 'manufacturingDate', label: 'Manufacturing Date', type: 'date' },
+    { key: 'manufacturer', label: 'Manufacturer', type: 'text', placeholder: 'Manufacturer name' },
+  ],
+  jewellery: [
+    { key: 'metalType', label: 'Metal Type', type: 'select', options: [
+      { value: 'gold', label: 'Gold' },
+      { value: 'silver', label: 'Silver' },
+      { value: 'platinum', label: 'Platinum' },
+      { value: 'diamond', label: 'Diamond' },
+    ]},
+    { key: 'purity', label: 'Purity', type: 'select', options: [
+      { value: '24K', label: '24K (99.9%)' },
+      { value: '22K', label: '22K (91.6%)' },
+      { value: '18K', label: '18K (75%)' },
+      { value: '14K', label: '14K (58.3%)' },
+    ]},
+    { key: 'weight', label: 'Weight (grams)', type: 'number', placeholder: 'Weight in grams' },
+    { key: 'makingCharges', label: 'Making Charges', type: 'number', placeholder: 'Making charges' },
+    { key: 'stoneCharges', label: 'Stone Charges', type: 'number', placeholder: 'Stone charges' },
+  ],
+  education: [
+    { key: 'feesType', label: 'Fees Type', type: 'select', options: [
+      { value: 'tuition', label: 'Tuition Fees' },
+      { value: 'admission', label: 'Admission Fees' },
+      { value: 'exam', label: 'Exam Fees' },
+      { value: 'library', label: 'Library Fees' },
+      { value: 'lab', label: 'Lab Fees' },
+      { value: 'transport', label: 'Transport Fees' },
+      { value: 'other', label: 'Other Fees' },
+    ]},
+    { key: 'studentRollNo', label: 'Student Roll Number', type: 'text', placeholder: 'Roll number' },
+    { key: 'courseClass', label: 'Course/Class', type: 'text', placeholder: 'e.g., Class 10, BCA' },
+    { key: 'sessionYear', label: 'Session Year', type: 'text', placeholder: 'e.g., 2024-25' },
+  ],
+  restaurant_hotel: [
+    { key: 'tableNumber', label: 'Table Number', type: 'text', placeholder: 'Table no.' },
+    { key: 'roomNumber', label: 'Room Number', type: 'text', placeholder: 'Room no.' },
+    { key: 'foodCategory', label: 'Food Category', type: 'select', options: [
+      { value: 'veg', label: 'Vegetarian' },
+      { value: 'non-veg', label: 'Non-Vegetarian' },
+      { value: 'egg', label: 'Egg' },
+    ]},
+    { key: 'kot', label: 'Kitchen Order Ticket (KOT)', type: 'text', placeholder: 'KOT number' },
+  ],
+  electronics_mobile: [
+    { key: 'serialNumber', label: 'Serial Number', type: 'text', placeholder: 'Serial no.' },
+    { key: 'imeiNumber', label: 'IMEI Number', type: 'text', placeholder: 'IMEI number' },
+    { key: 'warrantyPeriod', label: 'Warranty Period', type: 'text', placeholder: 'e.g., 12 months' },
+    { key: 'brand', label: 'Brand', type: 'text', placeholder: 'Brand name' },
+  ],
+  automobile: [
+    { key: 'vehicleModel', label: 'Vehicle Model', type: 'text', placeholder: 'e.g., Maruti Swift' },
+    { key: 'partNumber', label: 'Part Number', type: 'text', placeholder: 'OEM part number' },
+    { key: 'warrantyPeriod', label: 'Warranty', type: 'text', placeholder: 'e.g., 12 months' },
+    { key: 'brand', label: 'Brand', type: 'text', placeholder: 'Brand name' },
+  ],
+  service: [
+    { key: 'serviceType', label: 'Service Type', type: 'text', placeholder: 'e.g., Repair, Maintenance' },
+    { key: 'billingUnit', label: 'Billing Unit', type: 'select', options: [
+      { value: 'per_hour', label: 'Per Hour' },
+      { value: 'per_day', label: 'Per Day' },
+      { value: 'fixed', label: 'Fixed Charge' },
+    ]},
+    { key: 'technicianName', label: 'Technician Name', type: 'text', placeholder: 'Technician name' },
+  ],
+  hardware_cement: [
+    { key: 'weight', label: 'Weight', type: 'text', placeholder: 'e.g., 50 kg' },
+    { key: 'brand', label: 'Brand', type: 'text', placeholder: 'Brand name' },
+    { key: 'grade', label: 'Grade', type: 'text', placeholder: 'e.g., OPC 43' },
+  ],
+  custom: [],
+};
+
+// Get IndustryType from BusinessType for backward compatibility
+export const getIndustryTypeFromBusinessType = (businessType?: BusinessType): IndustryType => {
+  switch (businessType) {
+    case 'pharmacy_medical': return 'medical';
+    case 'retail_garments': return 'retail';
+    case 'electronics_mobile': return 'electronics';
+    case 'automobile': return 'automobile';
+    case 'hardware_cement': return 'hardware';
+    case 'service': return 'services';
+    default: return 'retail';
+  }
+};
 
 export interface Customer {
   name: string;
@@ -21,6 +160,22 @@ export interface Customer {
   gstNumber?: string;
   // Dynamic custom fields from template schema
   customFields?: Record<string, string | number | boolean>;
+}
+
+// Customer Database Entry (for Party Management)
+export interface CustomerData {
+  id: string;
+  name: string;
+  mobile: string;
+  gstNumber?: string;
+  email?: string;
+  village: string;
+  district: string;
+  billingAddress: string;
+  deliveryAddress?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ShipTo {
@@ -55,16 +210,165 @@ export interface Product {
   isManualAmount?: boolean;  // Flag to track if amount was manually set
   // Dynamic custom fields from template schema
   customFields?: Record<string, string | number | boolean>;
+  // NEW: Dynamic attributes carried from product catalog
+  attributes?: Record<string, string | number | boolean>;
 }
 
+// Industry Types for Dynamic Forms
+export type IndustryType =
+  | 'retail'
+  | 'medical'
+  | 'solar'
+  | 'automobile'
+  | 'electronics'
+  | 'hardware'
+  | 'cement'
+  | 'electrical'
+  | 'services'
+  | 'custom';
+
+// Unit Types
+export type UnitType =
+  | 'piece'
+  | 'box'
+  | 'packet'
+  | 'strip'
+  | 'bottle'
+  | 'kg'
+  | 'gram'
+  | 'liter'
+  | 'meter'
+  | 'feet'
+  | 'bag'
+  | 'ton'
+  | 'set'
+  | 'service'
+  | 'hour'
+  | 'day'
+  | 'custom';
+
+// Expiry Status
+export type ExpiryStatus = 'safe' | 'expiring_soon' | 'expired';
+
+// Universal Product Catalog Item
 export interface ProductCatalogItem {
   id: string;
   name: string;
-  hsnCode: string;
-  gstPercent: number;
-  defaultPrice: number;
+  sku?: string;                    // SKU / Item Code
+  category: string;                // Product Category
+  unit: UnitType;                  // Unit Type
+  purchasePrice: number;           // Purchase Price
+  sellingPrice: number;            // Selling Price
+  gstPercent: number;             // GST %
+  hsnCode: string;                // HSN/SAC Code
+  stockQuantity: number;           // Stock Quantity
+  minStockAlert?: number;          // Minimum Stock Alert Level
+  brand?: string;                 // Brand (optional)
+  description?: string;           // Notes/Description
+  // Expiry Tracking Fields (optional)
+  batchNumber?: string;
+  manufacturingDate?: string;      // Format: YYYY-MM-DD
+  expiryDate?: string;            // Format: YYYY-MM-DD
+  // Industry-specific fields
+  industryType?: IndustryType;
+  // Automobile fields
+  partNumber?: string;
+  modelNumber?: string;
+  variant?: string;
+  warrantyMonths?: number;
+  // Electronics fields
+  serialNumber?: string;
+  // Solar fields
+  wattage?: number;
+  // Service fields
+  sacCode?: string;
+  billingUnit?: 'per_hour' | 'fixed' | 'per_day';
+  serviceDuration?: number;
+  // Custom fields for flexibility
+  customFields?: Record<string, string | number | boolean>;
+  // NEW: Dynamic attributes based on business type (JSON field)
+  attributes?: Record<string, string | number | boolean>;
   createdAt: string;
+  updatedAt: string;
 }
+
+// Unit Options for Dropdown
+export const UNIT_OPTIONS: { value: UnitType; label: string }[] = [
+  { value: 'piece', label: 'Piece' },
+  { value: 'box', label: 'Box' },
+  { value: 'packet', label: 'Packet' },
+  { value: 'strip', label: 'Strip' },
+  { value: 'bottle', label: 'Bottle' },
+  { value: 'kg', label: 'Kg' },
+  { value: 'gram', label: 'Gram' },
+  { value: 'liter', label: 'Liter' },
+  { value: 'meter', label: 'Meter' },
+  { value: 'feet', label: 'Feet' },
+  { value: 'bag', label: 'Bag' },
+  { value: 'ton', label: 'Ton' },
+  { value: 'set', label: 'Set' },
+  { value: 'service', label: 'Service' },
+  { value: 'hour', label: 'Hour' },
+  { value: 'day', label: 'Day' },
+];
+
+// Industry Type Options for Dropdown
+export const INDUSTRY_OPTIONS: { value: IndustryType; label: string }[] = [
+  { value: 'retail', label: 'Retail' },
+  { value: 'medical', label: 'Medical / Pharmacy' },
+  { value: 'solar', label: 'Solar' },
+  { value: 'automobile', label: 'Automobile' },
+  { value: 'electronics', label: 'Electronics' },
+  { value: 'hardware', label: 'Hardware' },
+  { value: 'cement', label: 'Cement' },
+  { value: 'electrical', label: 'Electrical' },
+  { value: 'services', label: 'Service Business' },
+  { value: 'custom', label: 'Custom' },
+];
+
+// Industry-specific field configurations
+export const INDUSTRY_FIELDS: Record<IndustryType, { fields: string[]; labels: Record<string, string> }> = {
+  retail: {
+    fields: ['sku', 'brand', 'unit'],
+    labels: { sku: 'Barcode/SKU', brand: 'Brand', unit: 'Unit' },
+  },
+  medical: {
+    fields: ['batchNumber', 'manufacturingDate', 'expiryDate', 'brand'],
+    labels: { batchNumber: 'Batch Number', manufacturingDate: 'Mfg Date', expiryDate: 'Expiry Date', brand: 'Brand' },
+  },
+  solar: {
+    fields: ['wattage', 'brand', 'modelNumber', 'warrantyMonths'],
+    labels: { wattage: 'Wattage (W)', brand: 'Brand', modelNumber: 'Model Number', warrantyMonths: 'Warranty (Years)' },
+  },
+  automobile: {
+    fields: ['partNumber', 'modelNumber', 'variant', 'brand', 'warrantyMonths'],
+    labels: { partNumber: 'Part Number', modelNumber: 'Model Number', variant: 'Variant', brand: 'Brand', warrantyMonths: 'Warranty (Months)' },
+  },
+  electronics: {
+    fields: ['serialNumber', 'modelNumber', 'brand', 'warrantyMonths'],
+    labels: { serialNumber: 'Serial Number', modelNumber: 'Model Number', brand: 'Brand', warrantyMonths: 'Warranty (Months)' },
+  },
+  hardware: {
+    fields: ['brand', 'unit'],
+    labels: { brand: 'Brand', unit: 'Unit' },
+  },
+  cement: {
+    fields: ['brand', 'unit', 'batchNumber'],
+    labels: { brand: 'Brand', unit: 'Unit', batchNumber: 'Batch Number' },
+  },
+  electrical: {
+    fields: ['brand', 'modelNumber', 'warrantyMonths'],
+    labels: { brand: 'Brand', modelNumber: 'Model Number', warrantyMonths: 'Warranty (Months)' },
+  },
+  services: {
+    fields: ['sacCode', 'billingUnit', 'serviceDuration'],
+    labels: { sacCode: 'SAC Code', billingUnit: 'Billing Unit', serviceDuration: 'Duration' },
+  },
+  custom: {
+    fields: [],
+    labels: {},
+  },
+};
 
 export interface Quotation {
   id: string;

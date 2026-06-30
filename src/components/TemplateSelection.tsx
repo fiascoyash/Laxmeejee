@@ -23,7 +23,6 @@ interface Props {
   templates: QuotationTemplate[];
   selectedTemplateId: string | null;
   onSelect: (templateId: string) => void;
-  onContinue: () => void;
   onManageTemplates: () => void;
   companyProfile: CompanyProfile;
 }
@@ -34,7 +33,6 @@ export function TemplateSelection({
   templates,
   selectedTemplateId,
   onSelect,
-  onContinue,
   onManageTemplates,
   companyProfile,
 }: Props) {
@@ -72,25 +70,12 @@ export function TemplateSelection({
         </div>
       )}
 
-      <div className="mt-8 flex justify-between items-center">
+      <div className="mt-8 flex justify-start">
         <button
           onClick={onManageTemplates}
           className="text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
         >
           Manage Templates <ChevronRight className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={onContinue}
-          disabled={!selectedTemplateId}
-          className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
-            selectedTemplateId
-              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-              : 'bg-slate-200 text-slate-500 cursor-not-allowed'
-          }`}
-        >
-          Continue to Create Quotation
-          <ChevronRight className="w-5 h-5" />
         </button>
       </div>
     </div>

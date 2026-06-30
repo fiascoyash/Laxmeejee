@@ -1,6 +1,6 @@
-import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema } from '../types';
-import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, calculateGrandTotalAmount, roundTo2 } from '../utils/storage';
-import { Plus, Trash2, Package, ChevronDown, Settings2 } from 'lucide-react';
+import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UNIT_OPTIONS, ExpiryStatus } from '../types';
+import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, calculateGrandTotalAmount, roundTo2, getExpiryStatus, isLowStock, getDaysUntilExpiry } from '../utils/storage';
+import { Plus, Trash2, Package, ChevronDown, Settings2, AlertTriangle, AlertCircle, Clock } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 
 interface Props {
@@ -154,6 +154,18 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
   };
 
   const addFromCatalog = (catalogItem: ProductCatalogItem) => {
+    // Check for expiry warning
+    const expiryStatus = getExpiryStatus(catalogItem.expiryDate);
+    const daysUntilExpiry = getDaysUntilExpiry(catalogItem.expiryDate);
+
+    if (expiryStatus === 'expired') {
+      const proceed = confirm(`WARNING: This product expired on ${catalogItem.expiryDate}.\n\nDo you still want to add it to the quotation?`);
+      if (!proceed) return;
+    } else if (expiryStatus === 'expiring_soon') {
+      const proceed = confirm(`WARNING: This product will expire in ${daysUntilExpiry} days (on ${catalogItem.expiryDate}).\n\nDo you want to continue adding it?`);
+      if (!proceed) return;
+    }
+
     const newProduct: Product = {
       id: generateId(),
       name: catalogItem.name,
@@ -161,18 +173,20 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       hsnCode: catalogItem.hsnCode,
       gstPercent: catalogItem.gstPercent,
       quantity: 1,
-      unitPrice: catalogItem.defaultPrice,
+      unitPrice: catalogItem.sellingPrice,
       // Initialize schema-specific fields
-      batchNumber: visibleKeys.has('batchNumber') ? '' : undefined,
-      expiryDate: visibleKeys.has('expiryDate') ? '' : undefined,
+      batchNumber: catalogItem.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
+      expiryDate: catalogItem.expiryDate || (visibleKeys.has('expiryDate') ? '' : undefined),
       mrp: visibleKeys.has('mrp') ? 0 : undefined,
       discount: visibleKeys.has('discount') ? 0 : undefined,
-      wattage: visibleKeys.has('wattage') ? 0 : undefined,
-      partNumber: visibleKeys.has('partNumber') ? '' : undefined,
-      vehicleModel: visibleKeys.has('vehicleModel') ? '' : undefined,
-      warrantyMonths: visibleKeys.has('warrantyMonths') ? 0 : undefined,
-      sacCode: visibleKeys.has('sacCode') ? '' : undefined,
+      wattage: catalogItem.wattage || (visibleKeys.has('wattage') ? 0 : undefined),
+      partNumber: catalogItem.partNumber || (visibleKeys.has('partNumber') ? '' : undefined),
+      vehicleModel: catalogItem.modelNumber || (visibleKeys.has('vehicleModel') ? '' : undefined),
+      warrantyMonths: catalogItem.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
+      sacCode: catalogItem.sacCode || (visibleKeys.has('sacCode') ? '' : undefined),
       customFields: {},
+      // Carry attributes from catalog (NEW)
+      attributes: catalogItem.attributes ? { ...catalogItem.attributes } : undefined,
     };
     onChange([...products, newProduct]);
     setShowCatalog(false);
@@ -507,23 +521,71 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               <ChevronDown className="w-4 h-4" />
             </button>
             {showCatalog && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto">
+              <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto">
                 {catalog.length === 0 ? (
                   <div className="p-4 text-slate-500 text-center text-sm">No products in catalog</div>
                 ) : (
-                  catalog.map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => addFromCatalog(item)}
-                      className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0 flex justify-between items-center"
-                    >
-                      <div>
-                        <div className="font-medium text-slate-800">{item.name}</div>
-                        <div className="text-xs text-slate-500">HSN: {item.hsnCode} | GST: {item.gstPercent}%</div>
-                      </div>
-                      <div className="text-blue-600 font-medium">Rs. {item.defaultPrice.toLocaleString()}</div>
-                    </button>
-                  ))
+                  // Filter and sort catalog items by search query
+                  (() => {
+                    const searchableCatalog = catalog.filter(item => {
+                      const searchLower = showCatalog.toString().toLowerCase();
+                      // Simple filter - show all for now since we don't have search in dropdown
+                      return true;
+                    });
+                    // Sort by expiry status (expired first, then expiring soon)
+                    const sortedCatalog = [...catalog].sort((a, b) => {
+                      const statusA = getExpiryStatus(a.expiryDate);
+                      const statusB = getExpiryStatus(b.expiryDate);
+                      if (statusA === 'expired' && statusB !== 'expired') return -1;
+                      if (statusA !== 'expired' && statusB === 'expired') return 1;
+                      if (statusA === 'expiring_soon' && statusB === 'safe') return -1;
+                      if (statusA === 'safe' && statusB === 'expiring_soon') return 1;
+                      return 0;
+                    });
+                    return sortedCatalog.map(item => {
+                      const expiryStatus = getExpiryStatus(item.expiryDate);
+                      const lowStock = isLowStock(item);
+                      const daysUntilExpiry = getDaysUntilExpiry(item.expiryDate);
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => addFromCatalog(item)}
+                          className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0 flex justify-between items-center"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-slate-800 truncate">{item.name}</div>
+                            <div className="text-xs text-slate-500">
+                              {item.sku && <span className="font-mono mr-2">{item.sku}</span>}
+                              HSN: {item.hsnCode} | GST: {item.gstPercent}%
+                              {item.brand && <span className="ml-2">| {item.brand}</span>}
+                            </div>
+                            {/* Show warnings */}
+                            <div className="flex gap-2 mt-1">
+                              {expiryStatus === 'expired' && (
+                                <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                                  <AlertCircle className="w-3 h-3" /> Expired
+                                </span>
+                              )}
+                              {expiryStatus === 'expiring_soon' && (
+                                <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                                  <Clock className="w-3 h-3" /> {daysUntilExpiry} days left
+                                </span>
+                              )}
+                              {lowStock && (
+                                <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                                  <AlertTriangle className="w-3 h-3" /> Low Stock ({item.stockQuantity})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="text-emerald-600 font-medium">Rs. {item.sellingPrice.toLocaleString()}</div>
+                            <div className="text-xs text-slate-500">{UNIT_OPTIONS.find(u => u.value === item.unit)?.label || item.unit}</div>
+                          </div>
+                        </button>
+                      );
+                    });
+                  })()
                 )}
               </div>
             )}

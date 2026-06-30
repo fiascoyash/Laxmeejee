@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo } from './types';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData } from './types';
 import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
@@ -13,10 +13,13 @@ import { TemplateSelection } from './components/TemplateSelection';
 import { InvoiceForm } from './components/InvoiceForm';
 import { InvoiceList } from './components/InvoiceList';
 import { NumberingSettingsPanel } from './components/NumberingSettings';
+import { CustomerList } from './components/CustomerList';
+import { CustomerForm } from './components/CustomerForm';
+import { CustomerHistory } from './components/CustomerHistory';
 import { exportTemplatePDF } from './utils/templatePdfExport';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users } from 'lucide-react';
 
-type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice';
+type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers';
 
 function App() {
   const [view, setView] = useState<View>('home');
@@ -77,12 +80,20 @@ function App() {
   // Keyboard shortcuts modal state
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
+  // Customer Management State
+  const [customers, setCustomers] = useState<CustomerData[]>(storage.getCustomers);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerData | null>(null);
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [viewingCustomer, setViewingCustomer] = useState<CustomerData | null>(null);
+  const [isExistingCustomer, setIsExistingCustomer] = useState(false);
+
   // Load data on mount
   useEffect(() => {
     setQuotations(storage.getQuotations);
     setCatalog(storage.getProductCatalog);
     setTemplates(storage.getTemplates);
     setInvoices(storage.getInvoices);
+    setCustomers(storage.getCustomers);
     // Set default template as selected
     const defaultTemplate = storage.getDefaultTemplate();
     if (defaultTemplate) {
@@ -797,13 +808,7 @@ function App() {
     if (template?.schema?.defaultGstMode) {
       setGstMode(template.schema.defaultGstMode);
     }
-  };
-
-  const handleTemplateContinue = () => {
-    if (!selectedTemplateId) {
-      alert('Please select a template to continue');
-      return;
-    }
+    // Immediately navigate to quotation creation
     setView('new');
   };
 
@@ -814,6 +819,83 @@ function App() {
       setPreviewType('quotation');
       setPreviewingTemplate(template);
     }
+  };
+
+  // Customer Management Handlers
+  const handleSaveCustomer = (customerData: CustomerData) => {
+    const existingCustomer = storage.getCustomerByMobile(customerData.mobile);
+    if (existingCustomer && existingCustomer.id !== customerData.id) {
+      alert('A customer with this mobile number already exists.');
+      return;
+    }
+    const now = new Date().toISOString();
+    const customerToSave: CustomerData = {
+      ...customerData,
+      id: customerData.id || generateId(),
+      createdAt: customerData.createdAt || now,
+      updatedAt: now,
+    };
+    storage.saveCustomer(customerToSave);
+    setCustomers(storage.getCustomers);
+    setShowCustomerForm(false);
+    setEditingCustomer(null);
+    setIsExistingCustomer(false);
+    alert('Customer saved successfully!');
+  };
+
+  const handleDeleteCustomer = (id: string) => {
+    storage.deleteCustomer(id);
+    setCustomers(storage.getCustomers);
+  };
+
+  const handleEditCustomer = (customerData: CustomerData) => {
+    setEditingCustomer(customerData);
+    setShowCustomerForm(true);
+    setViewingCustomer(null);
+  };
+
+  const handleViewCustomer = (customerData: CustomerData) => {
+    setViewingCustomer(customerData);
+  };
+
+  const handleAddCustomerClick = () => {
+    setEditingCustomer(null);
+    setIsExistingCustomer(false);
+    setShowCustomerForm(true);
+  };
+
+  // Get customer stats for list
+  const getCustomerStats = () => {
+    const quotationCounts: Record<string, number> = {};
+    const invoiceCounts: Record<string, number> = {};
+    const lastActivityDates: Record<string, string> = {};
+
+    quotations.forEach(q => {
+      const mobile = q.customer.mobile;
+      quotationCounts[mobile] = (quotationCounts[mobile] || 0) + 1;
+      const existingDate = lastActivityDates[mobile];
+      if (!existingDate || q.date > existingDate) {
+        lastActivityDates[mobile] = q.date;
+      }
+    });
+
+    invoices.forEach(i => {
+      const mobile = i.customer.mobile;
+      invoiceCounts[mobile] = (invoiceCounts[mobile] || 0) + 1;
+      const existingDate = lastActivityDates[mobile];
+      if (!existingDate || i.date > existingDate) {
+        lastActivityDates[mobile] = i.date;
+      }
+    });
+
+    return { quotationCounts, invoiceCounts, lastActivityDates };
+  };
+
+  // Get customer history for viewing
+  const getCustomerHistory = (mobile: string) => {
+    const customerQuotations = quotations.filter(q => q.customer.mobile === mobile);
+    const customerInvoices = invoices.filter(i => i.customer.mobile === mobile);
+    return { customerQuotations, customerInvoices };
   };
 
   const NavItem = ({ icon: Icon, label, currentView, targetView }: {
@@ -896,11 +978,15 @@ function App() {
               <li><NavItem icon={Receipt} label="Invoice History" currentView={view} targetView="invoiceList" /></li>
             </ul>
           </div>
-          <ul className="mt-4 space-y-1 px-3">
-            <li><NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" /></li>
-            <li><NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" /></li>
-            <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" /></li>
-          </ul>
+          <div className="mt-4 px-3">
+            <p className="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Management</p>
+            <ul className="space-y-1">
+              <li><NavItem icon={Users} label="Customers" currentView={view} targetView="customers" /></li>
+              <li><NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" /></li>
+              <li><NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" /></li>
+              <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" /></li>
+            </ul>
+          </div>
         </nav>
 
         <div className="p-4 border-t border-slate-700">
@@ -1049,7 +1135,6 @@ function App() {
               templates={templates}
               selectedTemplateId={selectedTemplateId}
               onSelect={handleSelectTemplate}
-              onContinue={handleTemplateContinue}
               onManageTemplates={() => navigateTo('templates')}
               companyProfile={companyProfile}
             />
@@ -1381,11 +1466,31 @@ function App() {
             </div>
           )}
 
+          {/* Customers */}
+          {view === 'customers' && (
+            <div className="max-w-6xl mx-auto">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Customers</h2>
+                <p className="text-sm text-gray-500">Manage your customer database</p>
+              </div>
+              <CustomerList
+                customers={customers}
+                onView={handleViewCustomer}
+                onEdit={handleEditCustomer}
+                onDelete={handleDeleteCustomer}
+                onAdd={handleAddCustomerClick}
+                quotationCounts={getCustomerStats().quotationCounts}
+                invoiceCounts={getCustomerStats().invoiceCounts}
+                lastActivityDates={getCustomerStats().lastActivityDates}
+              />
+            </div>
+          )}
+
           {/* Product Catalog */}
           {view === 'catalog' && (
             <div className="max-w-4xl mx-auto">
               <h2 className="text-xl font-bold text-gray-800 mb-6">Product Catalog</h2>
-              <ProductCatalog catalog={catalog} onSave={handleSaveCatalog} />
+              <ProductCatalog catalog={catalog} onSave={handleSaveCatalog} businessType={companyProfile.businessType} />
             </div>
           )}
 
@@ -1603,6 +1708,38 @@ function App() {
           documentType={previewType}
           invoice={previewType === 'invoice' ? editingInvoice! : undefined}
           gstMode={previewType === 'invoice' && editingInvoice ? editingInvoice.gstMode || 'inclusive' : gstMode}
+        />
+      )}
+
+      {/* Customer Form Modal */}
+      {showCustomerForm && (
+        <CustomerForm
+          customer={editingCustomer}
+          onSave={handleSaveCustomer}
+          onCancel={() => {
+            setShowCustomerForm(false);
+            setEditingCustomer(null);
+            setIsExistingCustomer(false);
+          }}
+          isExistingCustomer={isExistingCustomer}
+        />
+      )}
+
+      {/* Customer History Modal */}
+      {viewingCustomer && (
+        <CustomerHistory
+          customer={viewingCustomer}
+          quotations={getCustomerHistory(viewingCustomer.mobile).customerQuotations}
+          invoices={getCustomerHistory(viewingCustomer.mobile).customerInvoices}
+          onClose={() => setViewingCustomer(null)}
+          onEditQuotation={(q) => {
+            setViewingCustomer(null);
+            editQuotation(q);
+          }}
+          onEditInvoice={(i) => {
+            setViewingCustomer(null);
+            editInvoice(i);
+          }}
         />
       )}
     </div>

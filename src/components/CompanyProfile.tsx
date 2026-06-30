@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { CompanyProfile as CompanyProfileType } from '../types';
-import { Building2, Mail, Phone, MapPin, Save, Upload, X } from 'lucide-react';
+import { CompanyProfile as CompanyProfileType, BusinessType, BUSINESS_TYPE_OPTIONS } from '../types';
+import { Building2, Mail, Phone, MapPin, Save, Upload, X, Briefcase } from 'lucide-react';
 
 interface Props {
   profile: CompanyProfileType;
@@ -60,6 +60,27 @@ export function CompanyProfile({ profile, onSave, onClose }: Props) {
                   required
                 />
               </div>
+
+              {/* Business Type Section */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-blue-600" />
+                  Business Type
+                </label>
+                <select
+                  value={formData.businessType || 'general'}
+                  onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-blue-500 bg-white"
+                >
+                  {BUSINESS_TYPE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-2">
+                  Select your business type to enable industry-specific product fields.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">GST Number</label>
                 <input
