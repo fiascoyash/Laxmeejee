@@ -434,7 +434,7 @@ const renderProductTable = (
       switch (col.key) {
         case 'sno': return (i + 1).toString();
         case 'name': return p.name;
-        case 'hsnCode': return p.hsnCode;
+        case 'hsnSacCode': return p.hsnSacCode;
         case 'gstPercent': return `${p.gstPercent}%`;
         case 'quantity': return p.quantity.toString();
         case 'unitPrice': return `Rs. ${p.unitPrice.toLocaleString('en-IN')}`;
@@ -483,13 +483,13 @@ const renderGstSummary = (
   y: number,
   columns: TableColumn[]
 ) => {
-  const hsnVisible = columns.some(c => c.key === 'hsnCode' && c.visible);
+  const hsnSacVisible = columns.some(c => c.key === 'hsnSacCode' && c.visible);
   const gstVisible = columns.some(c => c.key === 'gstPercent' && c.visible);
 
   const tableData = Array.from(taxSummary.entries()).map(([key, data]) => {
-    const hsnCode = key.split('_')[0];
+    const hsnSacCode = key.split('_')[0];
     const row: (string | number)[] = [];
-    if (hsnVisible) row.push(hsnCode);
+    if (hsnSacVisible) row.push(hsnSacCode);
     row.push(data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }));
     if (gstVisible) {
       row.push(`${data.cgstRate}%`);
@@ -502,7 +502,7 @@ const renderGstSummary = (
   });
 
   const head: string[] = [];
-  if (hsnVisible) head.push('HSN');
+  if (hsnSacVisible) head.push('HSN/SAC');
   head.push('Taxable');
   if (gstVisible) {
     head.push('CGST%');

@@ -21,13 +21,12 @@ interface Props {
 
 // Built-in columns for standard fields
 // DEFAULT VISIBILITY: Only Product Name, Quantity, Rate, Amount are visible by default
-// HSN, GST%, and other columns are hidden but available for toggling
+// HSN/SAC, GST%, and other columns are hidden but available for toggling
 const getBuiltinColumns = (): Record<string, TableColumn> => ({
   sno: { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
   name: { id: 'col_name', key: 'name', label: 'Product Name', width: 25, visible: true, order: 1 },
   description: { id: 'col_description', key: 'description', label: 'Description', width: 15, visible: false, order: 2 },
-  hsnCode: { id: 'col_hsn', key: 'hsnCode', label: 'HSN', width: 10, visible: false, order: 3 },
-  sacCode: { id: 'col_sac', key: 'sacCode', label: 'SAC', width: 10, visible: false, order: 3 },
+  hsnSacCode: { id: 'col_hsn_sac', key: 'hsnSacCode', label: 'HSN/SAC', width: 10, visible: false, order: 3 },
   batchNumber: { id: 'col_batch', key: 'batchNumber', label: 'Batch No.', width: 10, visible: false, order: 4 },
   expiryDate: { id: 'col_expiry', key: 'expiryDate', label: 'Expiry', width: 10, visible: false, order: 5 },
   mrp: { id: 'col_mrp', key: 'mrp', label: 'MRP', width: 10, visible: false, order: 6 },
@@ -138,7 +137,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       id: generateId(),
       name: '',
       description: visibleKeys.has('description') ? '' : undefined,
-      hsnCode: '',
+      hsnSacCode: '',
       gstPercent: 18,
       quantity: 1,
       unitPrice: 0,
@@ -151,7 +150,6 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       partNumber: visibleKeys.has('partNumber') ? '' : undefined,
       vehicleModel: visibleKeys.has('vehicleModel') ? '' : undefined,
       warrantyMonths: visibleKeys.has('warrantyMonths') ? 0 : undefined,
-      sacCode: visibleKeys.has('sacCode') ? '' : undefined,
       serialNumber: visibleKeys.has('serialNumber') ? '' : undefined,
       notes: visibleKeys.has('notes') ? '' : undefined,
       customFields: {},
@@ -176,7 +174,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       id: generateId(),
       name: catalogItem.name,
       description: visibleKeys.has('description') ? '' : undefined,
-      hsnCode: catalogItem.hsnCode,
+      hsnSacCode: catalogItem.hsnSacCode,
       gstPercent: catalogItem.gstPercent,
       quantity: 1,
       unitPrice: catalogItem.sellingPrice,
@@ -189,7 +187,6 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       partNumber: catalogItem.partNumber || (visibleKeys.has('partNumber') ? '' : undefined),
       vehicleModel: catalogItem.modelNumber || (visibleKeys.has('vehicleModel') ? '' : undefined),
       warrantyMonths: catalogItem.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
-      sacCode: catalogItem.sacCode || (visibleKeys.has('sacCode') ? '' : undefined),
       serialNumber: catalogItem.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
       notes: visibleKeys.has('notes') ? '' : undefined,
       customFields: {},
@@ -250,15 +247,14 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             rows={2}
           />
         );
-      case 'hsnCode':
-      case 'sacCode':
+      case 'hsnSacCode':
         return (
           <input
             type="text"
-            value={product.hsnCode}
-            onChange={(e) => updateProduct(product.id, 'hsnCode', e.target.value)}
+            value={product.hsnSacCode}
+            onChange={(e) => updateProduct(product.id, 'hsnSacCode', e.target.value)}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center font-mono"
-            placeholder={colKey === 'sacCode' ? 'SAC' : 'HSN'}
+            placeholder="HSN/SAC"
           />
         );
       case 'gstPercent':
@@ -535,7 +531,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     if (colKey === 'sno') return 'px-3 py-3 text-left font-semibold text-slate-700 w-8';
     if (colKey === 'amount') return 'px-3 py-3 text-right font-semibold text-slate-700 w-32';
     if (colKey === 'quantity' || colKey === 'gstPercent') return 'px-3 py-3 text-center font-semibold text-slate-700 w-24';
-    if (colKey === 'hsnCode') return 'px-3 py-3 text-left font-semibold text-slate-700 w-24';
+    if (colKey === 'hsnSacCode') return 'px-3 py-3 text-left font-semibold text-slate-700 w-24';
     if (colKey === 'unitPrice') return 'px-3 py-3 text-right font-semibold text-slate-700 w-32';
     return 'px-3 py-3 text-left font-semibold text-slate-700';
   };
@@ -623,7 +619,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                             <div className="font-medium text-slate-800 truncate">{item.name}</div>
                             <div className="text-xs text-slate-500">
                               {item.sku && <span className="font-mono mr-2">{item.sku}</span>}
-                              HSN: {item.hsnCode} | GST: {item.gstPercent}%
+                              HSN/SAC: {item.hsnSacCode} | GST: {item.gstPercent}%
                               {item.brand && <span className="ml-2">| {item.brand}</span>}
                             </div>
                             {/* Show warnings */}
@@ -709,12 +705,12 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       {/* Tax Summary Table */}
       {products.length > 0 && (
         <div className="mt-6">
-          <h4 className="text-sm font-semibold text-slate-700 mb-3">Tax Summary (HSN-wise)</h4>
+          <h4 className="text-sm font-semibold text-slate-700 mb-3">Tax Summary (HSN/SAC-wise)</h4>
           <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
             <thead className="bg-slate-100">
               <tr>
-                {isColumnVisible('hsnCode') && (
-                  <th className="px-3 py-2 text-left font-semibold text-slate-700">HSN Code</th>
+                {isColumnVisible('hsnSacCode') && (
+                  <th className="px-3 py-2 text-left font-semibold text-slate-700">HSN/SAC</th>
                 )}
                 <th className="px-3 py-2 text-right font-semibold text-slate-700">Taxable Amount</th>
                 {isColumnVisible('gstPercent') && (
@@ -730,11 +726,11 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             </thead>
             <tbody>
               {Array.from(taxSummary.entries()).map(([key, data]) => {
-                const hsnCode = key.split('_')[0];
+                const hsnSacCode = key.split('_')[0];
                 return (
                   <tr key={key} className="border-b border-gray-100">
-                    {isColumnVisible('hsnCode') && (
-                      <td className="px-3 py-2 font-mono">{hsnCode}</td>
+                    {isColumnVisible('hsnSacCode') && (
+                      <td className="px-3 py-2 font-mono">{hsnSacCode}</td>
                     )}
                     <td className="px-3 py-2 text-right">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     {isColumnVisible('gstPercent') && (

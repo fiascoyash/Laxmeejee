@@ -236,7 +236,7 @@ function App() {
           const newProduct: Product = {
             id: generateId(),
             name: '',
-            hsnCode: '',
+            hsnSacCode: '',
             gstPercent: 18,
             quantity: 1,
             unitPrice: 0,
@@ -380,17 +380,20 @@ function App() {
     // Restore the template used for this quotation
     if (quotation.selectedTemplateId) {
       setSelectedTemplateId(quotation.selectedTemplateId);
-      // Load template schema columns
+    }
+    // PRIORITY: Use saved column visibility from quotation (most important for persistence)
+    // Only fall back to template schema or defaults if no saved columns exist
+    if (quotation.productColumns && quotation.productColumns.length > 0) {
+      setProductColumns(quotation.productColumns);
+    } else if (quotation.selectedTemplateId) {
       const template = storage.getTemplateById(quotation.selectedTemplateId);
       if (template?.schema?.productColumns) {
         setProductColumns(template.schema.productColumns);
-      } else if (quotation.productColumns) {
-        setProductColumns(quotation.productColumns);
       } else {
         setProductColumns(getDefaultProductColumns());
       }
     } else {
-      setProductColumns(quotation.productColumns || getDefaultProductColumns());
+      setProductColumns(getDefaultProductColumns());
     }
     setView('new');
   };
@@ -648,8 +651,8 @@ function App() {
         gstNumber: '',
       },
       products: [
-        { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
-        { id: '2', name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
+        { id: '1', name: 'Solar Panel 335W', hsnSacCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
+        { id: '2', name: 'Solar Inverter 3kW', hsnSacCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
       ],
       totalAmount: 155000,
       totalCgst: 11100,
@@ -664,8 +667,8 @@ function App() {
       terms: '',
     } as Quotation,
     products: [
-      { id: '1', name: 'Solar Panel 335W', hsnCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
-      { id: '2', name: 'Solar Inverter 3kW', hsnCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
+      { id: '1', name: 'Solar Panel 335W', hsnSacCode: '8541', gstPercent: 18, quantity: 10, unitPrice: 12000 },
+      { id: '2', name: 'Solar Inverter 3kW', hsnSacCode: '8504', gstPercent: 18, quantity: 1, unitPrice: 35000 },
     ],
   });
 

@@ -449,23 +449,23 @@ const getDefaultProducts = (): ProductCatalogItem[] => {
   const now = new Date().toISOString();
   return [
     // Solar Products
-    { id: generateId(), name: 'Solar Panel 335W', sku: 'SP-335', category: 'Solar', unit: 'piece', purchasePrice: 10000, sellingPrice: 12000, gstPercent: 18, hsnCode: '8541', stockQuantity: 50, minStockAlert: 10, brand: 'Waaree', wattage: 335, industryType: 'solar', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'Solar Panel 550W', sku: 'SP-550', category: 'Solar', unit: 'piece', purchasePrice: 15000, sellingPrice: 18000, gstPercent: 18, hsnCode: '8541', stockQuantity: 30, minStockAlert: 5, brand: 'Waaree', wattage: 550, industryType: 'solar', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'Solar Inverter 3kW', sku: 'SI-3K', category: 'Solar', unit: 'piece', purchasePrice: 28000, sellingPrice: 35000, gstPercent: 18, hsnCode: '8504', stockQuantity: 10, minStockAlert: 3, brand: 'Luminous', industryType: 'solar', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'Solar Battery 150Ah', sku: 'SB-150', category: 'Solar', unit: 'piece', purchasePrice: 18000, sellingPrice: 22000, gstPercent: 18, hsnCode: '8507', stockQuantity: 15, minStockAlert: 5, brand: 'Exide', industryType: 'solar', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'DCDB Box', sku: 'DCDB-001', category: 'Solar', unit: 'piece', purchasePrice: 2500, sellingPrice: 3500, gstPercent: 18, hsnCode: '8537', stockQuantity: 20, minStockAlert: 5, industryType: 'solar', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'ACDB Box', sku: 'ACDB-001', category: 'Solar', unit: 'piece', purchasePrice: 3500, sellingPrice: 4500, gstPercent: 18, hsnCode: '8537', stockQuantity: 15, minStockAlert: 5, industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Solar Panel 335W', sku: 'SP-335', category: 'Solar', unit: 'piece', purchasePrice: 10000, sellingPrice: 12000, gstPercent: 18, hsnSacCode: '8541', stockQuantity: 50, minStockAlert: 10, brand: 'Waaree', wattage: 335, industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Solar Panel 550W', sku: 'SP-550', category: 'Solar', unit: 'piece', purchasePrice: 15000, sellingPrice: 18000, gstPercent: 18, hsnSacCode: '8541', stockQuantity: 30, minStockAlert: 5, brand: 'Waaree', wattage: 550, industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Solar Inverter 3kW', sku: 'SI-3K', category: 'Solar', unit: 'piece', purchasePrice: 28000, sellingPrice: 35000, gstPercent: 18, hsnSacCode: '8504', stockQuantity: 10, minStockAlert: 3, brand: 'Luminous', industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Solar Battery 150Ah', sku: 'SB-150', category: 'Solar', unit: 'piece', purchasePrice: 18000, sellingPrice: 22000, gstPercent: 18, hsnSacCode: '8507', stockQuantity: 15, minStockAlert: 5, brand: 'Exide', industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'DCDB Box', sku: 'DCDB-001', category: 'Solar', unit: 'piece', purchasePrice: 2500, sellingPrice: 3500, gstPercent: 18, hsnSacCode: '8537', stockQuantity: 20, minStockAlert: 5, industryType: 'solar', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'ACDB Box', sku: 'ACDB-001', category: 'Solar', unit: 'piece', purchasePrice: 3500, sellingPrice: 4500, gstPercent: 18, hsnSacCode: '8537', stockQuantity: 15, minStockAlert: 5, industryType: 'solar', createdAt: now, updatedAt: now },
     // Medical Products (Example)
-    { id: generateId(), name: 'Paracetamol 500mg', sku: 'MED-P500', category: 'Medicine', unit: 'strip', purchasePrice: 15, sellingPrice: 20, gstPercent: 5, hsnCode: '3004', stockQuantity: 100, minStockAlert: 20, brand: 'Cipla', batchNumber: 'BTH001', expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], industryType: 'medical', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'Azithromycin 500mg', sku: 'MED-A500', category: 'Medicine', unit: 'strip', purchasePrice: 50, sellingPrice: 65, gstPercent: 5, hsnCode: '3004', stockQuantity: 50, minStockAlert: 10, brand: 'Sun Pharma', batchNumber: 'BTH002', expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], industryType: 'medical', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Paracetamol 500mg', sku: 'MED-P500', category: 'Medicine', unit: 'strip', purchasePrice: 15, sellingPrice: 20, gstPercent: 5, hsnSacCode: '3004', stockQuantity: 100, minStockAlert: 20, brand: 'Cipla', batchNumber: 'BTH001', expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], industryType: 'medical', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Azithromycin 500mg', sku: 'MED-A500', category: 'Medicine', unit: 'strip', purchasePrice: 50, sellingPrice: 65, gstPercent: 5, hsnSacCode: '3004', stockQuantity: 50, minStockAlert: 10, brand: 'Sun Pharma', batchNumber: 'BTH002', expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], industryType: 'medical', createdAt: now, updatedAt: now },
   ];
 };
 
 export const getDefaultProductColumns = (): TableColumn[] => [
   { id: 'col_1', key: 'sno', label: '#', width: 8, visible: true, order: 0 },
   { id: 'col_2', key: 'name', label: 'Product Name', width: 35, visible: true, order: 1 },
-  { id: 'col_3', key: 'hsnCode', label: 'HSN', width: 12, visible: true, order: 2 },
-  { id: 'col_4', key: 'gstPercent', label: 'GST%', width: 10, visible: true, order: 3 },
+  { id: 'col_3', key: 'hsnSacCode', label: 'HSN/SAC', width: 12, visible: false, order: 2 },
+  { id: 'col_4', key: 'gstPercent', label: 'GST%', width: 10, visible: false, order: 3 },
   { id: 'col_5', key: 'quantity', label: 'Qty', width: 10, visible: true, order: 4 },
   { id: 'col_6', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 5 },
   { id: 'col_7', key: 'amount', label: 'Amount', width: 13, visible: true, order: 6 },
@@ -480,7 +480,7 @@ export const SOLAR_SCHEMA: TemplateSchema = {
     { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
     { id: 'col_2', key: 'name', label: 'Product Name', width: 30, visible: true, order: 1 },
     { id: 'col_3', key: 'wattage', label: 'Wattage', width: 10, visible: true, order: 2 },
-    { id: 'col_4', key: 'hsnCode', label: 'HSN', width: 10, visible: true, order: 3 },
+    { id: 'col_4', key: 'hsnSacCode', label: 'HSN/SAC', width: 10, visible: true, order: 3 },
     { id: 'col_5', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 4 },
     { id: 'col_6', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 5 },
     { id: 'col_7', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 6 },
@@ -720,24 +720,13 @@ export const SERVICES_SCHEMA: TemplateSchema = {
   productColumns: [
     { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
     { id: 'col_2', key: 'name', label: 'Service Description', width: 40, visible: true, order: 1 },
-    { id: 'col_3', key: 'sacCode', label: 'SAC', width: 10, visible: true, order: 2 },
+    { id: 'col_3', key: 'hsnSacCode', label: 'HSN/SAC', width: 10, visible: true, order: 2 },
     { id: 'col_4', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 3 },
     { id: 'col_5', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 4 },
     { id: 'col_6', key: 'unitPrice', label: 'Rate', width: 14, visible: true, order: 5 },
     { id: 'col_7', key: 'amount', label: 'Amount', width: 14, visible: true, order: 6 },
   ],
-  productFields: [
-    {
-      id: 'fld_sac',
-      key: 'sacCode',
-      label: 'SAC Code',
-      type: 'text',
-      required: false,
-      placeholder: 'Services Accounting Code',
-      location: 'product',
-      columnWidth: 10,
-    },
-  ],
+  productFields: [],
   customerFields: [],
   documentFields: [],
   defaultGstMode: 'exclusive',
@@ -990,7 +979,7 @@ export const calculateTaxSummary = (products: Product[], gstMode: GstMode = 'inc
   const summary = new Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }>();
 
   products.forEach(product => {
-    const key = `${product.hsnCode}_${product.gstPercent}`;
+    const key = `${product.hsnSacCode}_${product.gstPercent}`;
     const baseAmount = calculateProductAmount(product);
     const cgstRate = product.gstPercent / 2;
     const sgstRate = product.gstPercent / 2;

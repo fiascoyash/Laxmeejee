@@ -191,7 +191,7 @@ export interface Product {
   id: string;
   name: string;
   description?: string;
-  hsnCode: string;
+  hsnSacCode: string;          // Unified HSN/SAC Code
   gstPercent: number;
   quantity: number;
   unitPrice: number;
@@ -204,7 +204,6 @@ export interface Product {
   vehicleModel?: string;     // For automobile templates
   warrantyMonths?: number;   // Warranty period
   wattage?: number;          // For solar templates
-  sacCode?: string;          // For services templates
   serialNumber?: string;     // For electronics - Serial Number / IMEI
   notes?: string;            // Additional notes for the line item
   // Manual amount override
@@ -262,7 +261,7 @@ export interface ProductCatalogItem {
   purchasePrice: number;           // Purchase Price
   sellingPrice: number;            // Selling Price
   gstPercent: number;             // GST %
-  hsnCode: string;                // HSN/SAC Code
+  hsnSacCode: string;              // Unified HSN/SAC Code
   stockQuantity: number;           // Stock Quantity
   minStockAlert?: number;          // Minimum Stock Alert Level
   brand?: string;                 // Brand (optional)
@@ -283,7 +282,6 @@ export interface ProductCatalogItem {
   // Solar fields
   wattage?: number;
   // Service fields
-  sacCode?: string;
   billingUnit?: 'per_hour' | 'fixed' | 'per_day';
   serviceDuration?: number;
   // Custom fields for flexibility

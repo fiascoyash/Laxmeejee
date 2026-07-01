@@ -106,7 +106,7 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
       purchasePrice: 0,
       sellingPrice: 0,
       gstPercent: 18,
-      hsnCode: '',
+      hsnSacCode: '',
       stockQuantity: 0,
       minStockAlert: 0,
       brand: '',
@@ -147,8 +147,8 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
       alert('Please enter a product name');
       return;
     }
-    if (!editing.hsnCode.trim()) {
-      alert('Please enter an HSN code');
+    if (!editing.hsnSacCode.trim()) {
+      alert('Please enter an HSN/SAC code');
       return;
     }
 
@@ -381,19 +381,6 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
                 onChange={(e) => updateField('serialNumber', e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
                 placeholder="Serial number"
-              />
-            </div>
-          );
-        case 'sacCode':
-          return (
-            <div key={field}>
-              <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-              <input
-                type="text"
-                value={editing.sacCode || ''}
-                onChange={(e) => updateField('sacCode', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
-                placeholder="SAC code for services"
               />
             </div>
           );
@@ -935,16 +922,16 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
                 </div>
               </div>
 
-              {/* GST & HSN */}
+              {/* GST & HSN/SAC */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">HSN/SAC Code *</label>
                   <input
                     type="text"
-                    value={editing.hsnCode}
-                    onChange={(e) => updateField('hsnCode', e.target.value)}
+                    value={editing.hsnSacCode}
+                    onChange={(e) => updateField('hsnSacCode', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
-                    placeholder="e.g., 8541 for electronics"
+                    placeholder="e.g., 8541 for goods, 9987 for services"
                   />
                 </div>
               </div>

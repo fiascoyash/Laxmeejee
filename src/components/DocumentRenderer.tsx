@@ -149,8 +149,7 @@ export function DocumentRenderer({
     }
     // Priority 3: Fall back to settings flags
     const settingsMap: Record<string, boolean> = {
-      hsnCode: settings.showTax,
-      sacCode: settings.showTax,
+      hsnSacCode: settings.showTax,
       batchNumber: settings.showBatchNumber,
       expiryDate: settings.showExpiryDate,
       mrp: false, // MRP only via schema
@@ -828,14 +827,9 @@ export function DocumentRenderer({
           <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap' }}>
             <T id="table_header">Items</T>
           </th>
-          {isColumnVisible('hsnCode') && (
+          {isColumnVisible('hsnSacCode') && (
             <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
-              <T id="table_header">HSN No.</T>
-            </th>
-          )}
-          {isColumnVisible('sacCode') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
-              <T id="table_header">SAC</T>
+              <T id="table_header">HSN/SAC</T>
             </th>
           )}
           {isColumnVisible('wattage') && (
@@ -925,14 +919,9 @@ export function DocumentRenderer({
                   </T>
                 )}
               </td>
-              {isColumnVisible('hsnCode') && (
+              {isColumnVisible('hsnSacCode') && (
                 <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
-                  <T id="product_row">{product.hsnCode || '—'}</T>
-                </td>
-              )}
-              {isColumnVisible('sacCode') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
-                  <T id="product_row">{product.sacCode || '—'}</T>
+                  <T id="product_row">{product.hsnSacCode || '—'}</T>
                 </td>
               )}
               {isColumnVisible('wattage') && (
@@ -1040,8 +1029,8 @@ export function DocumentRenderer({
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: theme.tableHeaderBg, color: tableHeaderTextColor }}>
-                {['HSN', 'Tax%', 'Taxable Amt', 'CGST', 'SGST'].map(h => (
-                  <th key={h} style={{ padding: '3px 5px', textAlign: h === 'HSN' ? 'left' : 'right', fontWeight: 600 }}>
+                {['HSN/SAC', 'Tax%', 'Taxable Amt', 'CGST', 'SGST'].map(h => (
+                  <th key={h} style={{ padding: '3px 5px', textAlign: h === 'HSN/SAC' ? 'left' : 'right', fontWeight: 600 }}>
                     <T id="tax_summary_row">{h}</T>
                   </th>
                 ))}

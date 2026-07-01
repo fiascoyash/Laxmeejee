@@ -129,7 +129,7 @@ function QuotationPreview({ quotation, onClose }: { quotation: Quotation; onClos
               <thead className="bg-slate-100">
                 <tr>
                   <th className="border border-gray-300 px-2 py-1 text-left">Product</th>
-                  <th className="border border-gray-300 px-2 py-1 text-center">HSN</th>
+                  <th className="border border-gray-300 px-2 py-1 text-center">HSN/SAC</th>
                   <th className="border border-gray-300 px-2 py-1 text-center">GST%</th>
                   <th className="border border-gray-300 px-2 py-1 text-center">Qty</th>
                   <th className="border border-gray-300 px-2 py-1 text-right">Amount</th>
@@ -139,7 +139,7 @@ function QuotationPreview({ quotation, onClose }: { quotation: Quotation; onClos
                 {quotation.products.map((p, i) => (
                   <tr key={i}>
                     <td className="border border-gray-300 px-2 py-1">{p.name}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-center font-mono text-xs">{p.hsnCode}</td>
+                    <td className="border border-gray-300 px-2 py-1 text-center font-mono text-xs">{p.hsnSacCode}</td>
                     <td className="border border-gray-300 px-2 py-1 text-center">{p.gstPercent}%</td>
                     <td className="border border-gray-300 px-2 py-1 text-center">{p.quantity}</td>
                     <td className="border border-gray-300 px-2 py-1 text-right">{(p.quantity * p.unitPrice).toLocaleString('en-IN')}</td>
