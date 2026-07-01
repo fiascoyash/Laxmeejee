@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData } from './types';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData } from './types';
 import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
@@ -16,10 +16,13 @@ import { NumberingSettingsPanel } from './components/NumberingSettings';
 import { CustomerList } from './components/CustomerList';
 import { CustomerForm } from './components/CustomerForm';
 import { CustomerHistory } from './components/CustomerHistory';
+import { SupplierList } from './components/SupplierList';
+import { SupplierForm } from './components/SupplierForm';
+import { SupplierLedger } from './components/SupplierLedger';
 import { exportTemplatePDF } from './utils/templatePdfExport';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck } from 'lucide-react';
 
-type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers';
+type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers';
 
 function App() {
   const [view, setView] = useState<View>('home');
@@ -87,6 +90,12 @@ function App() {
   const [viewingCustomer, setViewingCustomer] = useState<CustomerData | null>(null);
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
 
+  // Supplier / Vendor Management State
+  const [suppliers, setSuppliers] = useState<SupplierData[]>(storage.getSuppliers);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierData | null>(null);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [viewingSupplier, setViewingSupplier] = useState<SupplierData | null>(null);
+
   // Load data on mount
   useEffect(() => {
     setQuotations(storage.getQuotations);
@@ -94,6 +103,7 @@ function App() {
     setTemplates(storage.getTemplates);
     setInvoices(storage.getInvoices);
     setCustomers(storage.getCustomers);
+    setSuppliers(storage.getSuppliers);
     // Set default template as selected
     const defaultTemplate = storage.getDefaultTemplate();
     if (defaultTemplate) {
@@ -898,6 +908,30 @@ function App() {
     return { customerQuotations, customerInvoices };
   };
 
+  // Supplier / Vendor Handlers
+  const handleSaveSupplier = (supplierData: SupplierData) => {
+    storage.saveSupplier(supplierData);
+    setSuppliers(storage.getSuppliers());
+    setShowSupplierForm(false);
+    setEditingSupplier(null);
+  };
+
+  const handleDeleteSupplier = (id: string) => {
+    storage.deleteSupplier(id);
+    setSuppliers(storage.getSuppliers());
+    if (viewingSupplier?.id === id) setViewingSupplier(null);
+  };
+
+  const handleEditSupplier = (supplierData: SupplierData) => {
+    setEditingSupplier(supplierData);
+    setShowSupplierForm(true);
+    setViewingSupplier(null);
+  };
+
+  const handleViewSupplier = (supplierData: SupplierData) => {
+    setViewingSupplier(supplierData);
+  };
+
   const NavItem = ({ icon: Icon, label, currentView, targetView }: {
     icon: LucideIcon;
     label: string;
@@ -982,6 +1016,7 @@ function App() {
             <p className="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Management</p>
             <ul className="space-y-1">
               <li><NavItem icon={Users} label="Customers" currentView={view} targetView="customers" /></li>
+              <li><NavItem icon={Truck} label="Suppliers" currentView={view} targetView="suppliers" /></li>
               <li><NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" /></li>
               <li><NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" /></li>
               <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" /></li>
@@ -1486,6 +1521,33 @@ function App() {
             </div>
           )}
 
+          {/* Suppliers */}
+          {view === 'suppliers' && (
+            <div className="max-w-6xl mx-auto">
+              {viewingSupplier ? (
+                <SupplierLedger
+                  supplier={viewingSupplier}
+                  onBack={() => setViewingSupplier(null)}
+                  onEdit={(s) => { handleEditSupplier(s); }}
+                />
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <h2 className="text-xl font-bold text-gray-800">Suppliers / Vendors</h2>
+                    <p className="text-sm text-gray-500">Manage your supplier ledger and purchase history</p>
+                  </div>
+                  <SupplierList
+                    suppliers={suppliers}
+                    onView={handleViewSupplier}
+                    onEdit={handleEditSupplier}
+                    onDelete={handleDeleteSupplier}
+                    onAdd={() => { setEditingSupplier(null); setShowSupplierForm(true); }}
+                  />
+                </>
+              )}
+            </div>
+          )}
+
           {/* Product Catalog */}
           {view === 'catalog' && (
             <div className="max-w-4xl mx-auto">
@@ -1711,9 +1773,17 @@ function App() {
         />
       )}
 
+      {/* Supplier Form Modal */}
+      {showSupplierForm && (
+        <SupplierForm
+          supplier={editingSupplier}
+          onSave={handleSaveSupplier}
+          onCancel={() => { setShowSupplierForm(false); setEditingSupplier(null); }}
+        />
+      )}
+
       {/* Customer Form Modal */}
-      {showCustomerForm && (
-        <CustomerForm
+      {showCustomerForm && (        <CustomerForm
           customer={editingCustomer}
           onSave={handleSaveCustomer}
           onCancel={() => {

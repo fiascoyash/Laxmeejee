@@ -1,7 +1,8 @@
 import {
   CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn,
   Invoice, NumberingSettings, GstMode, CustomerData,
-  DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UnitType, IndustryType, ExpiryStatus, UNIT_OPTIONS
+  DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UnitType, IndustryType, ExpiryStatus, UNIT_OPTIONS,
+  SupplierData, SupplierTransaction,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -12,6 +13,8 @@ const STORAGE_KEYS = {
   INVOICES: 'solar_invoices',
   NUMBERING: 'solar_numbering_settings',
   CUSTOMERS: 'solar_customers',
+  SUPPLIERS: 'laxmeejee_suppliers',
+  SUPPLIER_TRANSACTIONS: 'laxmeejee_supplier_transactions',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -291,6 +294,87 @@ export const storage = {
 
   isCustomerExists: (mobile: string): boolean => {
     return storage.getCustomers().some(c => c.mobile === mobile);
+  },
+
+  // ─── Suppliers / Vendors ──────────────────────────────────────────────────
+
+  getSuppliers: (): SupplierData[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.SUPPLIERS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  saveSupplier: (supplier: SupplierData): void => {
+    const suppliers = storage.getSuppliers();
+    const existingIndex = suppliers.findIndex(s => s.id === supplier.id);
+    if (existingIndex >= 0) {
+      suppliers[existingIndex] = { ...supplier, updatedAt: new Date().toISOString() };
+    } else {
+      suppliers.unshift(supplier);
+    }
+    localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers));
+  },
+
+  deleteSupplier: (id: string): void => {
+    const suppliers = storage.getSuppliers().filter(s => s.id !== id);
+    localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers));
+    // Also delete all transactions for this supplier
+    const txns = storage.getSupplierTransactions().filter(t => t.supplierId !== id);
+    localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
+  },
+
+  getSupplierById: (id: string): SupplierData | undefined => {
+    return storage.getSuppliers().find(s => s.id === id);
+  },
+
+  // Supplier Transactions
+  getSupplierTransactions: (): SupplierTransaction[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  getSupplierTransactionsBySupplierId: (supplierId: string): SupplierTransaction[] => {
+    return storage.getSupplierTransactions()
+      .filter(t => t.supplierId === supplierId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  },
+
+  saveSupplierTransaction: (transaction: SupplierTransaction): void => {
+    const txns = storage.getSupplierTransactions();
+    const existingIndex = txns.findIndex(t => t.id === transaction.id);
+    if (existingIndex >= 0) {
+      txns[existingIndex] = transaction;
+    } else {
+      txns.push(transaction);
+    }
+    localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
+  },
+
+  deleteSupplierTransaction: (id: string): void => {
+    const txns = storage.getSupplierTransactions().filter(t => t.id !== id);
+    localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
+  },
+
+  // Recalculate running balance for a supplier's transactions (call after any change)
+  recalculateSupplierBalance: (supplierId: string): void => {
+    const supplier = storage.getSupplierById(supplierId);
+    if (!supplier) return;
+
+    const txns = storage.getSupplierTransactions()
+      .filter(t => t.supplierId === supplierId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    // Opening balance: positive = we owe supplier (to_pay), negative = advance
+    let runningBalance = supplier.openingBalanceType === 'to_pay'
+      ? supplier.openingBalance
+      : -supplier.openingBalance;
+
+    const updatedTxns = txns.map(t => {
+      runningBalance += t.purchaseAmount - t.paymentMade;
+      return { ...t, runningBalance };
+    });
+
+    const allTxns = storage.getSupplierTransactions().filter(t => t.supplierId !== supplierId);
+    localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify([...allTxns, ...updatedTxns]));
   },
 };
 

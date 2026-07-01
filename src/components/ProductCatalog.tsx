@@ -675,6 +675,7 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
               <th className="px-4 py-3 text-center font-semibold text-slate-700">Unit</th>
               <th className="px-4 py-3 text-center font-semibold text-slate-700">GST%</th>
               <th className="px-4 py-3 text-right font-semibold text-slate-700">Selling Price</th>
+              <th className="px-4 py-3 text-right font-semibold text-slate-700">Value On Hand</th>
               <th className="px-4 py-3 text-center font-semibold text-slate-700">Expiry</th>
               <th className="px-4 py-3 text-center font-semibold text-slate-700 w-32">Actions</th>
             </tr>
@@ -710,7 +711,10 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-slate-800">
-                    Rs. {item.sellingPrice.toLocaleString()}
+                    Rs. {(item.sellingPrice || 0).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-emerald-700">
+                    Rs. {((item.purchasePrice || 0) * (item.stockQuantity || 0)).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {item.expiryDate ? getExpiryBadge(expiryStatus) : (
@@ -745,7 +749,7 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
             })}
             {filteredProducts.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                   {catalog.length === 0
                     ? 'No products in catalog. Click "Add Product" to add one.'
                     : 'No products match your search criteria.'}
@@ -773,6 +777,11 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
           <span>|
             <span className="text-red-700 ml-1">
               {catalog.filter(p => isLowStock(p)).length} Low Stock
+            </span>
+          </span>
+          <span>|
+            <span className="text-emerald-700 ml-1 font-medium">
+              Total Inventory Value: <strong>Rs. {catalog.reduce((sum, p) => sum + (p.purchasePrice || 0) * (p.stockQuantity || 0), 0).toLocaleString()}</strong>
             </span>
           </span>
         </div>

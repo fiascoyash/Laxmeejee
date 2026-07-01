@@ -1012,6 +1012,63 @@ export interface TemplateData {
   products: Product[];
 }
 
+// ─── Supplier / Vendor Management ────────────────────────────────────────────
+
+export type SupplierBalanceType = 'to_pay' | 'advance_paid';
+export type SupplierTransactionType =
+  | 'purchase_entry'
+  | 'payment_made'
+  | 'purchase_return'
+  | 'debit_note'
+  | 'credit_note'
+  | 'opening_balance';
+
+export type SupplierPaymentMethod = 'cash' | 'upi' | 'bank_transfer' | 'cheque';
+
+export interface SupplierData {
+  id: string;
+  firmName: string;                   // Required: Company / Firm name
+  contactPerson?: string;             // Optional: Contact person name
+  mobile?: string;
+  email?: string;
+  gstNumber?: string;
+  address?: string;
+  openingBalance: number;             // Opening balance amount
+  openingBalanceType: SupplierBalanceType; // to_pay or advance_paid
+  paymentTerms?: string;              // e.g., 30 Days, 7 Days
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupplierTransaction {
+  id: string;
+  supplierId: string;
+  date: string;
+  type: SupplierTransactionType;
+  referenceNumber?: string;
+  description: string;
+  purchaseAmount: number;             // Money owed to supplier (debit)
+  paymentMade: number;               // Money paid to supplier (credit)
+  paymentMethod?: SupplierPaymentMethod;
+  runningBalance: number;             // Calculated running balance (positive = we owe)
+  notes?: string;
+  createdAt: string;
+}
+
+export const PAYMENT_TERMS_OPTIONS = [
+  'Immediate',
+  '7 Days',
+  '15 Days',
+  '30 Days',
+  '45 Days',
+  '60 Days',
+  '90 Days',
+  'Custom',
+];
+
+// ─── End Supplier / Vendor Management ────────────────────────────────────────
+
 export const PLACEHOLDERS = {
   '{{customer_name}}': 'Customer Name',
   '{{quotation_no}}': 'QT-2024-0001',
