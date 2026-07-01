@@ -1,5 +1,5 @@
-import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UNIT_OPTIONS, ExpiryStatus } from '../types';
-import { generateId, calculateProductAmount, calculateTaxSummary, getDefaultProductColumns, calculateRoundOff, calculateGrandTotalAmount, roundTo2, getExpiryStatus, isLowStock, getDaysUntilExpiry } from '../utils/storage';
+import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UNIT_OPTIONS } from '../types';
+import { generateId, calculateProductAmount, calculateTaxSummary, calculateRoundOff, calculateGrandTotalAmount, roundTo2, getExpiryStatus, isLowStock, getDaysUntilExpiry } from '../utils/storage';
 import { Plus, Trash2, Package, ChevronDown, Settings2, AlertTriangle, AlertCircle, Clock } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 
@@ -20,25 +20,29 @@ interface Props {
 }
 
 // Built-in columns for standard fields
+// DEFAULT VISIBILITY: Only Product Name, Quantity, Rate, Amount are visible by default
+// HSN, GST%, and other columns are hidden but available for toggling
 const getBuiltinColumns = (): Record<string, TableColumn> => ({
   sno: { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
   name: { id: 'col_name', key: 'name', label: 'Product Name', width: 25, visible: true, order: 1 },
-  description: { id: 'col_description', key: 'description', label: 'Description', width: 15, visible: true, order: 2 },
-  hsnCode: { id: 'col_hsn', key: 'hsnCode', label: 'HSN', width: 10, visible: true, order: 3 },
-  sacCode: { id: 'col_sac', key: 'sacCode', label: 'SAC', width: 10, visible: true, order: 3 },
-  batchNumber: { id: 'col_batch', key: 'batchNumber', label: 'Batch No.', width: 10, visible: true, order: 4 },
-  expiryDate: { id: 'col_expiry', key: 'expiryDate', label: 'Expiry', width: 10, visible: true, order: 5 },
-  mrp: { id: 'col_mrp', key: 'mrp', label: 'MRP', width: 10, visible: true, order: 6 },
-  gstPercent: { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 7 },
+  description: { id: 'col_description', key: 'description', label: 'Description', width: 15, visible: false, order: 2 },
+  hsnCode: { id: 'col_hsn', key: 'hsnCode', label: 'HSN', width: 10, visible: false, order: 3 },
+  sacCode: { id: 'col_sac', key: 'sacCode', label: 'SAC', width: 10, visible: false, order: 3 },
+  batchNumber: { id: 'col_batch', key: 'batchNumber', label: 'Batch No.', width: 10, visible: false, order: 4 },
+  expiryDate: { id: 'col_expiry', key: 'expiryDate', label: 'Expiry', width: 10, visible: false, order: 5 },
+  mrp: { id: 'col_mrp', key: 'mrp', label: 'MRP', width: 10, visible: false, order: 6 },
+  gstPercent: { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: false, order: 7 },
   quantity: { id: 'col_qty', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 8 },
-  unit: { id: 'col_unit', key: 'unit', label: 'Unit', width: 6, visible: true, order: 9 },
+  unit: { id: 'col_unit', key: 'unit', label: 'Unit', width: 6, visible: false, order: 9 },
   unitPrice: { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 10 },
-  discount: { id: 'col_discount', key: 'discount', label: 'Disc%', width: 8, visible: true, order: 11 },
+  discount: { id: 'col_discount', key: 'discount', label: 'Disc%', width: 8, visible: false, order: 11 },
   amount: { id: 'col_amount', key: 'amount', label: 'Amount', width: 12, visible: true, order: 12 },
-  wattage: { id: 'col_wattage', key: 'wattage', label: 'Wattage', width: 10, visible: true, order: 3 },
-  partNumber: { id: 'col_partnum', key: 'partNumber', label: 'Part No.', width: 12, visible: true, order: 3 },
-  vehicleModel: { id: 'col_vehicle', key: 'vehicleModel', label: 'Vehicle', width: 14, visible: true, order: 4 },
-  warrantyMonths: { id: 'col_warranty', key: 'warrantyMonths', label: 'Warranty', width: 10, visible: true, order: 5 },
+  wattage: { id: 'col_wattage', key: 'wattage', label: 'Wattage', width: 10, visible: false, order: 3 },
+  partNumber: { id: 'col_partnum', key: 'partNumber', label: 'Part No.', width: 12, visible: false, order: 3 },
+  vehicleModel: { id: 'col_vehicle', key: 'vehicleModel', label: 'Vehicle', width: 14, visible: false, order: 4 },
+  warrantyMonths: { id: 'col_warranty', key: 'warrantyMonths', label: 'Warranty', width: 10, visible: false, order: 5 },
+  serialNumber: { id: 'col_serial', key: 'serialNumber', label: 'Serial/IMEI', width: 14, visible: false, order: 6 },
+  notes: { id: 'col_notes', key: 'notes', label: 'Notes', width: 15, visible: false, order: 13 },
 });
 
 export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema }: Props) {
@@ -119,7 +123,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
 
   const toggleColumn = (colId: string) => {
     if (!onColumnsChange) return;
-    onColumnsChange(activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } : c));
+    onColumnsChange(activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } as TableColumn : c));
   };
 
   // Get visible column keys from activeColumns (single source of truth)
@@ -148,6 +152,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       vehicleModel: visibleKeys.has('vehicleModel') ? '' : undefined,
       warrantyMonths: visibleKeys.has('warrantyMonths') ? 0 : undefined,
       sacCode: visibleKeys.has('sacCode') ? '' : undefined,
+      serialNumber: visibleKeys.has('serialNumber') ? '' : undefined,
+      notes: visibleKeys.has('notes') ? '' : undefined,
       customFields: {},
     };
     onChange([...products, newProduct]);
@@ -184,6 +190,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       vehicleModel: catalogItem.modelNumber || (visibleKeys.has('vehicleModel') ? '' : undefined),
       warrantyMonths: catalogItem.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
       sacCode: catalogItem.sacCode || (visibleKeys.has('sacCode') ? '' : undefined),
+      serialNumber: catalogItem.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
+      notes: visibleKeys.has('notes') ? '' : undefined,
       customFields: {},
       // Carry attributes from catalog (NEW)
       attributes: catalogItem.attributes ? { ...catalogItem.attributes } : undefined,
@@ -273,10 +281,24 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             min="1"
             value={product.quantity}
             onChange={(e) => {
-              // Reset manual amount when quantity changes
-              onChange(products.map(p =>
-                p.id === product.id ? { ...p, quantity: Number(e.target.value), isManualAmount: false } : p
-              ));
+              const newQuantity = Number(e.target.value) || 1;
+              // If manual amount is set, recalculate rate from amount/quantity
+              if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
+                const newRate = roundTo2(product.manualAmount / newQuantity);
+                onChange(products.map(p =>
+                  p.id === product.id ? {
+                    ...p,
+                    quantity: newQuantity,
+                    unitPrice: newRate,
+                    isManualAmount: true  // Keep manual amount flag
+                  } : p
+                ));
+              } else {
+                // Normal behavior: just update quantity
+                onChange(products.map(p =>
+                  p.id === product.id ? { ...p, quantity: newQuantity, isManualAmount: false } : p
+                ));
+              }
             }}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
           />
@@ -309,9 +331,34 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             value={displayAmount}
             onChange={(e) => {
               const manualValue = Number(e.target.value);
-              onChange(products.map(p =>
-                p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true } : p
-              ));
+              // REVERSE CALCULATION: Calculate rate from amount/quantity
+              // Formula: Rate = Amount / Quantity
+              // For GST Inclusive: Rate = Amount / Quantity / (1 + GST/100)
+              if (product.quantity > 0 && manualValue > 0) {
+                let calculatedRate: number;
+                if (gstMode === 'inclusive' && product.gstPercent > 0) {
+                  // Inclusive GST: extract base rate from amount
+                  // Rate = Amount / Quantity / (1 + GST/100)
+                  calculatedRate = roundTo2(manualValue / product.quantity / (1 + product.gstPercent / 100));
+                } else {
+                  // Exclusive GST or 0% GST: simple division
+                  // Rate = Amount / Quantity
+                  calculatedRate = roundTo2(manualValue / product.quantity);
+                }
+                onChange(products.map(p =>
+                  p.id === product.id ? {
+                    ...p,
+                    manualAmount: manualValue,
+                    isManualAmount: true,
+                    unitPrice: calculatedRate
+                  } : p
+                ));
+              } else {
+                // Zero or invalid: just store the manual amount
+                onChange(products.map(p =>
+                  p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true } : p
+                ));
+              }
             }}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-right font-medium"
           />
@@ -398,6 +445,26 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             onChange={(e) => updateProduct(product.id, 'wattage', Number(e.target.value))}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
             placeholder="W"
+          />
+        );
+      case 'serialNumber':
+        return (
+          <input
+            type="text"
+            value={product.serialNumber || ''}
+            onChange={(e) => updateProduct(product.id, 'serialNumber', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 font-mono text-sm"
+            placeholder="Serial/IMEI"
+          />
+        );
+      case 'notes':
+        return (
+          <input
+            type="text"
+            value={product.notes || ''}
+            onChange={(e) => updateProduct(product.id, 'notes', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-sm"
+            placeholder="Notes..."
           />
         );
       default:

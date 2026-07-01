@@ -205,6 +205,8 @@ export interface Product {
   warrantyMonths?: number;   // Warranty period
   wattage?: number;          // For solar templates
   sacCode?: string;          // For services templates
+  serialNumber?: string;     // For electronics - Serial Number / IMEI
+  notes?: string;            // Additional notes for the line item
   // Manual amount override
   manualAmount?: number;     // User-specified amount (overrides calculated)
   isManualAmount?: boolean;  // Flag to track if amount was manually set
