@@ -214,7 +214,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-6">
       {/* Recent Customers Quick Select */}
       {recentCustomers.length > 0 && !customer.name && (
         <div className="mb-4 pb-4 border-b border-slate-200">
@@ -227,7 +227,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
               <button
                 key={rc.id}
                 onClick={() => handleSelectRecent(rc)}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm transition-colors"
+                className="px-3 py-2 sm:py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm transition-colors min-h-[44px]"
               >
                 {rc.name}
               </button>
@@ -236,7 +236,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Bill To Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -247,10 +247,10 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
             {showSaveButton && (
               <button
                 onClick={handleSaveCustomer}
-                className="flex items-center gap-1 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-md text-sm transition-colors"
+                className="flex items-center gap-1 px-3 py-2 sm:py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-md text-sm transition-colors min-h-[44px]"
               >
                 <Save className="w-4 h-4" />
-                Save Customer
+                Save
               </button>
             )}
           </div>
@@ -261,7 +261,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                 type="text"
                 value={customer.name}
                 onChange={(e) => onChange({ ...customer, name: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                 placeholder="Enter customer name"
                 required
               />
@@ -279,7 +279,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                     setShowSuggestions(true);
                   }
                 }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                 placeholder="10-digit mobile number"
               />
               {/* Customer Suggestions Dropdown */}
@@ -289,7 +289,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                     <button
                       key={s.id}
                       onClick={() => handleSelectCustomer(s)}
-                      className="w-full px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                      className="w-full px-3 py-3 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 min-h-[60px]"
                     >
                       <div className="font-medium text-slate-800">{s.name}</div>
                       <div className="text-xs text-slate-500">
@@ -306,11 +306,11 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                 type="text"
                 value={customer.gstNumber || ''}
                 onChange={(e) => onChange({ ...customer, gstNumber: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                 placeholder="GSTIN number"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                   <MapPinned className="w-4 h-4" /> Village
@@ -319,7 +319,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                   type="text"
                   value={customer.village}
                   onChange={(e) => onChange({ ...customer, village: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                   placeholder="Village/Town"
                 />
               </div>
@@ -331,7 +331,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                   type="text"
                   value={customer.district}
                   onChange={(e) => onChange({ ...customer, district: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                   placeholder="District"
                 />
               </div>
@@ -341,7 +341,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
               <textarea
                 value={customer.billingAddress}
                 onChange={(e) => onChange({ ...customer, billingAddress: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 rows={2}
                 placeholder="Full address with pincode"
               />
@@ -368,12 +368,12 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
               Ship To
             </h3>
             <div className="mb-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
                 <input
                   type="checkbox"
                   checked={sameAsBillTo}
                   onChange={(e) => handleSameAsBillToChange(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                  className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                 />
                 <span className="text-sm text-slate-700 flex items-center gap-1">
                   <Copy className="w-4 h-4" /> Same as Bill To
@@ -387,7 +387,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                   type="text"
                   value={actualShipTo.name}
                   onChange={(e) => handleShipToChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed min-h-[44px]"
                   placeholder="Enter receiver name"
                   disabled={sameAsBillTo}
                 />
@@ -400,7 +400,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                   type="tel"
                   value={actualShipTo.mobile}
                   onChange={(e) => handleShipToChange('mobile', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed min-h-[44px]"
                   placeholder="10-digit mobile number"
                   disabled={sameAsBillTo}
                 />
@@ -411,7 +411,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                   type="text"
                   value={actualShipTo.gstNumber || ''}
                   onChange={(e) => handleShipToChange('gstNumber', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed min-h-[44px]"
                   placeholder="GSTIN number"
                   disabled={sameAsBillTo}
                 />
@@ -421,7 +421,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                 <textarea
                   value={actualShipTo.address}
                   onChange={(e) => handleShipToChange('address', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   rows={2}
                   placeholder="Full delivery address with pincode"
                   disabled={sameAsBillTo}

@@ -40,25 +40,26 @@ export function TemplatePreview({ template, company, customer, quotation, produc
   const paperDims = getPaperDimensions();
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-8">
-      <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-full overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-4 border-b bg-gray-50">
-          <h2 className="text-lg font-bold text-gray-800">Template Preview: {template.name}</h2>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 md:p-8 safe-area-inset">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-full overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-3 sm:p-4 border-b bg-gray-50">
+          <h2 className="text-base sm:text-lg font-bold text-gray-800 truncate">Template Preview: {template.name}</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportPDF}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+              className="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 min-h-[44px]"
             >
               <FileDown className="w-4 h-4" />
-              Export PDF
+              <span className="hidden sm:inline">Export PDF</span>
+              <span className="sm:hidden">PDF</span>
             </button>
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full">
-              <X className="w-6 h-6" />
+            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center">
+              <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-8 bg-gray-200 flex justify-center">
+        <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-8 bg-gray-200 flex justify-center">
           <div
             className="bg-white shadow-2xl relative"
             style={{

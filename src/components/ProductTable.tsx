@@ -549,33 +549,33 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
         <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
           <Package className="w-5 h-5 text-blue-600" />
           Products / Services
         </h3>
-        <div className="flex gap-2">
-          <div className="relative" ref={columnSettingsRef}>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none" ref={columnSettingsRef}>
             <button
               onClick={() => setShowColumnSettings(!showColumnSettings)}
-              className="px-3 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2 text-sm"
+              className="w-full sm:w-auto px-3 py-2.5 sm:py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-gray-200 transition-colors flex items-center justify-center sm:justify-start gap-2 text-sm min-h-[44px]"
               title="Toggle column visibility"
             >
               <Settings2 className="w-4 h-4" />
-              Columns
-              <ChevronDown className="w-4 h-4" />
+              <span className="hidden sm:inline">Columns</span>
+              <ChevronDown className="w-4 h-4 hidden sm:inline" />
             </button>
             {showColumnSettings && (
               <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-10 p-3">
                 <div className="text-xs font-semibold text-slate-600 mb-2">Toggle Columns</div>
                 {activeColumns.filter(c => c.key !== 'sno' && c.key !== 'amount').map(col => (
-                  <label key={col.id} className="flex items-center gap-2 py-1.5 text-sm cursor-pointer hover:bg-slate-50 rounded px-1">
+                  <label key={col.id} className="flex items-center gap-2 py-1.5 text-sm cursor-pointer hover:bg-slate-50 rounded px-1 min-h-[44px]">
                     <input
                       type="checkbox"
                       checked={col.visible}
                       onChange={() => toggleColumn(col.id)}
-                      className="rounded"
+                      className="rounded w-5 h-5"
                     />
                     <span className="text-slate-700">{col.label}</span>
                   </label>
@@ -586,17 +586,17 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               </div>
             )}
           </div>
-          <div className="relative" ref={catalogRef}>
+          <div className="relative flex-1 sm:flex-none" ref={catalogRef}>
             <button
               onClick={() => setShowCatalog(!showCatalog)}
-              className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 text-sm"
+              className="w-full sm:w-auto px-3 py-2.5 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center sm:justify-start gap-2 text-sm min-h-[44px]"
             >
               <Package className="w-4 h-4" />
-              From Catalog
+              <span>Catalog</span>
               <ChevronDown className="w-4 h-4" />
             </button>
             {showCatalog && (
-              <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto">
+              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto left-0 sm:left-auto">
                 {catalog.length === 0 ? (
                   <div className="p-4 text-slate-500 text-center text-sm">No products in catalog</div>
                 ) : (
@@ -625,7 +625,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                         <button
                           key={item.id}
                           onClick={() => addFromCatalog(item)}
-                          className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0 flex justify-between items-center"
+                          className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0 flex justify-between items-center min-h-[60px]"
                         >
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-slate-800 truncate">{item.name}</div>
@@ -667,7 +667,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
           </div>
           <button
             onClick={addProduct}
-            className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+            className="w-full sm:w-auto px-3 py-2.5 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center sm:justify-start gap-2 text-sm min-h-[44px]"
           >
             <Plus className="w-4 h-4" />
             Add Row
@@ -675,7 +675,207 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile Card Layout */}
+      <div className="md:hidden space-y-3">
+        {products.map((product, index) => (
+          <div key={product.id} className="bg-slate-50 rounded-lg border border-slate-200 p-3">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex-1">
+                <div className="text-xs text-slate-500 mb-1">#{index + 1}</div>
+                <input
+                  type="text"
+                  value={product.name}
+                  onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 text-sm min-h-[44px]"
+                  placeholder="Product/Service name"
+                />
+              </div>
+              <button
+                onClick={() => removeProduct(product.id)}
+                className="text-red-500 hover:text-red-700 p-2 ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Qty/Unit */}
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Qty/Unit</label>
+                <div className="flex gap-1">
+                  <input
+                    type="number"
+                    min="1"
+                    value={product.quantity}
+                    onChange={(e) => {
+                      const newQuantity = Number(e.target.value) || 1;
+                      if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
+                        const newRate = roundTo2(product.manualAmount / newQuantity);
+                        onChange(products.map(p =>
+                          p.id === product.id ? {
+                            ...p,
+                            quantity: newQuantity,
+                            unitPrice: newRate,
+                            isManualAmount: true
+                          } : p
+                        ));
+                      } else {
+                        onChange(products.map(p =>
+                          p.id === product.id ? { ...p, quantity: newQuantity, isManualAmount: false } : p
+                        ));
+                      }
+                    }}
+                    className="flex-1 px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
+                  />
+                  <select
+                    value={product.unit || 'piece'}
+                    onChange={(e) => updateProduct(product.id, 'unit', e.target.value)}
+                    className="flex-1 px-2 py-2 border border-slate-300 rounded text-sm min-h-[44px]"
+                  >
+                    {UNIT_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Rate */}
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Rate</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={product.unitPrice}
+                  onChange={(e) => {
+                    onChange(products.map(p =>
+                      p.id === product.id ? { ...p, unitPrice: Number(e.target.value), isManualAmount: false } : p
+                    ));
+                  }}
+                  className="w-full px-2 py-2 border border-slate-300 rounded text-right text-sm min-h-[44px]"
+                />
+              </div>
+
+              {/* GST */}
+              {isColumnVisible('gstPercent') && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">GST%</label>
+                  <select
+                    value={product.gstPercent}
+                    onChange={(e) => updateProduct(product.id, 'gstPercent', Number(e.target.value))}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
+                  >
+                    <option value={0}>0%</option>
+                    <option value={5}>5%</option>
+                    <option value={18}>18%</option>
+                    <option value={28}>28%</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Amount */}
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={product.isManualAmount && product.manualAmount !== undefined
+                    ? product.manualAmount
+                    : calculateProductAmount(product)}
+                  onChange={(e) => {
+                    const manualValue = Number(e.target.value);
+                    if (product.quantity > 0 && manualValue > 0) {
+                      let calculatedRate: number;
+                      if (gstMode === 'inclusive' && product.gstPercent > 0) {
+                        calculatedRate = roundTo2(manualValue / product.quantity / (1 + product.gstPercent / 100));
+                      } else {
+                        calculatedRate = roundTo2(manualValue / product.quantity);
+                      }
+                      onChange(products.map(p =>
+                        p.id === product.id ? {
+                          ...p,
+                          manualAmount: manualValue,
+                          isManualAmount: true,
+                          unitPrice: calculatedRate
+                        } : p
+                      ));
+                    } else {
+                      onChange(products.map(p =>
+                        p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true } : p
+                      ));
+                    }
+                  }}
+                  className="w-full px-2 py-2 border border-slate-300 rounded text-right text-sm font-medium min-h-[44px]"
+                />
+              </div>
+
+              {/* HSN/SAC */}
+              {isColumnVisible('hsnSacCode') && (
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-500 mb-1 block">HSN/SAC</label>
+                  <input
+                    type="text"
+                    value={product.hsnSacCode}
+                    onChange={(e) => updateProduct(product.id, 'hsnSacCode', e.target.value)}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center font-mono text-sm min-h-[44px]"
+                    placeholder="HSN/SAC Code"
+                  />
+                </div>
+              )}
+
+              {/* Additional mobile fields based on visibility */}
+              {isColumnVisible('batchNumber') && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Batch No.</label>
+                  <input
+                    type="text"
+                    value={product.batchNumber || ''}
+                    onChange={(e) => updateProduct(product.id, 'batchNumber', e.target.value)}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center font-mono text-sm min-h-[44px]"
+                    placeholder="Batch#"
+                  />
+                </div>
+              )}
+
+              {isColumnVisible('expiryDate') && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Expiry</label>
+                  <input
+                    type="month"
+                    value={product.expiryDate || ''}
+                    onChange={(e) => updateProduct(product.id, 'expiryDate', e.target.value)}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
+                  />
+                </div>
+              )}
+
+              {isColumnVisible('discount') && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Disc%</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={product.discount || 0}
+                    onChange={(e) => updateProduct(product.id, 'discount', Number(e.target.value))}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {products.length === 0 && (
+          <div className="text-center text-slate-500 py-8">
+            No products added. Click "Add Row" or "Catalog" to add products.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table Layout */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-y border-slate-200">
             <tr>
@@ -716,109 +916,147 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
 
       {/* Tax Summary Table */}
       {products.length > 0 && (
-        <div className="mt-6">
+        <div className="mt-4 sm:mt-6">
           <h4 className="text-sm font-semibold text-slate-700 mb-3">Tax Summary (HSN/SAC-wise)</h4>
-          <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
-            <thead className="bg-slate-100">
-              <tr>
-                {isColumnVisible('hsnSacCode') && (
-                  <th className="px-3 py-2 text-left font-semibold text-slate-700">HSN/SAC</th>
-                )}
-                <th className="px-3 py-2 text-right font-semibold text-slate-700">Taxable Amount</th>
-                {isColumnVisible('gstPercent') && (
-                  <>
-                    <th className="px-3 py-2 text-center font-semibold text-slate-700">CGST %</th>
-                    <th className="px-3 py-2 text-right font-semibold text-slate-700">CGST Amt</th>
-                    <th className="px-3 py-2 text-center font-semibold text-slate-700">SGST %</th>
-                    <th className="px-3 py-2 text-right font-semibold text-slate-700">SGST Amt</th>
-                  </>
-                )}
-                <th className="px-3 py-2 text-right font-semibold text-slate-700">Total Amt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from(taxSummary.entries()).map(([key, data]) => {
-                const hsnSacCode = key.split('_')[0];
-                return (
-                  <tr key={key} className="border-b border-gray-100">
-                    {isColumnVisible('hsnSacCode') && (
-                      <td className="px-3 py-2 font-mono">{hsnSacCode}</td>
-                    )}
-                    <td className="px-3 py-2 text-right">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          {/* Mobile Card Layout */}
+          <div className="md:hidden space-y-2">
+            {Array.from(taxSummary.entries()).map(([key, data]) => {
+              const hsnSacCode = key.split('_')[0];
+              return (
+                <div key={key} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  {isColumnVisible('hsnSacCode') && (
+                    <div className="text-sm font-mono text-slate-600 mb-2">HSN/SAC: {hsnSacCode}</div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Taxable:</span>
+                      <span className="font-medium">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
                     {isColumnVisible('gstPercent') && (
                       <>
-                        <td className="px-3 py-2 text-center">{data.cgstRate}%</td>
-                        <td className="px-3 py-2 text-right">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-center">{data.sgstRate}%</td>
-                        <td className="px-3 py-2 text-right">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">CGST:</span>
+                          <span className="font-medium">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">SGST:</span>
+                          <span className="font-medium">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
                       </>
                     )}
-                    <td className="px-3 py-2 text-right font-medium">
-                      {(data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    <div className="flex justify-between font-bold">
+                      <span className="text-slate-700">Total:</span>
+                      <span>{(data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Desktop Table Layout */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
+              <thead className="bg-slate-100">
+                <tr>
+                  {isColumnVisible('hsnSacCode') && (
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">HSN/SAC</th>
+                  )}
+                  <th className="px-3 py-2 text-right font-semibold text-slate-700">Taxable Amount</th>
+                  {isColumnVisible('gstPercent') && (
+                    <>
+                      <th className="px-3 py-2 text-center font-semibold text-slate-700">CGST %</th>
+                      <th className="px-3 py-2 text-right font-semibold text-slate-700">CGST Amt</th>
+                      <th className="px-3 py-2 text-center font-semibold text-slate-700">SGST %</th>
+                      <th className="px-3 py-2 text-right font-semibold text-slate-700">SGST Amt</th>
+                    </>
+                  )}
+                  <th className="px-3 py-2 text-right font-semibold text-slate-700">Total Amt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from(taxSummary.entries()).map(([key, data]) => {
+                  const hsnSacCode = key.split('_')[0];
+                  return (
+                    <tr key={key} className="border-b border-gray-100">
+                      {isColumnVisible('hsnSacCode') && (
+                        <td className="px-3 py-2 font-mono">{hsnSacCode}</td>
+                      )}
+                      <td className="px-3 py-2 text-right">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      {isColumnVisible('gstPercent') && (
+                        <>
+                          <td className="px-3 py-2 text-center">{data.cgstRate}%</td>
+                          <td className="px-3 py-2 text-right">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-center">{data.sgstRate}%</td>
+                          <td className="px-3 py-2 text-right">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        </>
+                      )}
+                      <td className="px-3 py-2 text-right font-medium">
+                        {(data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Totals */}
       {products.length > 0 && (
-        <div className="mt-6 flex flex-col sm:flex-row justify-between gap-4">
+        <div className="mt-4 sm:mt-6 flex flex-col gap-4">
           {/* GST Mode Toggle */}
           {onGstModeChange && (
-            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+            <div className="bg-slate-50 rounded-lg p-3 sm:p-4 border border-slate-200">
               <label className="block text-sm font-semibold text-slate-700 mb-2">GST Mode</label>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
                   <input
                     type="radio"
                     name="gstMode"
                     checked={gstMode === 'inclusive'}
                     onChange={() => onGstModeChange('inclusive')}
-                    className="w-4 h-4 text-blue-600"
+                    className="w-5 h-5 text-blue-600"
                   />
                   <span className="text-sm text-slate-700">Inclusive GST (price includes GST)</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
                   <input
                     type="radio"
                     name="gstMode"
                     checked={gstMode === 'exclusive'}
                     onChange={() => onGstModeChange('exclusive')}
-                    className="w-4 h-4 text-blue-600"
+                    className="w-5 h-5 text-blue-600"
                   />
                   <span className="text-sm text-slate-700">Exclusive GST (add GST on top)</span>
                 </label>
               </div>
             </div>
           )}
-          <div className="w-80 bg-slate-50 rounded-lg p-4 border border-slate-200">
-            <div className="flex justify-between py-1">
+          <div className="w-full sm:w-80 bg-slate-50 rounded-lg p-3 sm:p-4 border border-slate-200">
+            <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
               <span className="text-slate-600">Taxable Amount:</span>
               <span className="font-medium">Rs. {totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
             {isColumnVisible('gstPercent') && (
               <>
-                <div className="flex justify-between py-1">
+                <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
                   <span className="text-slate-600">CGST:</span>
                   <span className="font-medium">Rs. {totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between py-1">
+                <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
                   <span className="text-slate-600">SGST:</span>
                   <span className="font-medium">Rs. {totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
               </>
             )}
-            <div className="flex justify-between py-1">
+            <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
               <span className="text-slate-600">Round Off:</span>
               <span className="font-medium">Rs. {roundOff >= 0 ? roundOff.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '(' + Math.abs(roundOff).toLocaleString('en-IN', { minimumFractionDigits: 2 }) + ')'}</span>
             </div>
-            <div className="flex justify-between py-2 border-t-2 border-slate-300 mt-2">
-              <span className="text-slate-800 font-bold text-lg">Grand Total:</span>
-              <span className="font-bold text-lg text-blue-600">Rs. {roundedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            <div className="flex justify-between py-2 sm:py-2 border-t-2 border-slate-300 mt-2 text-base sm:text-lg">
+              <span className="text-slate-800 font-bold">Grand Total:</span>
+              <span className="font-bold text-blue-600">Rs. {roundedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
         </div>

@@ -122,9 +122,20 @@ export const storage = {
     storage.saveProductCatalog(catalog);
   },
 
-  // Templates - Always returns only the 5 curated templates
+  // Templates - Loads saved templates from localStorage, or initializes defaults
   getTemplates: (): QuotationTemplate[] => {
-    // Always reset to curated templates to avoid accumulation
+    const data = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    if (data) {
+      try {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch {
+        // Fall through to defaults if parsing fails
+      }
+    }
+    // Only initialize defaults if localStorage is empty
     const defaults = getDefaultTemplates();
     localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(defaults));
     return defaults;

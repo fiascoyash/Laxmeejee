@@ -5,10 +5,14 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
 
   body {
     @apply antialiased;
+    touch-action: manipulation;
+    -webkit-overflow-scrolling: touch;
   }
 
   input[type="number"]::-webkit-inner-spin-button,
@@ -19,6 +23,20 @@
 
   input[type="number"] {
     -moz-appearance: textfield;
+  }
+
+  /* Prevent iOS zoom on input focus */
+  @media screen and (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Safe area padding for notched devices */
+  .safe-area-inset {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
@@ -38,23 +56,64 @@
   .card {
     @apply bg-white rounded-xl shadow-sm border border-slate-200;
   }
+
+  /* Mobile responsive table wrapper */
+  .mobile-table-scroll {
+    @apply overflow-x-auto -mx-4 px-4;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Touch-friendly button sizes */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Mobile card instead of table row */
+  .mobile-card-item {
+    @apply bg-white rounded-lg border border-slate-200 p-4 mb-3;
+  }
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Custom scrollbar for desktop */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 3px;
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+/* PWA standalone mode adjustments */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* iOS specific adjustments */
+@supports (-webkit-touch-callout: none) {
+  .ios-safe-padding {
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+  }
 }

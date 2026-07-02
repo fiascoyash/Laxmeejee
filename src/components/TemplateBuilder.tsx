@@ -386,9 +386,240 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   const selectedBlockData = selectedBlock ? blocks.find(b => b.id === selectedBlock) : null;
 
   return (
-    <div className="fixed inset-0 bg-gray-900/90 z-50 flex">
+    <div className="fixed inset-0 bg-gray-900/90 z-50 flex flex-col lg:flex-row">
+      {/* Mobile Header - Preview Toggle and Actions */}
+      <div className="lg:hidden bg-white border-b border-slate-200 p-3 flex items-center justify-between gap-2 safe-area-inset">
+        <input
+          type="text"
+          value={templateName}
+          onChange={(e) => setTemplateName(e.target.value)}
+          className="flex-1 px-3 py-2 border border-slate-300 rounded-md font-semibold text-base min-h-[44px]"
+          placeholder="Template Name"
+        />
+        <button
+          onClick={handleSave}
+          className="px-4 py-2 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2 min-h-[44px]"
+        >
+          <Save className="w-4 h-4" /> Save
+        </button>
+        <button
+          onClick={onClose}
+          className="px-3 py-2 border border-slate-300 rounded-md min-h-[44px] min-w-[44px] flex items-center justify-center"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Mobile Layout - Accordion Style */}
+      <div className="lg:hidden flex-1 overflow-y-auto bg-gray-100">
+        {/* Preview Section - Always visible */}
+        <div className="bg-white border-b border-slate-200">
+          <div className="p-3 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-800">Preview</h3>
+            <select
+              value={effectiveStyleThemeId}
+              onChange={(e) => setTemplateSettings({ ...templateSettings, styleThemeId: e.target.value as StyleThemeId })}
+              className="px-2 py-1.5 border border-slate-300 rounded text-sm min-h-[40px]"
+            >
+              {availableStyleThemes.map(theme => (
+                <option key={theme.id} value={theme.id}>{theme.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="overflow-x-auto p-3 bg-gray-100">
+            <div className="inline-block min-w-[300px] transform origin-top-left"
+              style={{ transform: 'scale(0.5)', transformOrigin: 'top left', marginLeft: '-50%' }}>
+              <CanvasArea themeId={themeId} canvasRef={canvasRef}>
+                <DocumentRenderer
+                  themeId={themeId}
+                  settings={templateSettings}
+                  company={companyProfile}
+                  customer={sampleData.customer}
+                  quotation={sampleData.quotation}
+                  products={sampleData.products}
+                  docType="quotation"
+                  customBlocks={blocks}
+                  showZones={true}
+                  onZoneClick={handleZoneClick}
+                  onBlockClick={(id) => { if (id) setSelectedBlock(id); else setSelectedBlock(null); }}
+                  selectedBlockId={selectedBlock ?? undefined}
+                  onTypographyElementClick={setSelectedTypographyElement}
+                  selectedTypographyElementId={selectedTypographyElement}
+                  schema={template.schema}
+                />
+              </CanvasArea>
+            </div>
+          </div>
+        </div>
+
+        {/* Controls Section - Collapsible */}
+        <div className="bg-white border-b border-slate-200 mt-2">
+          <button
+            onClick={() => setShowAddBlock(!showAddBlock)}
+            className="w-full p-4 flex items-center justify-between"
+          >
+            <span className="font-semibold text-slate-800 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-emerald-600" />
+              Add Block / Controls
+            </span>
+            <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showAddBlock ? 'rotate-180' : ''}`} />
+          </button>
+          {showAddBlock && (
+            <div className="p-4 pt-0 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowColumnSettings(!showColumnSettings)}
+                  className="px-3 py-3 border border-slate-300 rounded-md text-sm flex items-center justify-center gap-2 hover:bg-slate-50 min-h-[44px]"
+                >
+                  <Settings className="w-4 h-4" />
+                  Columns
+                </button>
+                <button
+                  onClick={() => setShowSettingsPanel(!showSettingsPanel)}
+                  className={`px-3 py-3 rounded-md text-sm flex items-center justify-center gap-2 min-h-[44px] ${
+                    showSettingsPanel
+                      ? 'bg-emerald-600 text-white'
+                      : 'border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">Template (structure)</label>
+                <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded text-sm text-slate-600">
+                  {INVOICE_THEMES[themeId]?.name ?? 'Custom'}
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  isUndoRedoRef.current = true;
+                  undo();
+                }}
+                disabled={!canUndo}
+                className={`w-full px-3 py-3 rounded-md flex items-center justify-center gap-2 text-sm min-h-[44px] ${
+                  canUndo
+                    ? 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+                    : 'bg-slate-50 text-gray-300 cursor-not-allowed border border-slate-200'
+                }`}
+              >
+                <Undo2 className="w-4 h-4" /> Undo
+              </button>
+              <button
+                onClick={() => {
+                  isUndoRedoRef.current = true;
+                  redo();
+                }}
+                disabled={!canRedo}
+                className={`w-full px-3 py-3 rounded-md flex items-center justify-center gap-2 text-sm min-h-[44px] ${
+                  canRedo
+                    ? 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+                    : 'bg-slate-50 text-gray-300 cursor-not-allowed border border-slate-200'
+                }`}
+              >
+                <Redo2 className="w-4 h-4" /> Redo
+              </button>
+
+              {/* Blocks List */}
+              <div>
+                <h4 className="font-medium text-sm text-slate-700 mb-2">Custom Blocks</h4>
+                {blocks.length === 0 ? (
+                  <div className="text-sm text-slate-500 text-center py-4 bg-slate-50 rounded">
+                    No blocks added. Tap a zone in preview to add.
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {blocks.sort((a, b) => {
+                      const zoneOrder: BlockZone[] = ['after_header', 'after_party', 'after_products', 'after_totals', 'after_bank', 'footer'];
+                      const zoneA = zoneOrder.indexOf(a.zone);
+                      const zoneB = zoneOrder.indexOf(b.zone);
+                      if (zoneA !== zoneB) return zoneA - zoneB;
+                      return a.order - b.order;
+                    }).map(block => {
+                      const Icon = BLOCK_ICONS[block.type];
+                      return (
+                        <button
+                          key={block.id}
+                          onClick={() => setSelectedBlock(block.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-3 rounded text-left min-h-[44px] ${
+                            selectedBlock === block.id ? 'bg-blue-100 border border-blue-300' : 'bg-slate-50 border border-slate-200'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 text-slate-500" />
+                          <span className="text-sm flex-1">{BLOCK_LABELS[block.type]}</span>
+                          <Trash2
+                            className="w-4 h-4 text-red-400"
+                            onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Settings Panel - When Open */}
+        {showSettingsPanel && (
+          <div className="bg-white border-b border-slate-200 mt-2">
+            <div className="p-4">
+              <TemplateSettingsPanel
+                settings={templateSettings}
+                onChange={setTemplateSettings}
+                selectedTypographyElement={selectedTypographyElement}
+                onTypographyElementSelect={setSelectedTypographyElement}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Block Properties - When Selected */}
+        {selectedBlockData && (
+          <div className="bg-white border-b border-slate-200 mt-2 p-4">
+            <h4 className="font-semibold text-slate-800 mb-3">Block Properties</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Zone</label>
+                <select
+                  value={selectedBlockData.zone}
+                  onChange={(e) => updateBlockZone(selectedBlockData.id, e.target.value as BlockZone)}
+                  className="w-full px-3 py-2 border rounded text-sm min-h-[44px]"
+                >
+                  {Object.entries(ZONE_LABELS).map(([zone, label]) => (
+                    <option key={zone} value={zone}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              {['text_block', 'terms_conditions', 'warranty', 'transport_details', 'delivery_details', 'installation_details', 'footer_notes'].includes(selectedBlockData.type) && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Content</label>
+                  <textarea
+                    value={selectedBlockData.content || ''}
+                    onChange={(e) => updateBlockContent(selectedBlockData.id, e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm resize-none min-h-[88px]"
+                    rows={3}
+                  />
+                </div>
+              )}
+              <button
+                onClick={() => removeBlock(selectedBlockData.id)}
+                className="w-full px-3 py-3 bg-red-50 text-red-600 rounded flex items-center justify-center gap-2 min-h-[44px]"
+              >
+                <Trash2 className="w-4 h-4" /> Delete Block
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Layout */}
       {/* Left Sidebar - Tools */}
-      <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-full">
+      <div className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col h-full overflow-y-auto">
         <div className="p-4 border-b">
           <input
             type="text"
@@ -474,7 +705,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           <div className="relative">
             <button
               onClick={() => setShowAddBlock(!showAddBlock)}
-              className="w-full px-3 py-2 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2"
+              className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2 min-h-[44px]"
             >
               <Plus className="w-4 h-4" /> Add Block
               <ChevronDown className="w-4 h-4" />
@@ -483,7 +714,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           <div className="mt-3">
             <button
               onClick={() => setShowColumnSettings(!showColumnSettings)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm flex items-center justify-center gap-2 hover:bg-slate-50"
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm flex items-center justify-center gap-2 hover:bg-slate-50 min-h-[44px]"
             >
               <Settings className="w-4 h-4" />
               Table Columns
@@ -492,7 +723,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           <div className="mt-2">
             <button
               onClick={() => setShowSettingsPanel(!showSettingsPanel)}
-              className={`w-full px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2 ${
+              className={`w-full px-3 py-2.5 rounded-md text-sm flex items-center justify-center gap-2 min-h-[44px] ${
                 showSettingsPanel
                   ? 'bg-emerald-600 text-white'
                   : 'border border-slate-300 hover:bg-slate-50'
@@ -505,7 +736,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
           <div className="mt-3">
             <label className="block text-xs font-medium text-slate-700 mb-1.5">Template (structure)</label>
-            <div className="px-2 py-1.5 bg-slate-100 border border-slate-200 rounded text-sm text-slate-600">
+            <div className="px-2 py-2 bg-slate-100 border border-slate-200 rounded text-sm text-slate-600">
               {INVOICE_THEMES[themeId]?.name ?? 'Custom'}
             </div>
             <p className="text-[10px] text-slate-400 mt-1">Structure is fixed by the template. Use themes below to restyle.</p>
@@ -516,13 +747,13 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             <select
               value={effectiveStyleThemeId}
               onChange={(e) => setTemplateSettings({ ...templateSettings, styleThemeId: e.target.value as StyleThemeId })}
-              className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm"
+              className="w-full px-2 py-2 border border-slate-300 rounded text-sm min-h-[44px]"
             >
               {availableStyleThemes.map(theme => (
                 <option key={theme.id} value={theme.id}>{theme.name}</option>
               ))}
             </select>
-            <p className="text-[10px] text-slate-400 mt-1">Changes colors, typography, borders only — never layout.</p>
+            <p className="text-[10px] text-slate-400 mt-1">Changes colors, typography, borders only.</p>
           </div>
         </div>
 
@@ -559,7 +790,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                       const newCols = productColumns.map(c => c.id === col.id ? { ...c, visible: e.target.checked } : c);
                       setProductColumns(newCols);
                     }}
-                    className="w-3 h-3"
+                    className="w-4 h-4"
                   />
                   <input
                     type="text"
@@ -596,7 +827,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                 return (
                   <div
                     key={block.id}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer transition-colors min-h-[44px] ${
                       selectedBlock === block.id ? 'bg-blue-100 border-blue-300' : 'hover:bg-slate-100'
                     }`}
                     onClick={() => setSelectedBlock(block.id)}
@@ -615,21 +846,21 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
         <div className="p-4 border-t bg-slate-50 space-y-2">
           <button
             onClick={handleSave}
-            className="w-full px-4 py-2 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2"
+            className="w-full px-4 py-3 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2 min-h-[44px]"
           >
             <Save className="w-4 h-4" /> Save Template
           </button>
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 border border-slate-300 rounded-md"
+            className="w-full px-4 py-3 border border-slate-300 rounded-md min-h-[44px]"
           >
             Close
           </button>
         </div>
       </div>
 
-      {/* Main Canvas Area - Document Renderer */}
-      <div className="flex-1 overflow-auto p-8 bg-gray-200 flex items-start justify-center">
+      {/* Main Canvas Area - Document Renderer (Desktop) */}
+      <div className="hidden lg:block flex-1 overflow-auto p-8 bg-gray-200 flex items-start justify-center">
         <CanvasArea themeId={themeId} canvasRef={canvasRef}>
           <DocumentRenderer
             themeId={themeId}
@@ -651,9 +882,9 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
         </CanvasArea>
       </div>
 
-      {/* Right Sidebar - Block Properties or Settings Panel */}
+      {/* Right Sidebar - Block Properties or Settings Panel (Desktop) */}
       {showSettingsPanel ? (
-        <div className="w-72 border-l border-slate-200">
+        <div className="hidden lg:block w-72 border-l border-slate-200 bg-white overflow-y-auto">
           <TemplateSettingsPanel
             settings={templateSettings}
             onChange={setTemplateSettings}
@@ -661,102 +892,104 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             onTypographyElementSelect={setSelectedTypographyElement}
           />
         </div>
-      ) : (
-        <div className="w-64 bg-white border-l border-slate-200 p-4">
+      ) : selectedBlockData ? (
+        <div className="hidden lg:block w-64 bg-white border-l border-slate-200 p-4 overflow-y-auto">
           <h3 className="font-semibold text-slate-800 mb-4">Properties</h3>
-          {selectedBlockData ? (
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Block Type</label>
+              <div className="px-3 py-2 bg-slate-100 rounded text-sm">
+                {BLOCK_LABELS[selectedBlockData.type]}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Zone</label>
+              <select
+                value={selectedBlockData.zone}
+                onChange={(e) => updateBlockZone(selectedBlockData.id, e.target.value as BlockZone)}
+                className="w-full px-2 py-2 border rounded text-sm"
+              >
+                {Object.entries(ZONE_LABELS).map(([zone, label]) => (
+                  <option key={zone} value={zone}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => moveBlockInZone(selectedBlockData.id, 'up')}
+                className="flex-1 px-2 py-2 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50 min-h-[44px]"
+              >
+                <ArrowUp className="w-3 h-3" /> Up
+              </button>
+              <button
+                onClick={() => moveBlockInZone(selectedBlockData.id, 'down')}
+                className="flex-1 px-2 py-2 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50 min-h-[44px]"
+              >
+                <ArrowDown className="w-3 h-3" /> Down
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 min-h-[44px]">
+              <input
+                type="checkbox"
+                id="blockVisible"
+                checked={selectedBlockData.visible}
+                onChange={(e) => {
+                  const newBlocks = blocks.map(b =>
+                    b.id === selectedBlockData.id ? { ...b, visible: e.target.checked } : b
+                  );
+                  setBlocks(newBlocks);
+                  pushState({ blocks: newBlocks, productColumns });
+                }}
+                className="w-5 h-5"
+              />
+              <label htmlFor="blockVisible" className="text-sm">Visible</label>
+            </div>
+
+            {['text_block', 'terms_conditions', 'warranty', 'transport_details', 'delivery_details', 'installation_details', 'footer_notes'].includes(selectedBlockData.type) && (
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Block Type</label>
-                <div className="px-3 py-2 bg-slate-100 rounded text-sm">
-                  {BLOCK_LABELS[selectedBlockData.type]}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Zone</label>
-                <select
-                  value={selectedBlockData.zone}
-                  onChange={(e) => updateBlockZone(selectedBlockData.id, e.target.value as BlockZone)}
-                  className="w-full px-2 py-1.5 border rounded text-sm"
-                >
-                  {Object.entries(ZONE_LABELS).map(([zone, label]) => (
-                    <option key={zone} value={zone}>{label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => moveBlockInZone(selectedBlockData.id, 'up')}
-                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50"
-                >
-                  <ArrowUp className="w-3 h-3" /> Up
-                </button>
-                <button
-                  onClick={() => moveBlockInZone(selectedBlockData.id, 'down')}
-                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50"
-                >
-                  <ArrowDown className="w-3 h-3" /> Down
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="blockVisible"
-                  checked={selectedBlockData.visible}
-                  onChange={(e) => {
-                    const newBlocks = blocks.map(b =>
-                      b.id === selectedBlockData.id ? { ...b, visible: e.target.checked } : b
-                    );
-                    setBlocks(newBlocks);
-                    pushState({ blocks: newBlocks, productColumns });
-                  }}
+                <label className="block text-xs font-medium text-slate-600 mb-1">Content</label>
+                <textarea
+                  value={selectedBlockData.content || ''}
+                  onChange={(e) => updateBlockContent(selectedBlockData.id, e.target.value)}
+                  className="w-full px-2 py-2 border rounded text-sm resize-none"
+                  rows={4}
                 />
-                <label htmlFor="blockVisible" className="text-sm">Visible</label>
               </div>
+            )}
 
-              {['text_block', 'terms_conditions', 'warranty', 'transport_details', 'delivery_details', 'installation_details', 'footer_notes'].includes(selectedBlockData.type) && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Content</label>
-                  <textarea
-                    value={selectedBlockData.content || ''}
-                    onChange={(e) => updateBlockContent(selectedBlockData.id, e.target.value)}
-                    className="w-full px-2 py-1 border rounded text-sm resize-none"
-                    rows={4}
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => duplicateBlock(selectedBlockData.id)}
-                  className="flex-1 px-2 py-1.5 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50"
-                >
-                  <Copy className="w-3 h-3" /> Duplicate
-                </button>
-                <button
-                  onClick={() => removeBlock(selectedBlockData.id)}
-                  className="flex-1 px-2 py-1.5 bg-red-50 text-red-600 rounded text-sm flex items-center justify-center gap-1 hover:bg-red-100"
-                >
-                  <Trash2 className="w-3 h-3" /> Delete
-                </button>
-              </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => duplicateBlock(selectedBlockData.id)}
+                className="flex-1 px-2 py-2 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50 min-h-[44px]"
+              >
+                <Copy className="w-3 h-3" /> Duplicate
+              </button>
+              <button
+                onClick={() => removeBlock(selectedBlockData.id)}
+                className="flex-1 px-2 py-2 bg-red-50 text-red-600 rounded text-sm flex items-center justify-center gap-1 hover:bg-red-100 min-h-[44px]"
+              >
+                <Trash2 className="w-3 h-3" /> Delete
+              </button>
             </div>
-          ) : (
-            <div className="text-sm text-slate-500">
-              <p>Select a block to edit its properties.</p>
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-700">
-                  <strong>Tips:</strong><br />
-                  - Click a zone to add blocks<br />
-                  - Blocks are rendered in flow layout<br />
-                  - Use settings to toggle fixed sections
-                </p>
-              </div>
+          </div>
+        </div>
+      ) : (
+        <div className="hidden lg:block w-64 bg-white border-l border-slate-200 p-4">
+          <h3 className="font-semibold text-slate-800 mb-4">Properties</h3>
+          <div className="text-sm text-slate-500">
+            <p>Select a block to edit its properties.</p>
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-700">
+                <strong>Tips:</strong><br />
+                - Click a zone to add blocks<br />
+                - Blocks are rendered in flow layout<br />
+                - Use settings to toggle fixed sections
+              </p>
             </div>
-          )}
+          </div>
         </div>
       )}
 
