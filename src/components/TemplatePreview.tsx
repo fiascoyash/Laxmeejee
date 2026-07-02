@@ -15,8 +15,6 @@ interface Props {
   gstMode?: GstMode;
 }
 
-const MM_TO_PX = 3.7795275591;
-
 export function TemplatePreview({ template, company, customer, quotation, products, onClose, documentType = 'quotation', invoice, gstMode = 'inclusive' }: Props) {
   const handleExportPDF = () => {
     exportTemplatePDF(template, company, customer, quotation, products, documentType, invoice, gstMode);
@@ -27,33 +25,19 @@ export function TemplatePreview({ template, company, customer, quotation, produc
   const settings = template.settings ?? DEFAULT_TEMPLATE_SETTINGS;
   const theme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
 
-  // Get paper dimensions based on theme
+  // Get paper dimensions based on theme. POS height is dynamic (content-driven),
+  // matching the export path so preview and PDF render identically.
   const getPaperDimensions = () => {
     switch (theme.paperSize) {
       case 'a5':
         return { width: A5_WIDTH, height: A5_HEIGHT };
       case 'pos':
-        return { width: POS_WIDTH, height: 400 }; // Longer for POS
+        return { width: POS_WIDTH, height: 0 };
       default: // a4
         return { width: A4_WIDTH, height: A4_HEIGHT };
     }
   };
   const paperDims = getPaperDimensions();
-
-  // Scale settings for smaller paper sizes (applied to settings, not rendering engine)
-  const getGlobalFontSize = () => {
-    switch (theme.paperSize) {
-      case 'a5': return 10;
-      case 'pos': return 8;
-      default: return 12;
-    }
-  };
-
-  // Override font size for smaller paper
-  const scaledSettings = {
-    ...settings,
-    globalDefaultFontSize: getGlobalFontSize(),
-  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-8">
@@ -78,13 +62,13 @@ export function TemplatePreview({ template, company, customer, quotation, produc
           <div
             className="bg-white shadow-2xl relative"
             style={{
-              width: paperDims.width * MM_TO_PX,
-              minHeight: paperDims.height * MM_TO_PX,
+              width: `${paperDims.width}mm`,
+              minHeight: paperDims.height > 0 ? `${paperDims.height}mm` : undefined,
             }}
           >
             <DocumentRenderer
               themeId={themeId}
-              settings={scaledSettings}
+              settings={settings}
               company={company}
               customer={customer}
               quotation={quotation}

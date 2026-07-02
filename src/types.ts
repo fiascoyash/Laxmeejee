@@ -664,6 +664,195 @@ export interface TypographyElementMeta {
   usesGlobal: boolean;
 }
 
+// ─── Style Themes (Level 2) ──────────────────────────────────────────────────
+// A style theme changes ONLY colors, typography styling, borders, and accent
+// colors. It NEVER changes width, height, spacing, layout, paper size, or
+// block positions. Applied on top of a template structure inside the builder.
+export type StyleThemeId =
+  // Generic style themes (used by A5 / POS templates)
+  | 'classic_gold'
+  | 'clean_blue'
+  | 'minimal_gray'
+  | 'modern_green'
+  | 'black_white'
+  // Professional Corporate style variants
+  | 'pc_classic_premium'
+  | 'pc_minimal_clean'
+  | 'pc_modern_blue'
+  | 'pc_elegant_black';
+
+export interface StyleTheme {
+  id: StyleThemeId;
+  name: string;
+  // Header
+  headerBg: string;
+  headerTextColor: string;
+  headerBorderColor: string;
+  // Table
+  tableHeaderBg: string;
+  tableHeaderTextColor: string;
+  tableBorderColor: string;
+  tableRowAltBg: string;
+  // Accent / primary color
+  primaryColor: string;
+  accentColor: string;
+  // Section separators
+  sectionBorderColor: string;
+  // Typography color (company name)
+  companyNameColor: string;
+  // Optional style-only override for decorative corner symbols. When unset,
+  // falls back to the structure's cornerDecorations flag. This only toggles
+  // the ornament visibility — it never changes layout or dimensions.
+  cornerDecorations?: boolean;
+}
+
+export const STYLE_THEMES: Record<StyleThemeId, StyleTheme> = {
+  classic_gold: {
+    id: 'classic_gold',
+    name: 'Classic Gold',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#1A1A2E',
+    headerBorderColor: '#C9A84C',
+    tableHeaderBg: '#FDF8EC',
+    tableHeaderTextColor: '#333333',
+    tableBorderColor: '#E8D5A0',
+    tableRowAltBg: '#FFFDF5',
+    primaryColor: '#C9A84C',
+    accentColor: '#9E7B2D',
+    sectionBorderColor: '#C9A84C',
+    companyNameColor: '#1A1A2E',
+  },
+  clean_blue: {
+    id: 'clean_blue',
+    name: 'Clean Blue',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#0F172A',
+    headerBorderColor: '#2563EB',
+    tableHeaderBg: '#EFF6FF',
+    tableHeaderTextColor: '#1E3A8A',
+    tableBorderColor: '#BFDBFE',
+    tableRowAltBg: '#F8FAFC',
+    primaryColor: '#2563EB',
+    accentColor: '#1D4ED8',
+    sectionBorderColor: '#BFDBFE',
+    companyNameColor: '#0F172A',
+  },
+  minimal_gray: {
+    id: 'minimal_gray',
+    name: 'Minimal Gray',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#1F2937',
+    headerBorderColor: '#E5E7EB',
+    tableHeaderBg: '#F9FAFB',
+    tableHeaderTextColor: '#1F2937',
+    tableBorderColor: '#D1D5DB',
+    tableRowAltBg: '#FFFFFF',
+    primaryColor: '#4B5563',
+    accentColor: '#374151',
+    sectionBorderColor: '#E5E7EB',
+    companyNameColor: '#1F2937',
+  },
+  modern_green: {
+    id: 'modern_green',
+    name: 'Modern Green',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#064E3B',
+    headerBorderColor: '#059669',
+    tableHeaderBg: '#ECFDF5',
+    tableHeaderTextColor: '#065F46',
+    tableBorderColor: '#A7F3D0',
+    tableRowAltBg: '#F0FDF4',
+    primaryColor: '#059669',
+    accentColor: '#047857',
+    sectionBorderColor: '#A7F3D0',
+    companyNameColor: '#064E3B',
+  },
+  black_white: {
+    id: 'black_white',
+    name: 'Black & White',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#000000',
+    headerBorderColor: '#000000',
+    tableHeaderBg: '#F3F4F6',
+    tableHeaderTextColor: '#000000',
+    tableBorderColor: '#000000',
+    tableRowAltBg: '#FAFAFA',
+    primaryColor: '#000000',
+    accentColor: '#374151',
+    sectionBorderColor: '#000000',
+    companyNameColor: '#000000',
+  },
+  // ─── Professional Corporate style variants ───────────────────────────────
+  // These keep the Professional Corporate structure (A4, outer border, etc.)
+  // and only change colors/typography/borders + corner-ornament visibility.
+  pc_classic_premium: {
+    id: 'pc_classic_premium',
+    name: 'Classic Premium',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#1A1A2E',
+    headerBorderColor: '#C9A84C',
+    tableHeaderBg: '#FDF8EC',
+    tableHeaderTextColor: '#333333',
+    tableBorderColor: '#E8D5A0',
+    tableRowAltBg: '#FFFDF5',
+    primaryColor: '#C9A84C',
+    accentColor: '#9E7B2D',
+    sectionBorderColor: '#C9A84C',
+    companyNameColor: '#1A1A2E',
+    cornerDecorations: true,
+  },
+  pc_minimal_clean: {
+    id: 'pc_minimal_clean',
+    name: 'Minimal Clean',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#1F2937',
+    headerBorderColor: '#E5E7EB',
+    tableHeaderBg: '#F9FAFB',
+    tableHeaderTextColor: '#1F2937',
+    tableBorderColor: '#E5E7EB',
+    tableRowAltBg: '#FFFFFF',
+    primaryColor: '#6B7280',
+    accentColor: '#4B5563',
+    sectionBorderColor: '#E5E7EB',
+    companyNameColor: '#1F2937',
+    cornerDecorations: false,
+  },
+  pc_modern_blue: {
+    id: 'pc_modern_blue',
+    name: 'Modern Blue Corporate',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#0F172A',
+    headerBorderColor: '#2563EB',
+    tableHeaderBg: '#EFF6FF',
+    tableHeaderTextColor: '#1E3A8A',
+    tableBorderColor: '#BFDBFE',
+    tableRowAltBg: '#F8FAFC',
+    primaryColor: '#2563EB',
+    accentColor: '#1D4ED8',
+    sectionBorderColor: '#BFDBFE',
+    companyNameColor: '#0F172A',
+    cornerDecorations: false,
+  },
+  pc_elegant_black: {
+    id: 'pc_elegant_black',
+    name: 'Elegant Black',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#000000',
+    headerBorderColor: '#000000',
+    tableHeaderBg: '#F3F4F6',
+    tableHeaderTextColor: '#000000',
+    tableBorderColor: '#000000',
+    tableRowAltBg: '#FAFAFA',
+    primaryColor: '#000000',
+    accentColor: '#374151',
+    sectionBorderColor: '#000000',
+    companyNameColor: '#000000',
+    cornerDecorations: false,
+  },
+};
+
+export const DEFAULT_STYLE_THEME_ID: StyleThemeId = 'classic_gold';
+
 export interface TemplateSettings {
   // Invoice Details
   showPoNumber: boolean;
@@ -718,6 +907,9 @@ export interface TemplateSettings {
   globalDefaultFontSize: number;
   // NEW: Element-level typography overrides
   typographyOverrides: Partial<Record<TypographyElementId, TypographyElementMeta>>;
+  // Style theme (Level 2) — colors/typography/borders only. Structure comes
+  // from the template's themeId (Level 1).
+  styleThemeId: StyleThemeId;
 }
 
 export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
@@ -765,6 +957,7 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   // NEW defaults
   globalDefaultFontSize: 12,
   typographyOverrides: {},
+  styleThemeId: DEFAULT_STYLE_THEME_ID,
 };
 
 // Default typography values for each element (used when resetting)
@@ -829,158 +1022,77 @@ export const DEFAULT_TYPOGRAPHY_VALUES: Record<TypographyElementId, { fontSize: 
   custom_block: { fontSize: 10, fontWeight: 400, color: '#000000' },
 };
 
-// ─── Invoice Theme System ────────────────────────────────────────────────────
+// ─── Template / Theme Architecture ───────────────────────────────────────────
+// LEVEL 1 — TEMPLATE STRUCTURE
+// A template fixes the paper size + layout + structure. It never carries
+// colors. There are exactly 4 templates (one A4, two A5, one POS).
 export type ThemeId =
-  // A4 Themes
-  | 'professional_corporate'
-  | 'modern_gst'
-  // A5 Themes
-  | 'a5_retail'
-  | 'a5_wholesale'
-  // POS Theme
-  | 'pos_compact';
+  | 'professional_corporate'   // A4
+  | 'a5_retail'                // A5
+  | 'a5_wholesale'             // A5
+  | 'pos_compact';             // POS
 
 export interface InvoiceTheme {
   id: ThemeId;
   name: string;
   paperSize: PaperSize;
-  // Header
-  headerBg: string;
-  headerTextColor: string;
-  headerBorderColor: string;
-  // Table
-  tableHeaderBg: string;
-  tableHeaderTextColor: string;
-  tableBorderColor: string;
-  tableRowAltBg: string;
-  // Accent / primary color
-  primaryColor: string;
-  accentColor: string;
-  // Section separators
-  sectionBorderColor: string;
-  // Page
+  // Page layout flags (structure, not styling)
   outerBorder: boolean;
   outerBorderWidth: number;
   cornerDecorations: boolean;
   accentBar: boolean;        // colored bar under header
-  // Typography
+  // Typography sizing (structure-level; colors come from the style theme)
   companyNameSize: number;
-  companyNameColor: string;
   docTypeFontSize: number;
 }
 
 export const INVOICE_THEMES: Record<ThemeId, InvoiceTheme> = {
-  // A4 Themes
+  // A4 — Professional Corporate
   professional_corporate: {
     id: 'professional_corporate',
     name: 'Professional Corporate',
     paperSize: 'a4',
-    headerBg: '#FFFFFF',
-    headerTextColor: '#1A1A2E',
-    headerBorderColor: '#C9A84C',
-    tableHeaderBg: '#FDF8EC',
-    tableHeaderTextColor: '#333333',
-    tableBorderColor: '#E8D5A0',
-    tableRowAltBg: '#FFFDF5',
-    primaryColor: '#C9A84C',
-    accentColor: '#9E7B2D',
-    sectionBorderColor: '#C9A84C',
     outerBorder: true,
     outerBorderWidth: 2,
     cornerDecorations: true,
     accentBar: false,
     companyNameSize: 22,
-    companyNameColor: '#1A1A2E',
     docTypeFontSize: 15,
   },
-  modern_gst: {
-    id: 'modern_gst',
-    name: 'Modern GST Professional',
-    paperSize: 'a4',
-    headerBg: '#FFFFFF',
-    headerTextColor: '#000000',
-    headerBorderColor: '#000000',
-    tableHeaderBg: '#F3F4F6',
-    tableHeaderTextColor: '#000000',
-    tableBorderColor: '#000000',
-    tableRowAltBg: '#FAFAFA',
-    primaryColor: '#000000',
-    accentColor: '#374151',
-    sectionBorderColor: '#000000',
-    outerBorder: true,
-    outerBorderWidth: 2,
-    cornerDecorations: false,
-    accentBar: false,
-    companyNameSize: 17,
-    companyNameColor: '#000000',
-    docTypeFontSize: 13,
-  },
-  // A5 Themes
+  // A5 — Retail Quick Bill
   a5_retail: {
     id: 'a5_retail',
     name: 'A5 Retail Quick Bill',
     paperSize: 'a5',
-    headerBg: '#FFFFFF',
-    headerTextColor: '#1F2937',
-    headerBorderColor: '#E5E7EB',
-    tableHeaderBg: '#F9FAFB',
-    tableHeaderTextColor: '#1F2937',
-    tableBorderColor: '#D1D5DB',
-    tableRowAltBg: '#FFFFFF',
-    primaryColor: '#059669',
-    accentColor: '#047857',
-    sectionBorderColor: '#E5E7EB',
     outerBorder: true,
     outerBorderWidth: 1,
     cornerDecorations: false,
     accentBar: true,
     companyNameSize: 14,
-    companyNameColor: '#1F2937',
     docTypeFontSize: 11,
   },
+  // A5 — Wholesale Dealer Bill
   a5_wholesale: {
     id: 'a5_wholesale',
     name: 'A5 Wholesale Dealer Bill',
     paperSize: 'a5',
-    headerBg: '#FFFFFF',
-    headerTextColor: '#111827',
-    headerBorderColor: '#F97316',
-    tableHeaderBg: '#FFF7ED',
-    tableHeaderTextColor: '#111827',
-    tableBorderColor: '#FED7AA',
-    tableRowAltBg: '#FFFAF5',
-    primaryColor: '#F97316',
-    accentColor: '#EA6B0A',
-    sectionBorderColor: '#FED7AA',
     outerBorder: true,
     outerBorderWidth: 1,
     cornerDecorations: false,
     accentBar: false,
     companyNameSize: 14,
-    companyNameColor: '#111827',
     docTypeFontSize: 11,
   },
-  // POS Theme
+  // POS — Compact Bill
   pos_compact: {
     id: 'pos_compact',
     name: 'POS Compact Bill',
     paperSize: 'pos',
-    headerBg: '#FFFFFF',
-    headerTextColor: '#000000',
-    headerBorderColor: '#000000',
-    tableHeaderBg: '#FFFFFF',
-    tableHeaderTextColor: '#000000',
-    tableBorderColor: '#000000',
-    tableRowAltBg: '#FFFFFF',
-    primaryColor: '#000000',
-    accentColor: '#000000',
-    sectionBorderColor: '#000000',
     outerBorder: false,
     outerBorderWidth: 0,
     cornerDecorations: false,
     accentBar: false,
     companyNameSize: 12,
-    companyNameColor: '#000000',
     docTypeFontSize: 10,
   },
 };

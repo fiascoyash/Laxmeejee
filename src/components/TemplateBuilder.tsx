@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   QuotationTemplate, TemplateBlock, BlockType, TableColumn,
-  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, BlockZone, TypographyElementId
+  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, STYLE_THEMES, StyleThemeId, BlockZone, TypographyElementId
 } from '../types';
 import { generateId, getDefaultProductColumns } from '../utils/storage';
 import {
@@ -117,13 +117,11 @@ const ZONE_GROUPS = {
   split: ['party_left', 'party_right', 'bank_left', 'bank_right', 'footer_left', 'footer_center', 'footer_right'] as BlockZone[],
 };
 
-const MM_TO_PX = 3.7795275591;
-
 export function TemplateBuilder({ template, companyProfile, sampleData, onSave, onClose }: Props) {
   const [blocks, setBlocks] = useState<TemplateBlock[]>(template.blocks || []);
   const [productColumns, setProductColumns] = useState<TableColumn[]>(template.productColumns || getDefaultProductColumns());
   const [templateSettings, setTemplateSettings] = useState<TemplateSettings>(template.settings || DEFAULT_TEMPLATE_SETTINGS);
-  const [themeId, setThemeId] = useState<ThemeId>((template as any).themeId || 'professional_corporate');
+  const [themeId] = useState<ThemeId>((template as any).themeId || 'professional_corporate');
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState(template.name);
   const [templateDescription, setTemplateDescription] = useState(template.description || '');
@@ -137,6 +135,31 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   const canvasRef = useRef<HTMLDivElement>(null);
   const isUndoRedoRef = useRef(false);
   const clipboardRef = useRef<TemplateBlock | null>(null);
+
+  // Style themes shown in the builder dropdown are scoped to the template's
+  // structure. Professional Corporate exposes its 4 dedicated style variants;
+  // other structures expose the generic style themes. This keeps each
+  // template's styling options isolated without affecting the others.
+  const isProfessionalCorporate = themeId === 'professional_corporate';
+  const availableStyleThemes = Object.values(STYLE_THEMES).filter(
+    (t) => isProfessionalCorporate ? t.id.startsWith('pc_') : !t.id.startsWith('pc_')
+  );
+  // If the stored styleThemeId isn't valid for this structure (e.g. an older
+  // Professional Corporate template still on a generic theme), fall back to
+  // the structure's default so the dropdown always shows a valid selection.
+  const effectiveStyleThemeId: StyleThemeId =
+    availableStyleThemes.some((t) => t.id === templateSettings.styleThemeId)
+      ? (templateSettings.styleThemeId as StyleThemeId)
+      : (availableStyleThemes[0]?.id ?? 'pc_classic_premium');
+
+  // Persist the fallback so the saved template carries a style theme that
+  // matches its structure. Runs once on mount when the stored value is invalid.
+  useEffect(() => {
+    if (effectiveStyleThemeId !== templateSettings.styleThemeId) {
+      setTemplateSettings({ ...templateSettings, styleThemeId: effectiveStyleThemeId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     canUndo,
@@ -481,16 +504,25 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           </div>
 
           <div className="mt-3">
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">Theme</label>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Template (structure)</label>
+            <div className="px-2 py-1.5 bg-slate-100 border border-slate-200 rounded text-sm text-slate-600">
+              {INVOICE_THEMES[themeId]?.name ?? 'Custom'}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">Structure is fixed by the template. Use themes below to restyle.</p>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Theme (style)</label>
             <select
-              value={themeId}
-              onChange={(e) => setThemeId(e.target.value as ThemeId)}
+              value={effectiveStyleThemeId}
+              onChange={(e) => setTemplateSettings({ ...templateSettings, styleThemeId: e.target.value as StyleThemeId })}
               className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm"
             >
-              {Object.values(INVOICE_THEMES).map(theme => (
+              {availableStyleThemes.map(theme => (
                 <option key={theme.id} value={theme.id}>{theme.name}</option>
               ))}
             </select>
+            <p className="text-[10px] text-slate-400 mt-1">Changes colors, typography, borders only — never layout.</p>
           </div>
         </div>
 
@@ -844,7 +876,9 @@ function zoneLabels(zone: BlockZone): string {
   return labels[zone] || zone;
 }
 
-// Canvas area component that handles different paper sizes
+// Canvas area component that handles different paper sizes.
+// Uses mm-based width to match the PDF export container exactly so the builder
+// canvas renders identically to the preview and the exported PDF.
 function CanvasArea({ themeId, canvasRef, children }: { themeId: ThemeId; canvasRef: React.RefObject<HTMLDivElement>; children: React.ReactNode }) {
   const theme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
 
@@ -853,7 +887,7 @@ function CanvasArea({ themeId, canvasRef, children }: { themeId: ThemeId; canvas
       case 'a5':
         return { width: A5_WIDTH, height: A5_HEIGHT };
       case 'pos':
-        return { width: POS_WIDTH, height: 400 };
+        return { width: POS_WIDTH, height: 0 }; // POS height is dynamic (content-driven)
       default:
         return { width: A4_WIDTH, height: A4_HEIGHT };
     }
@@ -865,9 +899,8 @@ function CanvasArea({ themeId, canvasRef, children }: { themeId: ThemeId; canvas
       ref={canvasRef}
       className="bg-white shadow-2xl relative"
       style={{
-        width: dims.width * MM_TO_PX,
-        minHeight: dims.height * MM_TO_PX,
-        fontSize: theme.paperSize === 'a5' ? '10px' : theme.paperSize === 'pos' ? '8px' : '12px',
+        width: `${dims.width}mm`,
+        minHeight: dims.height > 0 ? `${dims.height}mm` : undefined,
       }}
     >
       {children}

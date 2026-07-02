@@ -741,7 +741,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
   const stdCols = getDefaultProductColumns();
 
   return [
-    // A4 Template 1: Professional Corporate (Premium)
+    // A4 Template: Professional Corporate (Premium)
     {
       id: 'tpl_professional_corporate',
       name: 'Professional Corporate',
@@ -756,32 +756,12 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
       schema: GENERAL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
+        styleThemeId: 'pc_classic_premium',
         showBankDetails: true,
         showPaymentQr: true,
         showSignature: true,
         showTermsConditions: true,
         showWatermark: false,
-      },
-    },
-    // A4 Template 2: Modern GST Professional
-    {
-      id: 'tpl_modern_gst',
-      name: 'Modern GST Professional',
-      description: 'A4 full borders with accounting-style layout. Perfect for Tally/Vyapar style billing.',
-      category: 'gst',
-      themeId: 'modern_gst',
-      isDefault: false,
-      isPremium: false,
-      createdAt: now,
-      updatedAt: now,
-      productColumns: stdCols,
-      schema: GENERAL_SCHEMA,
-      settings: {
-        ...DEFAULT_TEMPLATE_SETTINGS,
-        showGstin: true,
-        showTax: true,
-        showBankDetails: true,
-        showTermsConditions: true,
       },
     },
     // A5 Template: Retail Quick Bill
@@ -799,6 +779,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
       schema: RETAIL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
+        styleThemeId: 'modern_green',
         showPhone: true,
         showGstin: true,
         showDiscount: true,
@@ -822,6 +803,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
       schema: GENERAL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
+        styleThemeId: 'clean_blue',
         showGstin: true,
         showVehicleNumber: true,
         showBankDetails: false,
@@ -850,6 +832,7 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
       schema: RETAIL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
+        styleThemeId: 'black_white',
         showGstin: false,
         showDiscount: true,
         showTax: true,

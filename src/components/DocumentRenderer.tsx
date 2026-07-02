@@ -15,8 +15,9 @@ import React from 'react';
 import {
   CompanyProfile, Customer, Quotation, Product,
   TemplateSettings, Invoice, InvoiceTheme, INVOICE_THEMES, ThemeId,
+  StyleTheme, STYLE_THEMES, StyleThemeId, DEFAULT_STYLE_THEME_ID,
   TemplateBlock, BlockZone, TypographyElementId, DEFAULT_TYPOGRAPHY_VALUES,
-  TemplateSchema, TableColumn, UNIT_OPTIONS,
+  TemplateSchema, UNIT_OPTIONS,
 } from '../types';
 import {
   calculateProductAmount, calculateTaxSummary,
@@ -126,8 +127,36 @@ export function DocumentRenderer({
   selectedTypographyElementId,
   schema,
 }: Props) {
+  // LEVEL 1 — structure (paper size + layout) comes from the template's themeId.
   const theme: InvoiceTheme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
+  // LEVEL 2 — style (colors/typography/borders) comes from the style theme.
+  const styleThemeId: StyleThemeId = settings.styleThemeId ?? DEFAULT_STYLE_THEME_ID;
+  const style: StyleTheme = STYLE_THEMES[styleThemeId] ?? STYLE_THEMES[DEFAULT_STYLE_THEME_ID];
   const gstMode = quotation.gstMode ?? 'inclusive';
+
+  // Paper-size-aware font scaling. Each paper size gets an isolated scale factor
+  // so that A4, A5, and POS render with proportionally-appropriate typography.
+  // This is the single place that adapts rendering to the paper size — no shared
+  // width corruption between templates because every font size flows through here.
+  const paperSize = theme.paperSize ?? 'a4';
+  const paperFontScale: Record<typeof paperSize, number> = {
+    a4: 1,
+    a5: 0.72,
+    pos: 0.5,
+  };
+  const fontScale = paperFontScale[paperSize] ?? 1;
+
+  // Paper-size-aware column width + cell padding helpers. Keeps the product
+  // table inside the canvas on narrow paper (A5 / POS) without touching the
+  // business logic that decides which columns are visible.
+  const colW = (px: number) => `${Math.round(px * fontScale)}px`;
+  const cellPad = `${Math.round(6 * fontScale)}px ${Math.round(8 * fontScale)}px`;
+  // Scale a "Ypx Zpx" padding string by fontScale.
+  const pad = (v: string) =>
+    v
+      .split(' ')
+      .map((tok) => `${Math.round(parseFloat(tok) * fontScale)}px`)
+      .join(' ');
 
   // SINGLE SOURCE OF TRUTH: Check if a column should be visible
   // Priority: 1) User-toggled columns (quotation/invoice.productColumns), 2) Schema columns, 3) Settings flags
@@ -165,11 +194,12 @@ export function DocumentRenderer({
     return settingsMap[columnKey] ?? false;
   };
 
-  // Global default font size
-  const globalDefaultFontSize = settings.globalDefaultFontSize ?? 12;
+  // Global default font size (paper-size-scaled)
+  const globalDefaultFontSize = (settings.globalDefaultFontSize ?? 12) * fontScale;
 
   // Helper function to get typography style for an element
   // Priority: 1) Element override (usesGlobal=false), 2) Global default, 3) DEFAULT_TYPOGRAPHY_VALUES
+  // All font sizes are multiplied by fontScale so each paper size renders in isolation.
   const getTypographyStyle = (
     elementId: TypographyElementId,
     fallback: { fontSize: number; fontWeight: number; color: string }
@@ -178,10 +208,13 @@ export function DocumentRenderer({
     const defaults = DEFAULT_TYPOGRAPHY_VALUES[elementId] || fallback;
 
     // If element has custom override (usesGlobal=false), use that
-    // Otherwise use global default for fontSize, defaults for fontWeight/color
-    const fontSize = override?.usesGlobal === false
+    // Otherwise use global default for fontSize, defaults for fontWeight/color.
+    // Element overrides are also scaled by fontScale so a user-chosen font size
+    // stays proportional to the paper size (no overflow on POS/A5).
+    const rawFontSize = override?.usesGlobal === false
       ? (override.fontSize ?? defaults.fontSize)
       : globalDefaultFontSize;
+    const fontSize = rawFontSize * (override?.usesGlobal === false ? fontScale : 1);
 
     const fontWeight = override?.usesGlobal === false
       ? (override.fontWeight ?? defaults.fontWeight)
@@ -280,12 +313,12 @@ export function DocumentRenderer({
     position: 'relative',
     width: '100%',
     ...(theme.outerBorder && {
-      border: `${theme.outerBorderWidth}px solid ${theme.primaryColor}`,
+      border: `${theme.outerBorderWidth}px solid ${style.primaryColor}`,
     }),
   };
 
   const sec: React.CSSProperties = {
-    borderBottom: `1px solid ${theme.sectionBorderColor}`,
+    borderBottom: `1px solid ${style.sectionBorderColor}`,
     position: 'relative',
     zIndex: 1,
   };
@@ -303,8 +336,8 @@ export function DocumentRenderer({
   const renderCustomBlock = (block: TemplateBlock): React.ReactNode => {
     const isSelected = selectedBlockId === block.id;
     const blockStyle: React.CSSProperties = {
-      padding: '8px 16px',
-      borderBottom: `1px solid ${theme.sectionBorderColor}`,
+      padding: pad('8px 16px'),
+      borderBottom: `1px solid ${style.sectionBorderColor}`,
       backgroundColor: isSelected ? '#FEF3C7' : 'transparent',
       cursor: onBlockClick ? 'pointer' : 'default',
       position: 'relative',
@@ -316,7 +349,7 @@ export function DocumentRenderer({
         case 'bank_details':
           return (
             <>
-              <T id="bank_details_label" style={{ color: theme.primaryColor, marginBottom: '4px' }}>
+              <T id="bank_details_label" style={{ color: style.primaryColor, marginBottom: '4px' }}>
                 Bank Details
               </T>
               {company.bankName && <T id="bank_details_content" as="div">Bank: <strong>{company.bankName}</strong></T>}
@@ -328,13 +361,13 @@ export function DocumentRenderer({
 
         case 'signature_box':
           return (
-            <div style={{ textAlign: 'center', minWidth: '130px' }}>
+            <div style={{ textAlign: 'center', minWidth: `${Math.round(130 * fontScale)}px` }}>
               {company.signature ? (
-                <img src={company.signature} alt="Signature" style={{ height: '45px', objectFit: 'contain', marginBottom: '4px' }} />
+                <img src={company.signature} alt="Signature" style={{ height: `${Math.round(45 * fontScale)}px`, objectFit: 'contain', marginBottom: '4px' }} />
               ) : (
-                <div style={{ height: '45px' }} />
+                <div style={{ height: `${Math.round(45 * fontScale)}px` }} />
               )}
-              <T id="signature_label" style={{ borderTop: `1px solid ${theme.sectionBorderColor}`, paddingTop: '4px' }}>
+              <T id="signature_label" style={{ borderTop: `1px solid ${style.sectionBorderColor}`, paddingTop: '4px' }}>
                 Authorised Signatory
               </T>
             </div>
@@ -343,7 +376,7 @@ export function DocumentRenderer({
         case 'terms_conditions':
           return (
             <>
-              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
+              <T id="terms_label" style={{ color: style.primaryColor, marginBottom: '3px' }}>
                 Terms &amp; Conditions
               </T>
               <T id="terms_content" as="div" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
@@ -362,7 +395,7 @@ export function DocumentRenderer({
         case 'warranty':
           return (
             <>
-              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
+              <T id="terms_label" style={{ color: style.primaryColor, marginBottom: '3px' }}>
                 Warranty
               </T>
               <T id="terms_content" as="div" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
@@ -374,7 +407,7 @@ export function DocumentRenderer({
         case 'transport_details':
           return (
             <>
-              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
+              <T id="terms_label" style={{ color: style.primaryColor, marginBottom: '3px' }}>
                 Transport Details
               </T>
               <T id="terms_content" as="div" style={{ lineHeight: 1.5 }}>
@@ -386,7 +419,7 @@ export function DocumentRenderer({
         case 'delivery_details':
           return (
             <>
-              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
+              <T id="terms_label" style={{ color: style.primaryColor, marginBottom: '3px' }}>
                 Delivery Details
               </T>
               <T id="terms_content" as="div" style={{ lineHeight: 1.5 }}>
@@ -398,7 +431,7 @@ export function DocumentRenderer({
         case 'installation_details':
           return (
             <>
-              <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
+              <T id="terms_label" style={{ color: style.primaryColor, marginBottom: '3px' }}>
                 Installation Details
               </T>
               <T id="terms_content" as="div" style={{ lineHeight: 1.5 }}>
@@ -409,7 +442,7 @@ export function DocumentRenderer({
 
         case 'divider':
           return (
-            <div style={{ width: '100%', height: '1px', backgroundColor: block.style?.color || theme.sectionBorderColor, margin: '4px 0' }} />
+            <div style={{ width: '100%', height: '1px', backgroundColor: block.style?.color || style.sectionBorderColor, margin: '4px 0' }} />
           );
 
         case 'text_block':
@@ -508,7 +541,7 @@ export function DocumentRenderer({
       <div
         style={{
           display: 'flex',
-          borderBottom: `1px solid ${theme.sectionBorderColor}`,
+          borderBottom: `1px solid ${style.sectionBorderColor}`,
         }}
       >
         <div style={{ flex: 1, borderRight: `1px dashed #93C5FD` }}>
@@ -540,7 +573,7 @@ export function DocumentRenderer({
         <img
           src={company.logo}
           alt="Logo"
-          style={{ width: '52px', height: '42px', objectFit: 'contain', flexShrink: 0, alignSelf: align === 'center' ? 'center' : 'flex-start' }}
+          style={{ width: `${Math.round(52 * fontScale)}px`, height: `${Math.round(42 * fontScale)}px`, objectFit: 'contain', flexShrink: 0, alignSelf: align === 'center' ? 'center' : 'flex-start' }}
         />
       )}
       <div style={{ textAlign: align }}>
@@ -581,14 +614,14 @@ export function DocumentRenderer({
   );
 
   // Check if header has dark background (needs white text for doc type block)
-  const hasDarkHeader = theme.headerBg !== '#FFFFFF' && theme.headerBg !== '#F8FAFC' && theme.headerBg !== '#F9FAFB';
+  const hasDarkHeader = style.headerBg !== '#FFFFFF' && style.headerBg !== '#F8FAFC' && style.headerBg !== '#F9FAFB';
 
   const DocTypeBlock = (
     <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '12px' }}>
       <T
         id="doc_title"
         style={{
-          color: hasDarkHeader ? '#FFFFFF' : theme.primaryColor,
+          color: hasDarkHeader ? '#FFFFFF' : style.primaryColor,
           letterSpacing: '1px',
         }}
       >
@@ -598,10 +631,10 @@ export function DocumentRenderer({
         id="original_for_recipient"
         as="div"
         style={{
-          border: `1px solid ${hasDarkHeader ? '#FFFFFF99' : theme.primaryColor}`,
+          border: `1px solid ${hasDarkHeader ? '#FFFFFF99' : style.primaryColor}`,
           padding: '1px 7px',
           marginTop: '3px',
-          color: hasDarkHeader ? '#FFFFFF' : theme.primaryColor,
+          color: hasDarkHeader ? '#FFFFFF' : style.primaryColor,
           letterSpacing: '0.5px',
           display: 'inline-block',
         }}
@@ -615,9 +648,9 @@ export function DocumentRenderer({
     <div
       style={{
         ...sec,
-        backgroundColor: theme.headerBg,
-        color: theme.headerTextColor,
-        padding: '14px 16px 12px',
+        backgroundColor: style.headerBg,
+        color: style.headerTextColor,
+        padding: pad('14px 16px 12px'),
       }}
     >
       {headerAlign === 'center' ? (
@@ -627,7 +660,7 @@ export function DocumentRenderer({
             <T
               id="doc_title"
               style={{
-                color: hasDarkHeader ? '#FFFFFF' : theme.primaryColor,
+                color: hasDarkHeader ? '#FFFFFF' : style.primaryColor,
                 letterSpacing: '1px',
                 marginBottom: '6px',
               }}
@@ -640,9 +673,9 @@ export function DocumentRenderer({
             <T
               id="original_for_recipient"
               style={{
-                border: `1px solid ${hasDarkHeader ? '#FFFFFF99' : theme.primaryColor}`,
+                border: `1px solid ${hasDarkHeader ? '#FFFFFF99' : style.primaryColor}`,
                 padding: '1px 7px',
-                color: hasDarkHeader ? '#FFFFFF' : theme.primaryColor,
+                color: hasDarkHeader ? '#FFFFFF' : style.primaryColor,
                 letterSpacing: '0.5px',
                 display: 'inline-block',
               }}
@@ -668,7 +701,7 @@ export function DocumentRenderer({
         <div
           style={{
             height: '3px',
-            backgroundColor: theme.primaryColor,
+            backgroundColor: style.primaryColor,
             margin: '10px -16px -12px',
           }}
         />
@@ -686,7 +719,7 @@ export function DocumentRenderer({
   }) => (
     <div>
       <T id={labelId} style={{ marginBottom: '2px' }}>{label}</T>
-      <T id={valueId} style={{ color: highlight ? theme.primaryColor : 'inherit' }}>{value}</T>
+      <T id={valueId} style={{ color: highlight ? style.primaryColor : 'inherit' }}>{value}</T>
     </div>
   );
 
@@ -694,9 +727,9 @@ export function DocumentRenderer({
     <div
       style={{
         ...sec,
-        padding: '8px 16px',
+        padding: pad('8px 16px'),
         display: 'flex',
-        gap: '28px',
+        gap: `${Math.round(28 * fontScale)}px`,
         flexWrap: 'wrap',
         backgroundColor: '#FFFFFF',
       }}
@@ -737,18 +770,18 @@ export function DocumentRenderer({
       style={{
         ...sec,
         display: 'flex',
-        minHeight: '60px',
+        minHeight: `${Math.round(60 * fontScale)}px`,
       }}
     >
       {/* Bill To */}
       <div
         style={{
           flex: 1,
-          padding: '10px 16px',
-          borderRight: hasShipTo ? `1px solid ${theme.sectionBorderColor}` : 'none',
+          padding: pad('10px 16px'),
+          borderRight: hasShipTo ? `1px solid ${style.sectionBorderColor}` : 'none',
         }}
       >
-        <T id="bill_to_label" style={{ color: theme.primaryColor, marginBottom: '4px' }}>
+        <T id="bill_to_label" style={{ color: style.primaryColor, marginBottom: '4px' }}>
           Bill To
         </T>
         <T id="bill_to_name" as="div">{customer.name}</T>
@@ -776,8 +809,8 @@ export function DocumentRenderer({
 
       {/* Ship To */}
       {hasShipTo && (
-        <div style={{ flex: 1, padding: '10px 16px' }}>
-          <T id="ship_to_label" style={{ color: theme.primaryColor, marginBottom: '4px' }}>
+        <div style={{ flex: 1, padding: pad('10px 16px') }}>
+          <T id="ship_to_label" style={{ color: style.primaryColor, marginBottom: '4px' }}>
             Ship To
           </T>
           {quotation.shipTo?.name && (
@@ -811,83 +844,83 @@ export function DocumentRenderer({
         borderCollapse: 'collapse',
         position: 'relative',
         zIndex: 1,
-        borderBottom: `1px solid ${theme.sectionBorderColor}`,
+        borderBottom: `1px solid ${style.sectionBorderColor}`,
       }}
     >
       <thead>
         <tr
           style={{
-            backgroundColor: theme.tableHeaderBg,
+            backgroundColor: style.tableHeaderBg,
             color: tableHeaderTextColor,
             fontWeight: 600,
-            borderBottom: `1.5px solid ${theme.tableBorderColor}`,
+            borderBottom: `1.5px solid ${style.tableBorderColor}`,
           }}
         >
-          <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap', width: '32px' }}>
+          <th style={{ padding: cellPad, textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap', width: colW(32) }}>
             <T id="table_header">No</T>
           </th>
-          <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap' }}>
+          <th style={{ padding: cellPad, textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap' }}>
             <T id="table_header">Items</T>
           </th>
           {isColumnVisible('hsnSacCode') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(72) }}>
               <T id="table_header">HSN/SAC</T>
             </th>
           )}
           {isColumnVisible('wattage') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(72) }}>
               <T id="table_header">Wattage</T>
             </th>
           )}
           {isColumnVisible('partNumber') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(72) }}>
               <T id="table_header">Part No.</T>
             </th>
           )}
           {isColumnVisible('vehicleModel') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '80px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(80) }}>
               <T id="table_header">Vehicle</T>
             </th>
           )}
           {isColumnVisible('mrp') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(72) }}>
               <T id="table_header">MRP</T>
             </th>
           )}
           {isColumnVisible('batchNumber') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(72) }}>
               <T id="table_header">Batch No.</T>
             </th>
           )}
           {isColumnVisible('expiryDate') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '80px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(80) }}>
               <T id="table_header">Expiry</T>
             </th>
           )}
           {isColumnVisible('warrantyMonths') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '72px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(72) }}>
               <T id="table_header">Warranty</T>
             </th>
           )}
           {isColumnVisible('quantityUnit') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '80px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(80) }}>
               <T id="table_header">Qty/Unit</T>
             </th>
           )}
-          <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '76px' }}>
+          <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(76) }}>
             <T id="table_header">Rate</T>
           </th>
           {isColumnVisible('discount') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '70px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(70) }}>
               <T id="table_header">Disc.</T>
             </th>
           )}
           {isColumnVisible('gstPercent') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '76px' }}>
+            <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(76) }}>
               <T id="table_header">Tax</T>
             </th>
           )}
-          <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '84px' }}>
+          <th style={{ padding: cellPad, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: colW(84) }}>
             <T id="table_header">Total</T>
           </th>
         </tr>
@@ -901,19 +934,19 @@ export function DocumentRenderer({
             ? roundTo2(productTaxEntry.cgstAmount + productTaxEntry.sgstAmount)
             : 0;
 
-          const rowBg = i % 2 === 1 ? theme.tableRowAltBg : '#FFFFFF';
+          const rowBg = i % 2 === 1 ? style.tableRowAltBg : '#FFFFFF';
           return (
             <tr
               key={product.id}
               style={{
                 backgroundColor: rowBg,
-                borderBottom: `1px solid ${theme.tableBorderColor}`,
+                borderBottom: `1px solid ${style.tableBorderColor}`,
               }}
             >
-              <td style={{ padding: '6px 8px', textAlign: 'center', verticalAlign: 'top' }}>
+              <td style={{ padding: cellPad, textAlign: 'center', verticalAlign: 'top' }}>
                 <T id="product_row">{i + 1}</T>
               </td>
-              <td style={{ padding: '6px 8px', textAlign: 'left', verticalAlign: 'top' }}>
+              <td style={{ padding: cellPad, textAlign: 'left', verticalAlign: 'top' }}>
                 <T id="product_row" as="div">{product.name}</T>
                 {isColumnVisible('description') && product.description?.trim() && (
                   <T id="product_description" as="div" style={{ marginTop: '2px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
@@ -922,65 +955,65 @@ export function DocumentRenderer({
                 )}
               </td>
               {isColumnVisible('hsnSacCode') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.hsnSacCode || '—'}</T>
                 </td>
               )}
               {isColumnVisible('wattage') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.wattage ? `${product.wattage}W` : '—'}</T>
                 </td>
               )}
               {isColumnVisible('partNumber') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.partNumber || '—'}</T>
                 </td>
               )}
               {isColumnVisible('vehicleModel') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.vehicleModel || '—'}</T>
                 </td>
               )}
               {isColumnVisible('mrp') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.mrp ? `Rs. ${product.mrp.toLocaleString('en-IN')}` : '—'}</T>
                 </td>
               )}
               {isColumnVisible('batchNumber') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.batchNumber || '—'}</T>
                 </td>
               )}
               {isColumnVisible('expiryDate') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.expiryDate || '—'}</T>
                 </td>
               )}
               {isColumnVisible('warrantyMonths') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.warrantyMonths ? `${product.warrantyMonths} mo` : '—'}</T>
                 </td>
               )}
               {isColumnVisible('quantityUnit') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top', color: theme.primaryColor }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top', color: style.primaryColor }}>
                   <T id="product_row">{product.quantity} {UNIT_OPTIONS.find(u => u.value === product.unit)?.label || 'Piece'}</T>
                 </td>
               )}
-              <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+              <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                 <T id="product_row">{product.unitPrice.toLocaleString('en-IN')}</T>
               </td>
               {isColumnVisible('discount') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <T id="product_row">{product.discount ?? 0}%</T>
                 </td>
               )}
               {isColumnVisible('gstPercent') && (
-                <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
+                <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top' }}>
                   <div><T id="product_row">{taxAmount.toLocaleString('en-IN')}</T></div>
-                  <div style={{ fontSize: '9px' }}>({product.gstPercent}%)</div>
+                  <div style={{ fontSize: `${9 * fontScale}px` }}>({product.gstPercent}%)</div>
                 </td>
               )}
-              <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top', fontWeight: 600 }}>
+              <td style={{ padding: cellPad, textAlign: 'right', verticalAlign: 'top', fontWeight: 600 }}>
                 <T id="product_row">{amount.toLocaleString('en-IN')}</T>
               </td>
             </tr>
@@ -1018,18 +1051,18 @@ export function DocumentRenderer({
         <div
           style={{
             flex: 1,
-            padding: '10px 16px',
-            borderRight: `1px solid ${theme.sectionBorderColor}`,
+            padding: pad('10px 16px'),
+            borderRight: `1px solid ${style.sectionBorderColor}`,
           }}
         >
-          <T id="tax_summary_label" style={{ color: theme.primaryColor, marginBottom: '5px' }}>
+          <T id="tax_summary_label" style={{ color: style.primaryColor, marginBottom: '5px' }}>
             Tax Summary
           </T>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: theme.tableHeaderBg, color: tableHeaderTextColor }}>
+              <tr style={{ backgroundColor: style.tableHeaderBg, color: tableHeaderTextColor }}>
                 {['HSN/SAC', 'Tax%', 'Taxable Amt', 'CGST', 'SGST'].map(h => (
-                  <th key={h} style={{ padding: '3px 5px', textAlign: h === 'HSN/SAC' ? 'left' : 'right', fontWeight: 600 }}>
+                  <th key={h} style={{ padding: pad('3px 5px'), textAlign: h === 'HSN/SAC' ? 'left' : 'right', fontWeight: 600 }}>
                     <T id="tax_summary_row">{h}</T>
                   </th>
                 ))}
@@ -1041,12 +1074,12 @@ export function DocumentRenderer({
                 const displayHsnSac = data.hsnSacCode || '—';
                 const rate = key.split('_')[1];
                 return (
-                  <tr key={key} style={{ borderTop: `1px solid ${theme.tableBorderColor}` }}>
-                    <td style={{ padding: '2px 5px' }}><T id="tax_summary_row">{displayHsnSac}</T></td>
-                    <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{rate}%</T></td>
-                    <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.taxableAmount)}</T></td>
-                    <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.cgstAmount)}</T></td>
-                    <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.sgstAmount)}</T></td>
+                  <tr key={key} style={{ borderTop: `1px solid ${style.tableBorderColor}` }}>
+                    <td style={{ padding: pad('2px 5px') }}><T id="tax_summary_row">{displayHsnSac}</T></td>
+                    <td style={{ padding: pad('2px 5px'), textAlign: 'right' }}><T id="tax_summary_row">{rate}%</T></td>
+                    <td style={{ padding: pad('2px 5px'), textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.taxableAmount)}</T></td>
+                    <td style={{ padding: pad('2px 5px'), textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.cgstAmount)}</T></td>
+                    <td style={{ padding: pad('2px 5px'), textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.sgstAmount)}</T></td>
                   </tr>
                 );
               })}
@@ -1056,7 +1089,7 @@ export function DocumentRenderer({
       )}
 
       {/* Grand Total */}
-      <div style={{ width: showTaxSummary ? '220px' : '100%', padding: '10px 16px', flexShrink: 0 }}>
+      <div style={{ width: showTaxSummary ? `${Math.round(220 * fontScale)}px` : '100%', padding: pad('10px 16px'), flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
           <T id="subtotal_label" style={{ fontWeight: 600 }}>Sub Total</T>
           <T id="subtotal_value">₹{fmt(totalTaxable)}</T>
@@ -1079,7 +1112,7 @@ export function DocumentRenderer({
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            borderTop: `1.5px solid ${theme.sectionBorderColor}`,
+            borderTop: `1.5px solid ${style.sectionBorderColor}`,
             paddingTop: '5px',
             marginTop: '5px',
           }}
@@ -1096,8 +1129,8 @@ export function DocumentRenderer({
 
   // ── SECTION 6: Notes ──────────────────────────────────────────────────────
   const NotesSection = settings.showNotes ? (
-    <div style={{ ...sec, padding: '8px 16px' }}>
-      <T id="notes_label" style={{ color: theme.primaryColor }}>Notes: </T>
+    <div style={{ ...sec, padding: pad('8px 16px') }}>
+      <T id="notes_label" style={{ color: style.primaryColor }}>Notes: </T>
       <T id="notes_value">{quotation.notes || 'Thank you for your business!'}</T>
     </div>
   ) : null;
@@ -1117,14 +1150,14 @@ export function DocumentRenderer({
         <div
           style={{
             flex: 1,
-            padding: '10px 16px',
+            padding: pad('10px 16px'),
             borderRight:
               settings.showPaymentQr || settings.showSignature
-                ? `1px solid ${theme.sectionBorderColor}`
+                ? `1px solid ${style.sectionBorderColor}`
                 : 'none',
           }}
         >
-          <T id="bank_details_label" style={{ color: theme.primaryColor, marginBottom: '4px' }}>
+          <T id="bank_details_label" style={{ color: style.primaryColor, marginBottom: '4px' }}>
             Bank Details
           </T>
           {company.bankName && (
@@ -1153,14 +1186,14 @@ export function DocumentRenderer({
       {settings.showPaymentQr && (
         <div
           style={{
-            padding: '10px 16px',
+            padding: pad('10px 16px'),
             textAlign: 'center',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             borderRight: settings.showSignature
-              ? `1px solid ${theme.sectionBorderColor}`
+              ? `1px solid ${style.sectionBorderColor}`
               : 'none',
           }}
         >
@@ -1169,8 +1202,8 @@ export function DocumentRenderer({
               src={quotation.paymentQr}
               alt="Payment QR"
               style={{
-                width: '64px',
-                height: '64px',
+                width: `${Math.round(64 * fontScale)}px`,
+                height: `${Math.round(64 * fontScale)}px`,
                 objectFit: 'contain',
                 borderRadius: '2px',
               }}
@@ -1178,9 +1211,9 @@ export function DocumentRenderer({
           ) : (
             <div
               style={{
-                width: '64px',
-                height: '64px',
-                border: `1.5px solid ${theme.primaryColor}`,
+                width: `${Math.round(64 * fontScale)}px`,
+                height: `${Math.round(64 * fontScale)}px`,
+                border: `1.5px solid ${style.primaryColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1197,9 +1230,9 @@ export function DocumentRenderer({
       {settings.showSignature && (
         <div
           style={{
-            padding: '10px 16px',
+            padding: pad('10px 16px'),
             textAlign: 'center',
-            minWidth: '130px',
+            minWidth: `${Math.round(130 * fontScale)}px`,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'flex-end',
@@ -1209,20 +1242,20 @@ export function DocumentRenderer({
             <img
               src={quotation.signature}
               alt="Signature"
-              style={{ height: '45px', objectFit: 'contain', marginBottom: '4px' }}
+              style={{ height: `${Math.round(45 * fontScale)}px`, objectFit: 'contain', marginBottom: '4px' }}
             />
           ) : company.signature ? (
             <img
               src={company.signature}
               alt="Signature"
-              style={{ height: '45px', objectFit: 'contain', marginBottom: '4px' }}
+              style={{ height: `${Math.round(45 * fontScale)}px`, objectFit: 'contain', marginBottom: '4px' }}
             />
           ) : (
-            <div style={{ height: '45px' }} />
+            <div style={{ height: `${Math.round(45 * fontScale)}px` }} />
           )}
           <div
             style={{
-              borderTop: `1px solid ${theme.sectionBorderColor}`,
+              borderTop: `1px solid ${style.sectionBorderColor}`,
               paddingTop: '4px',
             }}
           >
@@ -1238,10 +1271,10 @@ export function DocumentRenderer({
     <div
       style={{
         ...sec,
-        padding: '8px 16px',
+        padding: pad('8px 16px'),
       }}
     >
-      <T id="terms_label" style={{ color: theme.primaryColor, marginBottom: '3px' }}>
+      <T id="terms_label" style={{ color: style.primaryColor, marginBottom: '3px' }}>
         Terms &amp; Conditions
       </T>
       <T id="terms_content" as="div" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
@@ -1255,9 +1288,9 @@ export function DocumentRenderer({
     <div
       style={{
         ...secNoBorder,
-        padding: '5px 16px',
+        padding: pad('5px 16px'),
         textAlign: 'center',
-        borderTop: `1px solid ${theme.sectionBorderColor}`,
+        borderTop: `1px solid ${style.sectionBorderColor}`,
       }}
     >
       <T id="footer_strip" style={{ color: '#aaa' }}>
@@ -1270,7 +1303,7 @@ export function DocumentRenderer({
   return (
     <div style={outerStyle} id="document-renderer-root" onClick={() => onTypographyElementClick?.('custom_block')}>
       {settings.showWatermark && <Watermark text={company.companyName || 'DRAFT'} />}
-      {theme.cornerDecorations && <CornerDecos color={theme.primaryColor} />}
+      {(style.cornerDecorations ?? theme.cornerDecorations) && <CornerDecos color={style.primaryColor} />}
 
       {HeaderSection}
       {/* Zone: after_header */}

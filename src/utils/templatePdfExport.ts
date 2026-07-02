@@ -103,7 +103,12 @@ const preprocessImages = async (container: HTMLElement): Promise<void> => {
 /**
  * WYSIWYG PDF export - captures DocumentRenderer directly
  * Ensures exact visual match between preview and exported PDF
- * Supports A4, A5, and POS paper sizes
+ * Supports A4, A5, and POS paper sizes.
+ *
+ * Page handling:
+ *  - POS: single dynamic-height page sized to content (thermal receipt style).
+ *  - A4/A5: fixed page size; content taller than one page is split across
+ *    multiple pages so nothing gets cropped (totals, footer, etc.).
  */
 const exportWysiwygPDF = async (
   themeId: ThemeId,
@@ -121,51 +126,39 @@ const exportWysiwygPDF = async (
   const theme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
   const paperSize = theme.paperSize ?? 'a4';
 
-  // Determine paper dimensions
+  // Determine paper dimensions (mm)
   let paperWidth: number;
-  let paperHeight: number;
-  let pdfFormat: 'a4' | 'a5' | number[];
+  let pageHeight: number; // per-page height for multi-page paper sizes
+  let pdfFormat: 'a4' | 'a5';
 
   switch (paperSize) {
     case 'a5':
       paperWidth = A5_WIDTH;
-      paperHeight = A5_HEIGHT;
+      pageHeight = A5_HEIGHT;
       pdfFormat = 'a5';
       break;
     case 'pos':
       paperWidth = POS_WIDTH;
-      paperHeight = 297; // Use A4 length, adjust dynamically
-      pdfFormat = [POS_WIDTH, paperHeight];
+      pageHeight = 0; // dynamic — single page sized to content
+      pdfFormat = 'a4'; // unused for POS (format set explicitly below)
       break;
     default: // a4
       paperWidth = A4_WIDTH;
-      paperHeight = A4_HEIGHT;
+      pageHeight = A4_HEIGHT;
       pdfFormat = 'a4';
   }
 
-  // Scale font sizes for smaller paper sizes (via settings, not rendering engine)
-  const getGlobalFontSize = () => {
-    switch (paperSize) {
-      case 'a5': return 10;
-      case 'pos': return 8;
-      default: return settings.globalDefaultFontSize ?? 12;
-    }
-  };
+  // DocumentRenderer self-scales typography by paper size, so pass raw settings.
+  const scaledSettings = settings;
 
-  // Create scaled settings
-  const scaledSettings = {
-    ...settings,
-    globalDefaultFontSize: getGlobalFontSize(),
-  };
-
-  // Create temporary container for rendering
+  // Create temporary container for rendering. Width in mm matches the preview
+  // and builder exactly so all three views render identically.
   const container = document.createElement('div');
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   container.style.top = '0';
   container.style.width = `${paperWidth}mm`;
   container.style.backgroundColor = '#FFFFFF';
-  // Use Roboto for professional document quality (fallback to Helvetica)
   container.style.fontFamily = "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif";
   document.body.appendChild(container);
 
@@ -177,11 +170,10 @@ const exportWysiwygPDF = async (
       settings: scaledSettings,
       company,
       customer,
-      quotation,
+      quotation: { ...quotation, gstMode: gstMode || quotation.gstMode || 'inclusive' },
       products,
       docType: documentType,
       invoice,
-      gstMode: gstMode || 'inclusive',
       schema,
     })
   );
@@ -193,10 +185,9 @@ const exportWysiwygPDF = async (
   // Process images with balanced compression
   await preprocessImages(container);
 
-  // Capture with html2canvas - BALANCED quality settings
-  // scale: 2 ensures sharp text and crisp borders
+  // Capture with html2canvas - scale 2 for sharp text/borders
   const canvas = await html2canvas(container, {
-    scale: 2,                // Sharp rendering for crisp text
+    scale: 2,
     useCORS: true,
     logging: false,
     backgroundColor: '#FFFFFF',
@@ -204,7 +195,6 @@ const exportWysiwygPDF = async (
     removeContainer: false,
     imageTimeout: 5000,
     onclone: (clonedDoc) => {
-      // Ensure white background for all elements
       const clonedContainer = clonedDoc.body.querySelector('div');
       if (clonedContainer) {
         clonedContainer.style.backgroundColor = '#FFFFFF';
@@ -217,21 +207,58 @@ const exportWysiwygPDF = async (
   root.unmount();
   document.body.removeChild(container);
 
-  // For POS, calculate dynamic height based on content
-  const actualPdfHeight = (canvas.height * paperWidth) / canvas.width;
+  // Total content height in mm, derived from the captured canvas aspect ratio.
+  const totalContentHeightMm = (canvas.height * paperWidth) / canvas.width;
 
-  // Create PDF with correct paper size
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: paperSize === 'pos' ? [paperWidth, actualPdfHeight] : pdfFormat,
-    compress: true,
-  });
-
-  // Use PNG for better text/border sharpness
   const imgData = canvas.toDataURL('image/png', 0.92);
 
-  doc.addImage(imgData, 'PNG', 0, 0, paperWidth, actualPdfHeight, undefined, 'MEDIUM');
+  let doc: jsPDF;
+
+  if (paperSize === 'pos') {
+    // POS: single dynamic-height page sized exactly to content. Nothing crops.
+    doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [paperWidth, totalContentHeightMm],
+      compress: true,
+    });
+    doc.addImage(imgData, 'PNG', 0, 0, paperWidth, totalContentHeightMm, undefined, 'MEDIUM');
+  } else {
+    // A4 / A5: fixed page size, split across multiple pages if content is
+    // taller than one page. Each page draws a slice of the source canvas.
+    doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: pdfFormat,
+      compress: true,
+    });
+
+    const pxPerMm = canvas.width / paperWidth;
+    const pageHeightPx = pageHeight * pxPerMm;
+    const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
+
+    for (let page = 0; page < totalPages; page++) {
+      if (page > 0) doc.addPage();
+
+      const srcY = page * pageHeightPx;
+      const sliceHeightPx = Math.min(pageHeightPx, canvas.height - srcY);
+      const sliceHeightMm = sliceHeightPx / pxPerMm;
+
+      // Render this page's slice into its own canvas, then place it at the
+      // top of the PDF page so content flows continuously across pages.
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sliceHeightPx;
+      const ctx = pageCanvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(canvas, 0, srcY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+      }
+      const pageImgData = pageCanvas.toDataURL('image/png', 0.92);
+      doc.addImage(pageImgData, 'PNG', 0, 0, paperWidth, sliceHeightMm, undefined, 'MEDIUM');
+    }
+  }
 
   const fileName = documentType === 'invoice' && invoice ? invoice.invoiceNumber : quotation.quotationNumber;
   doc.save(`${fileName}.pdf`);
