@@ -830,11 +830,20 @@ export const DEFAULT_TYPOGRAPHY_VALUES: Record<TypographyElementId, { fontSize: 
 };
 
 // ─── Invoice Theme System ────────────────────────────────────────────────────
-export type ThemeId = 'luxury' | 'stylish' | 'tally' | 'billbook' | 'modern' | 'simple';
+export type ThemeId =
+  // A4 Themes
+  | 'professional_corporate'
+  | 'modern_gst'
+  // A5 Themes
+  | 'a5_retail'
+  | 'a5_wholesale'
+  // POS Theme
+  | 'pos_compact';
 
 export interface InvoiceTheme {
   id: ThemeId;
   name: string;
+  paperSize: PaperSize;
   // Header
   headerBg: string;
   headerTextColor: string;
@@ -861,9 +870,11 @@ export interface InvoiceTheme {
 }
 
 export const INVOICE_THEMES: Record<ThemeId, InvoiceTheme> = {
-  luxury: {
-    id: 'luxury',
-    name: 'Luxury',
+  // A4 Themes
+  professional_corporate: {
+    id: 'professional_corporate',
+    name: 'Professional Corporate',
+    paperSize: 'a4',
     headerBg: '#FFFFFF',
     headerTextColor: '#1A1A2E',
     headerBorderColor: '#C9A84C',
@@ -882,30 +893,10 @@ export const INVOICE_THEMES: Record<ThemeId, InvoiceTheme> = {
     companyNameColor: '#1A1A2E',
     docTypeFontSize: 15,
   },
-  stylish: {
-    id: 'stylish',
-    name: 'Stylish',
-    headerBg: '#1E3A5F',
-    headerTextColor: '#FFFFFF',
-    headerBorderColor: '#1E3A5F',
-    tableHeaderBg: '#EFF6FF',
-    tableHeaderTextColor: '#1E3A5F',
-    tableBorderColor: '#BFDBFE',
-    tableRowAltBg: '#F8FBFF',
-    primaryColor: '#2563EB',
-    accentColor: '#1D4ED8',
-    sectionBorderColor: '#DBEAFE',
-    outerBorder: true,
-    outerBorderWidth: 1,
-    cornerDecorations: false,
-    accentBar: false,
-    companyNameSize: 20,
-    companyNameColor: '#FFFFFF',
-    docTypeFontSize: 14,
-  },
-  tally: {
-    id: 'tally',
-    name: 'Advanced GST (Tally)',
+  modern_gst: {
+    id: 'modern_gst',
+    name: 'Modern GST Professional',
+    paperSize: 'a4',
     headerBg: '#FFFFFF',
     headerTextColor: '#000000',
     headerBorderColor: '#000000',
@@ -924,9 +915,33 @@ export const INVOICE_THEMES: Record<ThemeId, InvoiceTheme> = {
     companyNameColor: '#000000',
     docTypeFontSize: 13,
   },
-  billbook: {
-    id: 'billbook',
-    name: 'Billbook',
+  // A5 Themes
+  a5_retail: {
+    id: 'a5_retail',
+    name: 'A5 Retail Quick Bill',
+    paperSize: 'a5',
+    headerBg: '#FFFFFF',
+    headerTextColor: '#1F2937',
+    headerBorderColor: '#E5E7EB',
+    tableHeaderBg: '#F9FAFB',
+    tableHeaderTextColor: '#1F2937',
+    tableBorderColor: '#D1D5DB',
+    tableRowAltBg: '#FFFFFF',
+    primaryColor: '#059669',
+    accentColor: '#047857',
+    sectionBorderColor: '#E5E7EB',
+    outerBorder: true,
+    outerBorderWidth: 1,
+    cornerDecorations: false,
+    accentBar: true,
+    companyNameSize: 14,
+    companyNameColor: '#1F2937',
+    docTypeFontSize: 11,
+  },
+  a5_wholesale: {
+    id: 'a5_wholesale',
+    name: 'A5 Wholesale Dealer Bill',
+    paperSize: 'a5',
     headerBg: '#FFFFFF',
     headerTextColor: '#111827',
     headerBorderColor: '#F97316',
@@ -937,55 +952,36 @@ export const INVOICE_THEMES: Record<ThemeId, InvoiceTheme> = {
     primaryColor: '#F97316',
     accentColor: '#EA6B0A',
     sectionBorderColor: '#FED7AA',
-    outerBorder: false,
-    outerBorderWidth: 0,
-    cornerDecorations: false,
-    accentBar: true,
-    companyNameSize: 20,
-    companyNameColor: '#111827',
-    docTypeFontSize: 14,
-  },
-  modern: {
-    id: 'modern',
-    name: 'Modern',
-    headerBg: '#F8FAFC',
-    headerTextColor: '#0F172A',
-    headerBorderColor: '#E2E8F0',
-    tableHeaderBg: '#F1F5F9',
-    tableHeaderTextColor: '#0F172A',
-    tableBorderColor: '#E2E8F0',
-    tableRowAltBg: '#F8FAFC',
-    primaryColor: '#6366F1',
-    accentColor: '#4F46E5',
-    sectionBorderColor: '#E2E8F0',
-    outerBorder: false,
-    outerBorderWidth: 0,
+    outerBorder: true,
+    outerBorderWidth: 1,
     cornerDecorations: false,
     accentBar: false,
-    companyNameSize: 20,
-    companyNameColor: '#0F172A',
-    docTypeFontSize: 14,
+    companyNameSize: 14,
+    companyNameColor: '#111827',
+    docTypeFontSize: 11,
   },
-  simple: {
-    id: 'simple',
-    name: 'Simple',
+  // POS Theme
+  pos_compact: {
+    id: 'pos_compact',
+    name: 'POS Compact Bill',
+    paperSize: 'pos',
     headerBg: '#FFFFFF',
-    headerTextColor: '#111827',
-    headerBorderColor: '#D1D5DB',
-    tableHeaderBg: '#F9FAFB',
-    tableHeaderTextColor: '#374151',
-    tableBorderColor: '#D1D5DB',
+    headerTextColor: '#000000',
+    headerBorderColor: '#000000',
+    tableHeaderBg: '#FFFFFF',
+    tableHeaderTextColor: '#000000',
+    tableBorderColor: '#000000',
     tableRowAltBg: '#FFFFFF',
-    primaryColor: '#374151',
-    accentColor: '#1F2937',
-    sectionBorderColor: '#E5E7EB',
+    primaryColor: '#000000',
+    accentColor: '#000000',
+    sectionBorderColor: '#000000',
     outerBorder: false,
     outerBorderWidth: 0,
     cornerDecorations: false,
     accentBar: false,
-    companyNameSize: 18,
-    companyNameColor: '#111827',
-    docTypeFontSize: 13,
+    companyNameSize: 12,
+    companyNameColor: '#000000',
+    docTypeFontSize: 10,
   },
 };
 
@@ -1107,7 +1103,17 @@ export const PLACEHOLDERS = {
 
 export type PlaceholderKey = keyof typeof PLACEHOLDERS;
 
-// A4 dimensions in mm
+// Paper sizes in mm
+export type PaperSize = 'a4' | 'a5' | 'pos';
+
 export const A4_WIDTH = 210;
 export const A4_HEIGHT = 297;
 export const A4_MARGIN = 10;
+
+export const A5_WIDTH = 148;
+export const A5_HEIGHT = 210;
+export const A5_MARGIN = 8;
+
+export const POS_WIDTH = 80;  // Thermal printer width (mm)
+export const POS_HEIGHT = 297; // Variable length, use A4 height as base
+export const POS_MARGIN = 4;

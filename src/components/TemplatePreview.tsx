@@ -1,4 +1,4 @@
-import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, DEFAULT_TEMPLATE_SETTINGS, ThemeId, Invoice, GstMode } from '../types';
+import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH, DEFAULT_TEMPLATE_SETTINGS, ThemeId, Invoice, GstMode, INVOICE_THEMES } from '../types';
 import { X, FileDown } from 'lucide-react';
 import { exportTemplatePDF, DocumentType } from '../utils/templatePdfExport';
 import { DocumentRenderer } from './DocumentRenderer';
@@ -23,8 +23,37 @@ export function TemplatePreview({ template, company, customer, quotation, produc
   };
 
   // Use the new flow-based DocumentRenderer
-  const themeId: ThemeId = (template as any).themeId ?? 'simple';
+  const themeId: ThemeId = (template as any).themeId ?? 'professional_corporate';
   const settings = template.settings ?? DEFAULT_TEMPLATE_SETTINGS;
+  const theme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
+
+  // Get paper dimensions based on theme
+  const getPaperDimensions = () => {
+    switch (theme.paperSize) {
+      case 'a5':
+        return { width: A5_WIDTH, height: A5_HEIGHT };
+      case 'pos':
+        return { width: POS_WIDTH, height: 400 }; // Longer for POS
+      default: // a4
+        return { width: A4_WIDTH, height: A4_HEIGHT };
+    }
+  };
+  const paperDims = getPaperDimensions();
+
+  // Scale settings for smaller paper sizes (applied to settings, not rendering engine)
+  const getGlobalFontSize = () => {
+    switch (theme.paperSize) {
+      case 'a5': return 10;
+      case 'pos': return 8;
+      default: return 12;
+    }
+  };
+
+  // Override font size for smaller paper
+  const scaledSettings = {
+    ...settings,
+    globalDefaultFontSize: getGlobalFontSize(),
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-8">
@@ -49,13 +78,13 @@ export function TemplatePreview({ template, company, customer, quotation, produc
           <div
             className="bg-white shadow-2xl relative"
             style={{
-              width: A4_WIDTH * MM_TO_PX,
-              minHeight: A4_HEIGHT * MM_TO_PX,
+              width: paperDims.width * MM_TO_PX,
+              minHeight: paperDims.height * MM_TO_PX,
             }}
           >
             <DocumentRenderer
               themeId={themeId}
-              settings={settings}
+              settings={scaledSettings}
               company={company}
               customer={customer}
               quotation={quotation}

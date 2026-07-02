@@ -122,20 +122,12 @@ export const storage = {
     storage.saveProductCatalog(catalog);
   },
 
-  // Templates
+  // Templates - Always returns only the 5 curated templates
   getTemplates: (): QuotationTemplate[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
-    if (!data) return getDefaultTemplates();
-    const stored: QuotationTemplate[] = JSON.parse(data);
+    // Always reset to curated templates to avoid accumulation
     const defaults = getDefaultTemplates();
-    const existingIds = new Set(stored.map(t => t.id));
-    const missing = defaults.filter(t => !existingIds.has(t.id));
-    if (missing.length > 0) {
-      const merged = [...stored, ...missing];
-      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(merged));
-      return merged;
-    }
-    return stored;
+    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(defaults));
+    return defaults;
   },
 
   saveTemplates: (templates: QuotationTemplate[]): void => {
@@ -168,7 +160,7 @@ export const storage = {
       id: generateId(),
       name: `${original.name} (Copy)`,
       category: original.category || 'professional',
-      themeId: (original as any).themeId || 'simple',
+      themeId: (original as any).themeId || 'professional_corporate',
       settings: original.settings ? { ...original.settings } : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -749,13 +741,13 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
   const stdCols = getDefaultProductColumns();
 
   return [
-    // Template 1: Luxury Gold Invoice
+    // A4 Template 1: Professional Corporate (Premium)
     {
-      id: 'tpl_luxury_gold',
-      name: 'Luxury Gold Invoice',
-      description: 'Premium invoice with elegant gold borders, decorative corners, and sophisticated styling.',
-      category: 'luxury',
-      themeId: 'luxury',
+      id: 'tpl_professional_corporate',
+      name: 'Professional Corporate',
+      description: 'Premium A4 invoice with elegant gold borders, decorative corners, and sophisticated styling.',
+      category: 'professional',
+      themeId: 'professional_corporate',
       isDefault: true,
       isPremium: true,
       createdAt: now,
@@ -771,33 +763,13 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
         showWatermark: false,
       },
     },
-    // Template 2: Stylish Blue Invoice
+    // A4 Template 2: Modern GST Professional
     {
-      id: 'tpl_stylish_blue',
-      name: 'Stylish Blue Invoice',
-      description: 'Modern blue header with professional styling.',
-      category: 'modern',
-      themeId: 'stylish',
-      isDefault: false,
-      isPremium: false,
-      createdAt: now,
-      updatedAt: now,
-      productColumns: stdCols,
-      schema: GENERAL_SCHEMA,
-      settings: {
-        ...DEFAULT_TEMPLATE_SETTINGS,
-        showBankDetails: true,
-        showSignature: true,
-        showNotes: true,
-      },
-    },
-    // Template 3: Tally GST Professional
-    {
-      id: 'tpl_tally_gst',
-      name: 'Tally GST Professional',
-      description: 'Full borders with accounting-style layout.',
+      id: 'tpl_modern_gst',
+      name: 'Modern GST Professional',
+      description: 'A4 full borders with accounting-style layout. Perfect for Tally/Vyapar style billing.',
       category: 'gst',
-      themeId: 'tally',
+      themeId: 'modern_gst',
       isDefault: false,
       isPremium: false,
       createdAt: now,
@@ -812,13 +784,13 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
         showTermsConditions: true,
       },
     },
-    // Template 4: Billbook Retail Invoice
+    // A5 Template: Retail Quick Bill
     {
-      id: 'tpl_billbook_retail',
-      name: 'Billbook Retail Invoice',
-      description: 'Dmart/Big Bazaar inspired layout.',
+      id: 'tpl_a5_retail',
+      name: 'A5 Retail Quick Bill',
+      description: 'Compact A5 bill for medical stores, pharmacies, mobile shops, retail counters.',
       category: 'retail',
-      themeId: 'billbook',
+      themeId: 'a5_retail',
       isDefault: false,
       isPremium: false,
       createdAt: now,
@@ -835,87 +807,56 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
         showTermsConditions: false,
       },
     },
-    // Template 5: Solar Energy Invoice
+    // A5 Template: Wholesale Dealer Bill
     {
-      id: 'tpl_solar',
-      name: 'Solar Energy Invoice',
-      description: 'Specialized template for solar panel and inverter businesses with wattage and installation fields.',
-      category: 'specialty',
-      themeId: 'modern',
+      id: 'tpl_a5_wholesale',
+      name: 'A5 Wholesale Dealer Bill',
+      description: 'Compact A5 bill for cement dealers, hardware wholesalers, distributors.',
+      category: 'retail',
+      themeId: 'a5_wholesale',
       isDefault: false,
       isPremium: false,
       createdAt: now,
       updatedAt: now,
-      productColumns: SOLAR_SCHEMA.productColumns,
-      schema: SOLAR_SCHEMA,
+      productColumns: stdCols,
+      schema: GENERAL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
-        showBankDetails: true,
-        showSignature: true,
-        showTermsConditions: true,
-      },
-    },
-    // Template 6: Medical/Pharmacy Invoice
-    {
-      id: 'tpl_medical',
-      name: 'Medical/Pharmacy Invoice',
-      description: 'Pharmacy invoice with batch number, expiry date, and doctor information.',
-      category: 'specialty',
-      themeId: 'simple',
-      isDefault: false,
-      isPremium: false,
-      createdAt: now,
-      updatedAt: now,
-      productColumns: MEDICAL_SCHEMA.productColumns,
-      schema: MEDICAL_SCHEMA,
-      settings: {
-        ...DEFAULT_TEMPLATE_SETTINGS,
-        showBankDetails: true,
-        showSignature: true,
-        showTermsConditions: true,
-        showBatchNumber: true,
-        showExpiryDate: true,
-      },
-    },
-    // Template 7: Automobile Spare Parts
-    {
-      id: 'tpl_automobile',
-      name: 'Automobile Spare Parts',
-      description: 'Auto parts invoice with part numbers, vehicle model, and warranty.',
-      category: 'specialty',
-      themeId: 'stylish',
-      isDefault: false,
-      isPremium: false,
-      createdAt: now,
-      updatedAt: now,
-      productColumns: AUTOMOBILE_SCHEMA.productColumns,
-      schema: AUTOMOBILE_SCHEMA,
-      settings: {
-        ...DEFAULT_TEMPLATE_SETTINGS,
-        showBankDetails: true,
-        showSignature: true,
-        showTermsConditions: true,
+        showGstin: true,
         showVehicleNumber: true,
+        showBankDetails: false,
+        showSignature: true,
+        showTermsConditions: false,
       },
     },
-    // Template 8: Services Invoice
+    // POS Template: Compact Bill
     {
-      id: 'tpl_services',
-      name: 'Services Invoice',
-      description: 'Professional services invoice with SAC codes.',
-      category: 'professional',
-      themeId: 'modern',
+      id: 'tpl_pos_compact',
+      name: 'POS Compact Bill',
+      description: 'Thermal printer compatible compact bill for POS checkout.',
+      category: 'retail',
+      themeId: 'pos_compact',
       isDefault: false,
       isPremium: false,
       createdAt: now,
       updatedAt: now,
-      productColumns: SERVICES_SCHEMA.productColumns,
-      schema: SERVICES_SCHEMA,
+      productColumns: [
+        { id: 'col_1', key: 'sno', label: '#', width: 8, visible: true, order: 0 },
+        { id: 'col_2', key: 'name', label: 'Item', width: 40, visible: true, order: 1 },
+        { id: 'col_3', key: 'quantity', label: 'Qty', width: 15, visible: true, order: 2 },
+        { id: 'col_4', key: 'unitPrice', label: 'Rate', width: 18, visible: true, order: 3 },
+        { id: 'col_5', key: 'amount', label: 'Total', width: 19, visible: true, order: 4 },
+      ],
+      schema: RETAIL_SCHEMA,
       settings: {
         ...DEFAULT_TEMPLATE_SETTINGS,
-        showBankDetails: true,
-        showSignature: true,
-        showTermsConditions: true,
+        showGstin: false,
+        showDiscount: true,
+        showTax: true,
+        showBankDetails: false,
+        showSignature: false,
+        showTermsConditions: false,
+        showTaxSummary: false,
       },
     },
   ];
@@ -975,11 +916,13 @@ export const calculateGstAmount = (amount: number, gstPercent: number, gstMode: 
 };
 
 // Tax summary calculation - now supports both GST modes
-export const calculateTaxSummary = (products: Product[], gstMode: GstMode = 'inclusive'): Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }> => {
-  const summary = new Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number }>();
+export const calculateTaxSummary = (products: Product[], gstMode: GstMode = 'inclusive'): Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number; hsnSacCode: string }> => {
+  const summary = new Map<string, { taxableAmount: number; cgstAmount: number; sgstAmount: number; cgstRate: number; sgstRate: number; hsnSacCode: string }>();
 
   products.forEach(product => {
-    const key = `${product.hsnSacCode}_${product.gstPercent}`;
+    // Use actual hsnSacCode or fallback to empty string (never show "undefined")
+    const hsnSacCode = product.hsnSacCode || '';
+    const key = `${hsnSacCode}_${product.gstPercent}`;
     const baseAmount = calculateProductAmount(product);
     const cgstRate = product.gstPercent / 2;
     const sgstRate = product.gstPercent / 2;
@@ -1001,6 +944,7 @@ export const calculateTaxSummary = (products: Product[], gstMode: GstMode = 'inc
         sgstRate,
         cgstAmount,
         sgstAmount,
+        hsnSacCode,
       });
     }
   });

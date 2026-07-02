@@ -126,7 +126,7 @@ export function DocumentRenderer({
   selectedTypographyElementId,
   schema,
 }: Props) {
-  const theme: InvoiceTheme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES.simple;
+  const theme: InvoiceTheme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
   const gstMode = quotation.gstMode ?? 'inclusive';
 
   // SINGLE SOURCE OF TRUTH: Check if a column should be visible
@@ -273,7 +273,7 @@ export function DocumentRenderer({
     !!(quotation.shipTo?.name?.trim() || quotation.shipTo?.address?.trim());
 
   const outerStyle: React.CSSProperties = {
-    fontFamily: "'Helvetica Neue', Arial, sans-serif",
+    fontFamily: "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif",
     fontSize: `${globalDefaultFontSize}px`,
     color: bodyTextColor,
     backgroundColor: '#FFFFFF',
@@ -580,12 +580,15 @@ export function DocumentRenderer({
     </div>
   );
 
+  // Check if header has dark background (needs white text for doc type block)
+  const hasDarkHeader = theme.headerBg !== '#FFFFFF' && theme.headerBg !== '#F8FAFC' && theme.headerBg !== '#F9FAFB';
+
   const DocTypeBlock = (
     <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '12px' }}>
       <T
         id="doc_title"
         style={{
-          color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
+          color: hasDarkHeader ? '#FFFFFF' : theme.primaryColor,
           letterSpacing: '1px',
         }}
       >
@@ -595,10 +598,10 @@ export function DocumentRenderer({
         id="original_for_recipient"
         as="div"
         style={{
-          border: `1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor}`,
+          border: `1px solid ${hasDarkHeader ? '#FFFFFF99' : theme.primaryColor}`,
           padding: '1px 7px',
           marginTop: '3px',
-          color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
+          color: hasDarkHeader ? '#FFFFFF' : theme.primaryColor,
           letterSpacing: '0.5px',
           display: 'inline-block',
         }}
@@ -624,7 +627,7 @@ export function DocumentRenderer({
             <T
               id="doc_title"
               style={{
-                color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
+                color: hasDarkHeader ? '#FFFFFF' : theme.primaryColor,
                 letterSpacing: '1px',
                 marginBottom: '6px',
               }}
@@ -637,9 +640,9 @@ export function DocumentRenderer({
             <T
               id="original_for_recipient"
               style={{
-                border: `1px solid ${themeId === 'stylish' ? '#FFFFFF99' : theme.primaryColor}`,
+                border: `1px solid ${hasDarkHeader ? '#FFFFFF99' : theme.primaryColor}`,
                 padding: '1px 7px',
-                color: themeId === 'stylish' ? '#FFFFFF' : theme.primaryColor,
+                color: hasDarkHeader ? '#FFFFFF' : theme.primaryColor,
                 letterSpacing: '0.5px',
                 display: 'inline-block',
               }}
@@ -1034,10 +1037,12 @@ export function DocumentRenderer({
             </thead>
             <tbody>
               {Array.from(taxSummary.entries()).map(([key, data]) => {
-                const [hsn, rate] = key.split('_');
+                // Use hsnSacCode from data (never shows "undefined")
+                const displayHsnSac = data.hsnSacCode || '—';
+                const rate = key.split('_')[1];
                 return (
                   <tr key={key} style={{ borderTop: `1px solid ${theme.tableBorderColor}` }}>
-                    <td style={{ padding: '2px 5px' }}><T id="tax_summary_row">{hsn}</T></td>
+                    <td style={{ padding: '2px 5px' }}><T id="tax_summary_row">{displayHsnSac}</T></td>
                     <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{rate}%</T></td>
                     <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.taxableAmount)}</T></td>
                     <td style={{ padding: '2px 5px', textAlign: 'right' }}><T id="tax_summary_row">{fmt(data.cgstAmount)}</T></td>

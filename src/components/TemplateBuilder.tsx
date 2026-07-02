@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   QuotationTemplate, TemplateBlock, BlockType, TableColumn,
-  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, BlockZone, TypographyElementId
+  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, BlockZone, TypographyElementId
 } from '../types';
 import { generateId, getDefaultProductColumns } from '../utils/storage';
 import {
@@ -123,7 +123,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   const [blocks, setBlocks] = useState<TemplateBlock[]>(template.blocks || []);
   const [productColumns, setProductColumns] = useState<TableColumn[]>(template.productColumns || getDefaultProductColumns());
   const [templateSettings, setTemplateSettings] = useState<TemplateSettings>(template.settings || DEFAULT_TEMPLATE_SETTINGS);
-  const [themeId, setThemeId] = useState<ThemeId>((template as any).themeId || 'simple');
+  const [themeId, setThemeId] = useState<ThemeId>((template as any).themeId || 'professional_corporate');
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState(template.name);
   const [templateDescription, setTemplateDescription] = useState(template.description || '');
@@ -598,14 +598,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
 
       {/* Main Canvas Area - Document Renderer */}
       <div className="flex-1 overflow-auto p-8 bg-gray-200 flex items-start justify-center">
-        <div
-          ref={canvasRef}
-          className="bg-white shadow-2xl relative"
-          style={{
-            width: A4_WIDTH * MM_TO_PX,
-            minHeight: A4_HEIGHT * MM_TO_PX,
-          }}
-        >
+        <CanvasArea themeId={themeId} canvasRef={canvasRef}>
           <DocumentRenderer
             themeId={themeId}
             settings={templateSettings}
@@ -623,7 +616,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
             selectedTypographyElementId={selectedTypographyElement}
             schema={template.schema}
           />
-        </div>
+        </CanvasArea>
       </div>
 
       {/* Right Sidebar - Block Properties or Settings Panel */}
@@ -849,4 +842,35 @@ function zoneLabels(zone: BlockZone): string {
     canvas: 'Canvas',
   };
   return labels[zone] || zone;
+}
+
+// Canvas area component that handles different paper sizes
+function CanvasArea({ themeId, canvasRef, children }: { themeId: ThemeId; canvasRef: React.RefObject<HTMLDivElement>; children: React.ReactNode }) {
+  const theme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
+
+  const getPaperDimensions = () => {
+    switch (theme.paperSize) {
+      case 'a5':
+        return { width: A5_WIDTH, height: A5_HEIGHT };
+      case 'pos':
+        return { width: POS_WIDTH, height: 400 };
+      default:
+        return { width: A4_WIDTH, height: A4_HEIGHT };
+    }
+  };
+  const dims = getPaperDimensions();
+
+  return (
+    <div
+      ref={canvasRef}
+      className="bg-white shadow-2xl relative"
+      style={{
+        width: dims.width * MM_TO_PX,
+        minHeight: dims.height * MM_TO_PX,
+        fontSize: theme.paperSize === 'a5' ? '10px' : theme.paperSize === 'pos' ? '8px' : '12px',
+      }}
+    >
+      {children}
+    </div>
+  );
 }

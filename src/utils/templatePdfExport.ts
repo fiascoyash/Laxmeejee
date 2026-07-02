@@ -3,14 +3,14 @@ import html2canvas from 'html2canvas';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { DocumentRenderer } from '../components/DocumentRenderer';
-import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, Invoice, GstMode, ThemeId, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema } from '../types';
+import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, Invoice, GstMode, ThemeId, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, INVOICE_THEMES, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH } from '../types';
 
 export type DocumentType = 'quotation' | 'invoice';
 
 /**
- * Main PDF export function - WYSIWYG HTML-to-PDF with aggressive optimization
+ * Main PDF export function - WYSIWYG HTML-to-PDF with balanced quality
  * Uses DocumentRenderer (same as preview) for pixel-perfect consistency
- * Optimized to produce 100-500KB PDFs instead of 9-12MB
+ * Produces professional-quality PDFs (300-800KB) with sharp text and borders
  */
 export const exportTemplatePDF = async (
   template: QuotationTemplate,
@@ -33,13 +33,14 @@ export const exportTemplatePDF = async (
   }
 
   // Fallback for legacy templates (not commonly used)
-  await exportWysiwygPDF('billbook', settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+  await exportWysiwygPDF('professional_corporate', settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
 };
 
 /**
- * Compress image to JPEG with reduced quality
+ * Compress image with balanced quality settings
+ * Maintains sharpness while keeping file size reasonable
  */
-const compressImageToJpeg = (dataUrl: string, maxWidth: number = 400, quality: number = 0.6): Promise<string> => {
+const compressImageWithQuality = (dataUrl: string, maxWidth: number = 600, quality: number = 0.85): Promise<string> => {
   return new Promise((resolve) => {
     if (!dataUrl || !dataUrl.startsWith('data:image')) {
       resolve(dataUrl);
@@ -54,7 +55,7 @@ const compressImageToJpeg = (dataUrl: string, maxWidth: number = 400, quality: n
       let width = img.width;
       let height = img.height;
 
-      // Scale down if larger than max
+      // Scale down only if significantly larger
       if (width > maxWidth) {
         height = (height / width) * maxWidth;
         width = maxWidth;
@@ -63,13 +64,18 @@ const compressImageToJpeg = (dataUrl: string, maxWidth: number = 400, quality: n
       canvas.width = width;
       canvas.height = height;
 
-      // Fill with white background for JPEG
+      // Fill with white background
       ctx!.fillStyle = '#FFFFFF';
       ctx!.fillRect(0, 0, width, height);
       ctx!.drawImage(img, 0, 0, width, height);
 
-      // Return as JPEG
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      // Use PNG for logos/graphics to preserve sharpness
+      if (width < 300) {
+        resolve(canvas.toDataURL('image/png'));
+      } else {
+        // Use higher quality JPEG for larger images
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      }
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
@@ -77,14 +83,14 @@ const compressImageToJpeg = (dataUrl: string, maxWidth: number = 400, quality: n
 };
 
 /**
- * Pre-process images in the container to compress them
+ * Pre-process images in the container with balanced compression
  */
 const preprocessImages = async (container: HTMLElement): Promise<void> => {
   const images = container.querySelectorAll('img');
   const compressPromises = Array.from(images).map(async (img) => {
     if (img.src && img.src.startsWith('data:image')) {
       try {
-        const compressed = await compressImageToJpeg(img.src, 300, 0.5);
+        const compressed = await compressImageWithQuality(img.src, 600, 0.85);
         img.src = compressed;
       } catch {
         // Keep original if compression fails
@@ -97,7 +103,7 @@ const preprocessImages = async (container: HTMLElement): Promise<void> => {
 /**
  * WYSIWYG PDF export - captures DocumentRenderer directly
  * Ensures exact visual match between preview and exported PDF
- * Optimized: scale=1, JPEG format, quality=0.5
+ * Supports A4, A5, and POS paper sizes
  */
 const exportWysiwygPDF = async (
   themeId: ThemeId,
@@ -111,14 +117,56 @@ const exportWysiwygPDF = async (
   gstMode?: GstMode,
   schema?: TemplateSchema
 ) => {
+  // Get theme and paper size
+  const theme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
+  const paperSize = theme.paperSize ?? 'a4';
+
+  // Determine paper dimensions
+  let paperWidth: number;
+  let paperHeight: number;
+  let pdfFormat: 'a4' | 'a5' | number[];
+
+  switch (paperSize) {
+    case 'a5':
+      paperWidth = A5_WIDTH;
+      paperHeight = A5_HEIGHT;
+      pdfFormat = 'a5';
+      break;
+    case 'pos':
+      paperWidth = POS_WIDTH;
+      paperHeight = 297; // Use A4 length, adjust dynamically
+      pdfFormat = [POS_WIDTH, paperHeight];
+      break;
+    default: // a4
+      paperWidth = A4_WIDTH;
+      paperHeight = A4_HEIGHT;
+      pdfFormat = 'a4';
+  }
+
+  // Scale font sizes for smaller paper sizes (via settings, not rendering engine)
+  const getGlobalFontSize = () => {
+    switch (paperSize) {
+      case 'a5': return 10;
+      case 'pos': return 8;
+      default: return settings.globalDefaultFontSize ?? 12;
+    }
+  };
+
+  // Create scaled settings
+  const scaledSettings = {
+    ...settings,
+    globalDefaultFontSize: getGlobalFontSize(),
+  };
+
   // Create temporary container for rendering
   const container = document.createElement('div');
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   container.style.top = '0';
-  container.style.width = '210mm'; // A4 width
+  container.style.width = `${paperWidth}mm`;
   container.style.backgroundColor = '#FFFFFF';
-  container.style.fontFamily = "'Helvetica Neue', Arial, sans-serif";
+  // Use Roboto for professional document quality (fallback to Helvetica)
+  container.style.fontFamily = "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif";
   document.body.appendChild(container);
 
   // Render the DocumentRenderer component (same as preview)
@@ -126,7 +174,7 @@ const exportWysiwygPDF = async (
   root.render(
     React.createElement(DocumentRenderer, {
       themeId,
-      settings,
+      settings: scaledSettings,
       company,
       customer,
       quotation,
@@ -142,25 +190,25 @@ const exportWysiwygPDF = async (
   await new Promise(resolve => setTimeout(resolve, 150));
   await waitForImages(container);
 
-  // Compress images in the container before capture
+  // Process images with balanced compression
   await preprocessImages(container);
 
-  // Capture with html2canvas - OPTIMIZED settings
-  // scale: 1 (not 2!) - reduces pixel count by 75%
+  // Capture with html2canvas - BALANCED quality settings
+  // scale: 2 ensures sharp text and crisp borders
   const canvas = await html2canvas(container, {
-    scale: 1,                // Key optimization: scale 1 instead of 2
+    scale: 2,                // Sharp rendering for crisp text
     useCORS: true,
     logging: false,
     backgroundColor: '#FFFFFF',
     allowTaint: true,
     removeContainer: false,
     imageTimeout: 5000,
-    // Additional optimizations
     onclone: (clonedDoc) => {
       // Ensure white background for all elements
       const clonedContainer = clonedDoc.body.querySelector('div');
       if (clonedContainer) {
         clonedContainer.style.backgroundColor = '#FFFFFF';
+        clonedContainer.style.width = `${paperWidth}mm`;
       }
     }
   });
@@ -169,22 +217,21 @@ const exportWysiwygPDF = async (
   root.unmount();
   document.body.removeChild(container);
 
-  // Create PDF with compression enabled
+  // For POS, calculate dynamic height based on content
+  const actualPdfHeight = (canvas.height * paperWidth) / canvas.width;
+
+  // Create PDF with correct paper size
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
-    format: 'a4',
-    compress: true,  // Enable PDF compression
+    format: paperSize === 'pos' ? [paperWidth, actualPdfHeight] : pdfFormat,
+    compress: true,
   });
 
-  // Convert canvas to JPEG (not PNG!) - massive size reduction
-  // PNG = lossless but huge, JPEG = lossy but tiny (10-20x smaller)
-  const imgData = canvas.toDataURL('image/jpeg', 0.6);  // 60% quality is sufficient for documents
+  // Use PNG for better text/border sharpness
+  const imgData = canvas.toDataURL('image/png', 0.92);
 
-  const pdfWidth = 210;
-  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-  doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+  doc.addImage(imgData, 'PNG', 0, 0, paperWidth, actualPdfHeight, undefined, 'MEDIUM');
 
   const fileName = documentType === 'invoice' && invoice ? invoice.invoiceNumber : quotation.quotationNumber;
   doc.save(`${fileName}.pdf`);

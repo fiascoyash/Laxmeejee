@@ -1,4 +1,4 @@
-import { QuotationTemplate, A4_WIDTH, A4_HEIGHT, CompanyProfile, TemplateCategory } from '../types';
+import { QuotationTemplate, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH, CompanyProfile, TemplateCategory, INVOICE_THEMES, ThemeId } from '../types';
 import { Check, Layout, Star, ChevronRight, Sparkles } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<TemplateCategory, string> = {
@@ -134,51 +134,7 @@ function TemplateCard({
       <div className={`h-32 rounded-lg mb-3 overflow-hidden relative ${
         template.isPremium ? 'bg-gradient-to-br from-amber-50 to-yellow-50' : 'bg-slate-50'
       }`}>
-        <div
-          className="bg-white shadow-sm absolute transform origin-top-left scale-[0.4]"
-          style={{
-            width: A4_WIDTH * MM_TO_PX,
-            height: A4_HEIGHT * MM_TO_PX,
-          }}
-        >
-          {(template.blocks || []).filter(b => b.visible && b.zone === 'canvas' && b.x !== undefined && b.y !== undefined).map(block => (
-            <div
-              key={block.id}
-              className="absolute overflow-hidden"
-              style={{
-                left: (block.x || 0) * MM_TO_PX,
-                top: (block.y || 0) * MM_TO_PX,
-                width: (block.width || 60) * MM_TO_PX,
-                height: (block.height || 30) * MM_TO_PX,
-              }}
-            >
-              {block.type === 'company_logo' && companyProfile.logo && (
-                <div className="w-full h-full bg-slate-200" />
-              )}
-              {block.type === 'company_details' && (
-                <div className="text-sm font-bold">{companyProfile.companyName || 'Company'}</div>
-              )}
-              {block.type === 'quotation_number' && (
-                <div className="text-xs font-semibold">QT-2024-0001</div>
-              )}
-              {block.type === 'customer_details' && (
-                <div className="text-xs">Customer Name</div>
-              )}
-              {block.type === 'product_table' && (
-                <div className="w-full h-full bg-slate-100 text-xs p-0.5">Table</div>
-              )}
-              {block.type === 'totals' && (
-                <div className="text-xs text-right">Total</div>
-              )}
-              {(block.type === 'bank_details' || block.type === 'terms_conditions') && (
-                <div className="text-xs text-slate-500">{block.type === 'bank_details' ? 'Bank' : 'Terms'}</div>
-              )}
-              {block.type === 'signature_box' && (
-                <div className="border-t border-gray-400 mt-auto text-xs text-center">Sign</div>
-              )}
-            </div>
-          ))}
-        </div>
+        <MiniTemplatePreview template={template} companyProfile={companyProfile} />
       </div>
 
       {/* Template info */}
@@ -191,5 +147,75 @@ function TemplateCard({
         {(template.blocks || []).length} blocks
       </div>
     </button>
+  );
+}
+
+// Mini preview component that handles different paper sizes
+function MiniTemplatePreview({ template, companyProfile }: { template: QuotationTemplate; companyProfile: CompanyProfile }) {
+  const themeId = (template as any).themeId as ThemeId | undefined;
+  const theme = themeId ? INVOICE_THEMES[themeId] : null;
+
+  // Get paper dimensions based on theme
+  const getPaperDimensions = () => {
+    if (!theme) return { width: A4_WIDTH, height: A4_HEIGHT };
+    switch (theme.paperSize) {
+      case 'a5':
+        return { width: A5_WIDTH, height: A5_HEIGHT };
+      case 'pos':
+        return { width: POS_WIDTH, height: 150 };
+      default:
+        return { width: A4_WIDTH, height: A4_HEIGHT };
+    }
+  };
+  const dims = getPaperDimensions();
+
+  return (
+    <div
+      className="bg-white shadow-sm absolute transform origin-top-left"
+      style={{
+        width: dims.width * MM_TO_PX * 0.4,
+        height: dims.height * MM_TO_PX * 0.4,
+        transform: 'scale(0.4)',
+        transformOrigin: 'top left',
+      }}
+    >
+      {(template.blocks || []).filter(b => b.visible && b.zone === 'canvas' && b.x !== undefined && b.y !== undefined).map(block => (
+        <div
+          key={block.id}
+          className="absolute overflow-hidden"
+          style={{
+            left: (block.x || 0) * MM_TO_PX,
+            top: (block.y || 0) * MM_TO_PX,
+            width: (block.width || 60) * MM_TO_PX,
+            height: (block.height || 30) * MM_TO_PX,
+          }}
+        >
+          {block.type === 'company_logo' && companyProfile.logo && (
+            <div className="w-full h-full bg-slate-200" />
+          )}
+          {block.type === 'company_details' && (
+            <div className="text-sm font-bold">{companyProfile.companyName || 'Company'}</div>
+          )}
+          {block.type === 'quotation_number' && (
+            <div className="text-xs font-semibold">QT-2024-0001</div>
+          )}
+          {block.type === 'customer_details' && (
+            <div className="text-xs">Customer Name</div>
+          )}
+          {block.type === 'product_table' && (
+            <div className="w-full h-full bg-slate-100 text-xs p-0.5">Table</div>
+          )}
+          {block.type === 'totals' && (
+            <div className="text-xs text-right">Total</div>
+          )}
+          {(block.type === 'bank_details' || block.type === 'terms_conditions') && (
+            <div className="text-xs text-slate-500">{block.type === 'bank_details' ? 'Bank' : 'Terms'}</div>
+          )}
+          {block.type === 'signature_box' && (
+            <div className="border-t border-gray-400 mt-auto text-xs text-center">Sign</div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
