@@ -20,7 +20,7 @@ interface Props {
 }
 
 // Built-in columns for standard fields
-// DEFAULT VISIBILITY: Only Product Name, Quantity, Rate, Amount are visible by default
+// DEFAULT VISIBILITY: Only Product Name, Qty/Unit, Rate, Amount are visible by default
 // HSN/SAC, GST%, and other columns are hidden but available for toggling
 const getBuiltinColumns = (): Record<string, TableColumn> => ({
   sno: { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
@@ -31,8 +31,7 @@ const getBuiltinColumns = (): Record<string, TableColumn> => ({
   expiryDate: { id: 'col_expiry', key: 'expiryDate', label: 'Expiry', width: 10, visible: false, order: 5 },
   mrp: { id: 'col_mrp', key: 'mrp', label: 'MRP', width: 10, visible: false, order: 6 },
   gstPercent: { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: false, order: 7 },
-  quantity: { id: 'col_qty', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 8 },
-  unit: { id: 'col_unit', key: 'unit', label: 'Unit', width: 6, visible: false, order: 9 },
+  quantityUnit: { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 14, visible: true, order: 8 },
   unitPrice: { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 10 },
   discount: { id: 'col_discount', key: 'discount', label: 'Disc%', width: 8, visible: false, order: 11 },
   amount: { id: 'col_amount', key: 'amount', label: 'Amount', width: 12, visible: true, order: 12 },
@@ -90,8 +89,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     return allColumns.map(col => {
       const settingMap: Record<string, boolean> = {
         description: settings.showDescription,
-        quantity: settings.showQuantity,
-        unit: settings.showUnit,
+        quantityUnit: settings.showQuantity || settings.showUnit,
         discount: settings.showDiscount,
         tax: settings.showTax,
         batchNumber: settings.showBatchNumber,
@@ -140,6 +138,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       hsnSacCode: '',
       gstPercent: 18,
       quantity: 1,
+      unit: 'piece',
       unitPrice: 0,
       // Initialize schema-specific fields
       batchNumber: visibleKeys.has('batchNumber') ? '' : undefined,
@@ -177,6 +176,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       hsnSacCode: catalogItem.hsnSacCode,
       gstPercent: catalogItem.gstPercent,
       quantity: 1,
+      unit: catalogItem.unit || 'piece',
       unitPrice: catalogItem.sellingPrice,
       // Initialize schema-specific fields
       batchNumber: catalogItem.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
@@ -270,34 +270,45 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             <option value={28}>28%</option>
           </select>
         );
-      case 'quantity':
+      case 'quantityUnit':
         return (
-          <input
-            type="number"
-            min="1"
-            value={product.quantity}
-            onChange={(e) => {
-              const newQuantity = Number(e.target.value) || 1;
-              // If manual amount is set, recalculate rate from amount/quantity
-              if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
-                const newRate = roundTo2(product.manualAmount / newQuantity);
-                onChange(products.map(p =>
-                  p.id === product.id ? {
-                    ...p,
-                    quantity: newQuantity,
-                    unitPrice: newRate,
-                    isManualAmount: true  // Keep manual amount flag
-                  } : p
-                ));
-              } else {
-                // Normal behavior: just update quantity
-                onChange(products.map(p =>
-                  p.id === product.id ? { ...p, quantity: newQuantity, isManualAmount: false } : p
-                ));
-              }
-            }}
-            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
-          />
+          <div className="flex gap-1 items-center">
+            <input
+              type="number"
+              min="1"
+              value={product.quantity}
+              onChange={(e) => {
+                const newQuantity = Number(e.target.value) || 1;
+                // If manual amount is set, recalculate rate from amount/quantity
+                if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
+                  const newRate = roundTo2(product.manualAmount / newQuantity);
+                  onChange(products.map(p =>
+                    p.id === product.id ? {
+                      ...p,
+                      quantity: newQuantity,
+                      unitPrice: newRate,
+                      isManualAmount: true  // Keep manual amount flag
+                    } : p
+                  ));
+                } else {
+                  // Normal behavior: just update quantity
+                  onChange(products.map(p =>
+                    p.id === product.id ? { ...p, quantity: newQuantity, isManualAmount: false } : p
+                  ));
+                }
+              }}
+              className="w-16 px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
+            />
+            <select
+              value={product.unit || 'piece'}
+              onChange={(e) => updateProduct(product.id, 'unit', e.target.value)}
+              className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-sm"
+            >
+              {UNIT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
         );
       case 'unitPrice':
         return (
@@ -522,7 +533,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     if (colKey === 'name') return 'px-3 py-2 min-w-64';
     if (colKey === 'sno') return 'px-3 py-2 text-slate-500 w-8';
     if (colKey === 'amount') return 'px-3 py-2 text-right font-medium text-slate-800';
-    if (colKey === 'quantity' || colKey === 'gstPercent') return 'px-3 py-2 text-center';
+    if (colKey === 'quantityUnit' || colKey === 'gstPercent') return 'px-3 py-2';
     return 'px-3 py-2';
   };
 
@@ -530,7 +541,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     if (colKey === 'name') return 'px-3 py-3 text-left font-semibold text-slate-700 min-w-64';
     if (colKey === 'sno') return 'px-3 py-3 text-left font-semibold text-slate-700 w-8';
     if (colKey === 'amount') return 'px-3 py-3 text-right font-semibold text-slate-700 w-32';
-    if (colKey === 'quantity' || colKey === 'gstPercent') return 'px-3 py-3 text-center font-semibold text-slate-700 w-24';
+    if (colKey === 'quantityUnit') return 'px-3 py-3 text-center font-semibold text-slate-700 w-36';
+    if (colKey === 'gstPercent') return 'px-3 py-3 text-center font-semibold text-slate-700 w-24';
     if (colKey === 'hsnSacCode') return 'px-3 py-3 text-left font-semibold text-slate-700 w-24';
     if (colKey === 'unitPrice') return 'px-3 py-3 text-right font-semibold text-slate-700 w-32';
     return 'px-3 py-3 text-left font-semibold text-slate-700';

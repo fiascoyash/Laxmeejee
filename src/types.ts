@@ -194,6 +194,7 @@ export interface Product {
   hsnSacCode: string;          // Unified HSN/SAC Code
   gstPercent: number;
   quantity: number;
+  unit?: UnitType;            // Unit Type
   unitPrice: number;
   // Fields controlled by template settings
   batchNumber?: string;      // For medical templates

@@ -16,7 +16,7 @@ import {
   CompanyProfile, Customer, Quotation, Product,
   TemplateSettings, Invoice, InvoiceTheme, INVOICE_THEMES, ThemeId,
   TemplateBlock, BlockZone, TypographyElementId, DEFAULT_TYPOGRAPHY_VALUES,
-  TemplateSchema, TableColumn,
+  TemplateSchema, TableColumn, UNIT_OPTIONS,
 } from '../types';
 import {
   calculateProductAmount, calculateTaxSummary,
@@ -153,8 +153,7 @@ export function DocumentRenderer({
       batchNumber: settings.showBatchNumber,
       expiryDate: settings.showExpiryDate,
       mrp: false, // MRP only via schema
-      quantity: settings.showQuantity,
-      unit: settings.showUnit,
+      quantityUnit: settings.showQuantity || settings.showUnit,
       discount: settings.showDiscount,
       gstPercent: settings.showTax,
       description: settings.showDescription,
@@ -867,9 +866,9 @@ export function DocumentRenderer({
               <T id="table_header">Warranty</T>
             </th>
           )}
-          {isColumnVisible('quantity') && (
-            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '54px' }}>
-              <T id="table_header">Qty.</T>
+          {isColumnVisible('quantityUnit') && (
+            <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '80px' }}>
+              <T id="table_header">Qty/Unit</T>
             </th>
           )}
           <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', width: '76px' }}>
@@ -959,12 +958,9 @@ export function DocumentRenderer({
                   <T id="product_row">{product.warrantyMonths ? `${product.warrantyMonths} mo` : '—'}</T>
                 </td>
               )}
-              {isColumnVisible('quantity') && (
+              {isColumnVisible('quantityUnit') && (
                 <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top', color: theme.primaryColor }}>
-                  <T id="product_row">{product.quantity}</T>
-                  {isColumnVisible('unit') && (
-                    <span style={{ marginLeft: '2px' }}>PCS</span>
-                  )}
+                  <T id="product_row">{product.quantity} {UNIT_OPTIONS.find(u => u.value === product.unit)?.label || 'Piece'}</T>
                 </td>
               )}
               <td style={{ padding: '6px 8px', textAlign: 'right', verticalAlign: 'top' }}>
