@@ -480,13 +480,13 @@ const getDefaultProducts = (): ProductCatalogItem[] => {
 };
 
 export const getDefaultProductColumns = (): TableColumn[] => [
-  { id: 'col_1', key: 'sno', label: '#', width: 8, visible: true, order: 0 },
-  { id: 'col_2', key: 'name', label: 'Product Name', width: 35, visible: true, order: 1 },
-  { id: 'col_3', key: 'hsnSacCode', label: 'HSN/SAC', width: 12, visible: false, order: 2 },
-  { id: 'col_4', key: 'gstPercent', label: 'GST%', width: 10, visible: false, order: 3 },
-  { id: 'col_5', key: 'quantity', label: 'Qty', width: 10, visible: true, order: 4 },
-  { id: 'col_6', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 5 },
-  { id: 'col_7', key: 'amount', label: 'Amount', width: 13, visible: true, order: 6 },
+  { id: 'col_sno', key: 'sno', label: '#', width: 8, visible: true, order: 0 },
+  { id: 'col_name', key: 'name', label: 'Product Name', width: 35, visible: true, order: 1 },
+  { id: 'col_hsn_sac', key: 'hsnSacCode', label: 'HSN/SAC', width: 12, visible: false, order: 2 },
+  { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 10, visible: false, order: 3 },
+  { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 14, visible: true, order: 4 },
+  { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 5 },
+  { id: 'col_amount', key: 'amount', label: 'Amount', width: 13, visible: true, order: 6 },
 ];
 
 // ─── Industry-Specific Template Schemas ─────────────────────────────────────
@@ -495,14 +495,14 @@ export const getDefaultProductColumns = (): TableColumn[] => [
 export const SOLAR_SCHEMA: TemplateSchema = {
   industry: 'solar',
   productColumns: [
-    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
-    { id: 'col_2', key: 'name', label: 'Product Name', width: 30, visible: true, order: 1 },
-    { id: 'col_3', key: 'wattage', label: 'Wattage', width: 10, visible: true, order: 2 },
-    { id: 'col_4', key: 'hsnSacCode', label: 'HSN/SAC', width: 10, visible: true, order: 3 },
-    { id: 'col_5', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 4 },
-    { id: 'col_6', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 5 },
-    { id: 'col_7', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 6 },
-    { id: 'col_8', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
+    { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_name', key: 'name', label: 'Product Name', width: 30, visible: true, order: 1 },
+    { id: 'col_wattage', key: 'wattage', label: 'Wattage', width: 10, visible: true, order: 2 },
+    { id: 'col_hsn_sac', key: 'hsnSacCode', label: 'HSN/SAC', width: 10, visible: true, order: 3 },
+    { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 4 },
+    { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 8, visible: true, order: 5 },
+    { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 6 },
+    { id: 'col_amount', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
   ],
   productFields: [
     {
@@ -556,15 +556,15 @@ export const SOLAR_SCHEMA: TemplateSchema = {
 export const MEDICAL_SCHEMA: TemplateSchema = {
   industry: 'medical',
   productColumns: [
-    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
-    { id: 'col_2', key: 'name', label: 'Product Name', width: 28, visible: true, order: 1 },
-    { id: 'col_3', key: 'batchNumber', label: 'Batch No.', width: 12, visible: true, order: 2 },
-    { id: 'col_4', key: 'expiryDate', label: 'Expiry', width: 10, visible: true, order: 3 },
-    { id: 'col_5', key: 'mrp', label: 'MRP', width: 10, visible: true, order: 4 },
-    { id: 'col_6', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 5 },
-    { id: 'col_7', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 6 },
-    { id: 'col_8', key: 'unitPrice', label: 'Rate', width: 10, visible: true, order: 7 },
-    { id: 'col_9', key: 'amount', label: 'Amount', width: 10, visible: true, order: 8 },
+    { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_name', key: 'name', label: 'Product Name', width: 28, visible: true, order: 1 },
+    { id: 'col_batch', key: 'batchNumber', label: 'Batch No.', width: 12, visible: true, order: 2 },
+    { id: 'col_expiry', key: 'expiryDate', label: 'Expiry', width: 10, visible: true, order: 3 },
+    { id: 'col_mrp', key: 'mrp', label: 'MRP', width: 10, visible: true, order: 4 },
+    { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 5 },
+    { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 8, visible: true, order: 6 },
+    { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 10, visible: true, order: 7 },
+    { id: 'col_amount', key: 'amount', label: 'Amount', width: 10, visible: true, order: 8 },
   ],
   productFields: [
     {
@@ -630,14 +630,14 @@ export const MEDICAL_SCHEMA: TemplateSchema = {
 export const AUTOMOBILE_SCHEMA: TemplateSchema = {
   industry: 'automobile',
   productColumns: [
-    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
-    { id: 'col_2', key: 'name', label: 'Part Name', width: 28, visible: true, order: 1 },
-    { id: 'col_3', key: 'partNumber', label: 'Part No.', width: 12, visible: true, order: 2 },
-    { id: 'col_4', key: 'vehicleModel', label: 'Vehicle', width: 14, visible: true, order: 3 },
-    { id: 'col_5', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 4 },
-    { id: 'col_6', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 5 },
-    { id: 'col_7', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 6 },
-    { id: 'col_8', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
+    { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_name', key: 'name', label: 'Part Name', width: 28, visible: true, order: 1 },
+    { id: 'col_partnum', key: 'partNumber', label: 'Part No.', width: 12, visible: true, order: 2 },
+    { id: 'col_vehicle', key: 'vehicleModel', label: 'Vehicle', width: 14, visible: true, order: 3 },
+    { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 4 },
+    { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 8, visible: true, order: 5 },
+    { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 6 },
+    { id: 'col_amount', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
   ],
   productFields: [
     {
@@ -701,14 +701,14 @@ export const AUTOMOBILE_SCHEMA: TemplateSchema = {
 export const RETAIL_SCHEMA: TemplateSchema = {
   industry: 'retail',
   productColumns: [
-    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
-    { id: 'col_2', key: 'name', label: 'Item', width: 35, visible: true, order: 1 },
-    { id: 'col_3', key: 'hsnCode', label: 'HSN', width: 10, visible: true, order: 2 },
-    { id: 'col_4', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 3 },
-    { id: 'col_5', key: 'quantity', label: 'Qty', width: 10, visible: true, order: 4 },
-    { id: 'col_6', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 5 },
-    { id: 'col_7', key: 'discount', label: 'Disc%', width: 8, visible: true, order: 6 },
-    { id: 'col_8', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
+    { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_name', key: 'name', label: 'Item', width: 35, visible: true, order: 1 },
+    { id: 'col_hsn_sac', key: 'hsnSacCode', label: 'HSN', width: 10, visible: true, order: 2 },
+    { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 3 },
+    { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 10, visible: true, order: 4 },
+    { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 5 },
+    { id: 'col_discount', key: 'discount', label: 'Disc%', width: 8, visible: true, order: 6 },
+    { id: 'col_amount', key: 'amount', label: 'Amount', width: 12, visible: true, order: 7 },
   ],
   productFields: [
     {
@@ -736,13 +736,13 @@ export const RETAIL_SCHEMA: TemplateSchema = {
 export const SERVICES_SCHEMA: TemplateSchema = {
   industry: 'services',
   productColumns: [
-    { id: 'col_1', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
-    { id: 'col_2', key: 'name', label: 'Service Description', width: 40, visible: true, order: 1 },
-    { id: 'col_3', key: 'hsnSacCode', label: 'HSN/SAC', width: 10, visible: true, order: 2 },
-    { id: 'col_4', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 3 },
-    { id: 'col_5', key: 'quantity', label: 'Qty', width: 8, visible: true, order: 4 },
-    { id: 'col_6', key: 'unitPrice', label: 'Rate', width: 14, visible: true, order: 5 },
-    { id: 'col_7', key: 'amount', label: 'Amount', width: 14, visible: true, order: 6 },
+    { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+    { id: 'col_name', key: 'name', label: 'Service Description', width: 40, visible: true, order: 1 },
+    { id: 'col_hsn_sac', key: 'hsnSacCode', label: 'HSN/SAC', width: 10, visible: true, order: 2 },
+    { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: true, order: 3 },
+    { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 8, visible: true, order: 4 },
+    { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 14, visible: true, order: 5 },
+    { id: 'col_amount', key: 'amount', label: 'Amount', width: 14, visible: true, order: 6 },
   ],
   productFields: [],
   customerFields: [],
@@ -849,11 +849,11 @@ const getDefaultTemplates = (): QuotationTemplate[] => {
       createdAt: now,
       updatedAt: now,
       productColumns: [
-        { id: 'col_1', key: 'sno', label: '#', width: 8, visible: true, order: 0 },
-        { id: 'col_2', key: 'name', label: 'Item', width: 40, visible: true, order: 1 },
-        { id: 'col_3', key: 'quantity', label: 'Qty', width: 15, visible: true, order: 2 },
-        { id: 'col_4', key: 'unitPrice', label: 'Rate', width: 18, visible: true, order: 3 },
-        { id: 'col_5', key: 'amount', label: 'Total', width: 19, visible: true, order: 4 },
+        { id: 'col_sno', key: 'sno', label: '#', width: 8, visible: true, order: 0 },
+        { id: 'col_name', key: 'name', label: 'Item', width: 40, visible: true, order: 1 },
+        { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 15, visible: true, order: 2 },
+        { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 18, visible: true, order: 3 },
+        { id: 'col_amount', key: 'amount', label: 'Total', width: 19, visible: true, order: 4 },
       ],
       schema: RETAIL_SCHEMA,
       settings: {

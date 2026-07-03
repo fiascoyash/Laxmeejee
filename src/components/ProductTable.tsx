@@ -1,7 +1,7 @@
 import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UNIT_OPTIONS } from '../types';
 import { generateId, calculateProductAmount, calculateTaxSummary, calculateRoundOff, calculateGrandTotalAmount, roundTo2, getExpiryStatus, isLowStock, getDaysUntilExpiry } from '../utils/storage';
 import { Plus, Trash2, Package, ChevronDown, Settings2, AlertTriangle, AlertCircle, Clock } from 'lucide-react';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 
 interface Props {
   products: Product[];
@@ -48,6 +48,10 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const columnSettingsRef = useRef<HTMLDivElement>(null);
   const catalogRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const catalogSearchRef = useRef<HTMLInputElement>(null);
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [highlightedCatalogIndex, setHighlightedCatalogIndex] = useState(0);
 
   const settings = templateSettings || DEFAULT_TEMPLATE_SETTINGS;
 
@@ -67,6 +71,69 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Filtered catalog for search
+  const filteredCatalog = useMemo(() => {
+    if (!catalogSearch) return catalog;
+    const searchLower = catalogSearch.toLowerCase();
+    return catalog.filter(item =>
+      item.name.toLowerCase().includes(searchLower) ||
+      item.hsnSacCode?.toLowerCase().includes(searchLower) ||
+      item.brand?.toLowerCase().includes(searchLower) ||
+      item.sku?.toLowerCase().includes(searchLower)
+    );
+  }, [catalog, catalogSearch]);
+
+  // Sorted catalog by expiry
+  const sortedCatalog = useMemo(() => {
+    return [...filteredCatalog].sort((a, b) => {
+      const statusA = getExpiryStatus(a.expiryDate);
+      const statusB = getExpiryStatus(b.expiryDate);
+      if (statusA === 'expired' && statusB !== 'expired') return -1;
+      if (statusA !== 'expired' && statusB === 'expired') return 1;
+      if (statusA === 'expiring_soon' && statusB === 'safe') return -1;
+      if (statusA === 'safe' && statusB === 'expiring_soon') return 1;
+      return 0;
+    });
+  }, [filteredCatalog]);
+
+  // Keyboard navigation for catalog dropdown
+  useEffect(() => {
+    if (!showCatalog || sortedCatalog.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedCatalogIndex(prev => Math.min(prev + 1, sortedCatalog.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedCatalogIndex(prev => Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter' && highlightedCatalogIndex >= 0) {
+        e.preventDefault();
+        const item = sortedCatalog[highlightedCatalogIndex];
+        if (item) {
+          addFromCatalog(item);
+        }
+      } else if (e.key === 'Escape') {
+        setShowCatalog(false);
+        setCatalogSearch('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCatalog, sortedCatalog, highlightedCatalogIndex]);
+
+  // Reset highlight when catalog opens
+  useEffect(() => {
+    if (showCatalog) {
+      setHighlightedCatalogIndex(0);
+      // Auto focus search input
+      setTimeout(() => catalogSearchRef.current?.focus(), 50);
+    } else {
+      setCatalogSearch('');
+    }
+  }, [showCatalog]);
 
   // Build the FULL master list of all available columns from schema/settings
   // Always includes ALL built-in columns so they are available for toggling.
@@ -610,70 +677,74 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             </button>
             {showCatalog && (
               <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto left-0 sm:left-auto">
-                {catalog.length === 0 ? (
-                  <div className="p-4 text-slate-500 text-center text-sm">No products in catalog</div>
+                {/* Search input */}
+                <div className="sticky top-0 bg-white border-b border-slate-200 p-2">
+                  <input
+                    ref={catalogSearchRef}
+                    type="text"
+                    value={catalogSearch}
+                    onChange={(e) => {
+                      setCatalogSearch(e.target.value);
+                      setHighlightedCatalogIndex(0);
+                    }}
+                    placeholder="Search catalog... (type to filter)"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                  <div className="text-xs text-slate-400 mt-1">
+                    Use arrow keys to navigate, Enter to select, Esc to close
+                  </div>
+                </div>
+                {sortedCatalog.length === 0 ? (
+                  <div className="p-4 text-slate-500 text-center text-sm">
+                    {catalogSearch ? 'No products match your search' : 'No products in catalog'}
+                  </div>
                 ) : (
-                  // Filter and sort catalog items by search query
-                  (() => {
-                    const searchableCatalog = catalog.filter(item => {
-                      const searchLower = showCatalog.toString().toLowerCase();
-                      // Simple filter - show all for now since we don't have search in dropdown
-                      return true;
-                    });
-                    // Sort by expiry status (expired first, then expiring soon)
-                    const sortedCatalog = [...catalog].sort((a, b) => {
-                      const statusA = getExpiryStatus(a.expiryDate);
-                      const statusB = getExpiryStatus(b.expiryDate);
-                      if (statusA === 'expired' && statusB !== 'expired') return -1;
-                      if (statusA !== 'expired' && statusB === 'expired') return 1;
-                      if (statusA === 'expiring_soon' && statusB === 'safe') return -1;
-                      if (statusA === 'safe' && statusB === 'expiring_soon') return 1;
-                      return 0;
-                    });
-                    return sortedCatalog.map(item => {
-                      const expiryStatus = getExpiryStatus(item.expiryDate);
-                      const lowStock = isLowStock(item);
-                      const daysUntilExpiry = getDaysUntilExpiry(item.expiryDate);
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => addFromCatalog(item)}
-                          className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0 flex justify-between items-center min-h-[60px]"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-slate-800 truncate">{item.name}</div>
-                            <div className="text-xs text-slate-500">
-                              {item.sku && <span className="font-mono mr-2">{item.sku}</span>}
-                              HSN/SAC: {item.hsnSacCode} | GST: {item.gstPercent}%
-                              {item.brand && <span className="ml-2">| {item.brand}</span>}
-                            </div>
-                            {/* Show warnings */}
-                            <div className="flex gap-2 mt-1">
-                              {expiryStatus === 'expired' && (
-                                <span className="inline-flex items-center gap-1 text-xs text-red-600">
-                                  <AlertCircle className="w-3 h-3" /> Expired
-                                </span>
-                              )}
-                              {expiryStatus === 'expiring_soon' && (
-                                <span className="inline-flex items-center gap-1 text-xs text-amber-600">
-                                  <Clock className="w-3 h-3" /> {daysUntilExpiry} days left
-                                </span>
-                              )}
-                              {lowStock && (
-                                <span className="inline-flex items-center gap-1 text-xs text-red-600">
-                                  <AlertTriangle className="w-3 h-3" /> Low Stock ({item.stockQuantity})
-                                </span>
-                              )}
-                            </div>
+                  sortedCatalog.map((item, idx) => {
+                    const expiryStatus = getExpiryStatus(item.expiryDate);
+                    const lowStock = isLowStock(item);
+                    const daysUntilExpiry = getDaysUntilExpiry(item.expiryDate);
+                    const isHighlighted = highlightedCatalogIndex === idx;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => addFromCatalog(item)}
+                        className={`w-full px-4 py-3 text-left border-b border-gray-100 last:border-b-0 flex justify-between items-center min-h-[60px] ${
+                          isHighlighted ? 'bg-emerald-50' : 'hover:bg-blue-50'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-slate-800 truncate">{item.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {item.sku && <span className="font-mono mr-2">{item.sku}</span>}
+                            HSN/SAC: {item.hsnSacCode} | GST: {item.gstPercent}%
+                            {item.brand && <span className="ml-2">| {item.brand}</span>}
                           </div>
-                          <div className="text-right ml-4">
-                            <div className="text-emerald-600 font-medium">Rs. {item.sellingPrice.toLocaleString()}</div>
-                            <div className="text-xs text-slate-500">{UNIT_OPTIONS.find(u => u.value === item.unit)?.label || item.unit}</div>
+                          {/* Show warnings */}
+                          <div className="flex gap-2 mt-1">
+                            {expiryStatus === 'expired' && (
+                              <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                                <AlertCircle className="w-3 h-3" /> Expired
+                              </span>
+                            )}
+                            {expiryStatus === 'expiring_soon' && (
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                                <Clock className="w-3 h-3" /> {daysUntilExpiry} days left
+                              </span>
+                            )}
+                            {lowStock && (
+                              <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                                <AlertTriangle className="w-3 h-3" /> Low Stock ({item.stockQuantity})
+                              </span>
+                            )}
                           </div>
-                        </button>
-                      );
-                    });
-                  })()
+                        </div>
+                        <div className="text-right ml-4">
+                          <div className="text-emerald-600 font-medium">Rs. {item.sellingPrice.toLocaleString()}</div>
+                          <div className="text-xs text-slate-500">{UNIT_OPTIONS.find(u => u.value === item.unit)?.label || item.unit}</div>
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             )}

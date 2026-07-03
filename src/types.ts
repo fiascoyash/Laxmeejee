@@ -1178,6 +1178,45 @@ export const PAYMENT_TERMS_OPTIONS = [
 
 // ─── End Supplier / Vendor Management ────────────────────────────────────────
 
+// ─── Product Inventory History ────────────────────────────────────────────────
+
+export interface ProductPurchase {
+  id: string;
+  productId: string;
+  supplierName?: string;
+  quantity: number;
+  purchasePrice: number;
+  totalValue: number;
+  purchaseDate: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export type StockMovementType = 'purchase' | 'sale' | 'adjustment' | 'return';
+
+export interface ProductStockMovement {
+  id: string;
+  productId: string;
+  movementType: StockMovementType;
+  quantityChange: number;
+  balanceAfter: number;
+  referenceType?: string;
+  referenceId?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface ProductLedgerSummary {
+  currentStock: number;
+  averagePurchasePrice: number;
+  sellingPrice: number;
+  totalStockValue: number;
+  lastPurchaseDate?: string;
+  primarySupplier?: string;
+}
+
+// ─── End Product Inventory History ────────────────────────────────────────────
+
 export const PLACEHOLDERS = {
   '{{customer_name}}': 'Customer Name',
   '{{quotation_no}}': 'QT-2024-0001',

@@ -1,6 +1,6 @@
 import { Customer, ShipTo, TemplateField, CustomerData } from '../types';
 import { User, MapPin, Phone, MapPinned, Truck, Copy, Save, Clock } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { storage, generateId } from '../utils/storage';
 
 interface Props {
@@ -25,6 +25,9 @@ const createShipToFromCustomer = (customer: Customer): ShipTo => ({
   gstNumber: customer.gstNumber || '',
 });
 
+// Field IDs for keyboard navigation
+const BILL_TO_FIELDS = ['customerName', 'customerMobile', 'customerGst', 'customerVillage', 'customerDistrict', 'customerAddress'];
+
 export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, customFields = [] }: Props) {
   const [sameAsBillTo, setSameAsBillTo] = useState(true);
   const [suggestions, setSuggestions] = useState<CustomerData[]>([]);
@@ -32,6 +35,8 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
   const [recentCustomers, setRecentCustomers] = useState<CustomerData[]>([]);
   const [showSaveButton, setShowSaveButton] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const highlightedSuggestionRef = useRef<number>(-1);
 
   const actualShipTo = shipTo || createEmptyShipTo();
 
@@ -73,11 +78,59 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
     const handleClickOutside = (event: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+        highlightedSuggestionRef.current = -1;
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Keyboard navigation for suggestions dropdown
+  useEffect(() => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightedSuggestionRef.current = Math.min(highlightedSuggestionRef.current + 1, suggestions.length - 1);
+        // Force re-render to highlight
+        setSuggestions([...suggestions]);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightedSuggestionRef.current = Math.max(highlightedSuggestionRef.current - 1, 0);
+        setSuggestions([...suggestions]);
+      } else if (e.key === 'Enter' && highlightedSuggestionRef.current >= 0) {
+        e.preventDefault();
+        handleSelectCustomer(suggestions[highlightedSuggestionRef.current]);
+        highlightedSuggestionRef.current = -1;
+      } else if (e.key === 'Escape') {
+        setShowSuggestions(false);
+        highlightedSuggestionRef.current = -1;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSuggestions, suggestions]);
+
+  // Field navigation with Enter/Shift+Enter
+  const handleFieldKeyDown = (e: React.KeyboardEvent, currentFieldId: string) => {
+    if (e.key === 'Enter' && !e.shiftKey && !showSuggestions) {
+      e.preventDefault();
+      const currentIndex = BILL_TO_FIELDS.indexOf(currentFieldId);
+      if (currentIndex >= 0 && currentIndex < BILL_TO_FIELDS.length - 1) {
+        const nextField = containerRef.current?.querySelector(`[data-field-id="${BILL_TO_FIELDS[currentIndex + 1]}"] input, [data-field-id="${BILL_TO_FIELDS[currentIndex + 1]}"] textarea`) as HTMLElement;
+        nextField?.focus();
+      }
+    } else if (e.key === 'Enter' && e.shiftKey && !showSuggestions) {
+      e.preventDefault();
+      const currentIndex = BILL_TO_FIELDS.indexOf(currentFieldId);
+      if (currentIndex > 0) {
+        const prevField = containerRef.current?.querySelector(`[data-field-id="${BILL_TO_FIELDS[currentIndex - 1]}"] input, [data-field-id="${BILL_TO_FIELDS[currentIndex - 1]}"] textarea`) as HTMLElement;
+        prevField?.focus();
+      }
+    }
+  };
 
   const handleSameAsBillToChange = (checked: boolean) => {
     setSameAsBillTo(checked);
@@ -223,7 +276,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-6" ref={containerRef}>
       {/* Recent Customers Quick Select */}
       {recentCustomers.length > 0 && !customer.name && (
         <div className="mb-4 pb-4 border-b border-slate-200">
@@ -264,18 +317,19 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
             )}
           </div>
           <div className="space-y-4">
-            <div>
+            <div data-field-id="customerName">
               <label className="block text-sm font-medium text-slate-700 mb-1">Customer Name</label>
               <input
                 type="text"
                 value={customer.name}
                 onChange={(e) => onChange({ ...customer, name: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'customerName')}
                 className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                 placeholder="Enter customer name"
                 required
               />
             </div>
-            <div className="relative" ref={suggestionsRef}>
+            <div className="relative" ref={suggestionsRef} data-field-id="customerMobile">
               <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                 <Phone className="w-4 h-4" /> Mobile
               </label>
@@ -288,17 +342,22 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                     setShowSuggestions(true);
                   }
                 }}
+                onKeyDown={(e) => {
+                  if (!showSuggestions) handleFieldKeyDown(e, 'customerMobile');
+                }}
                 className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                 placeholder="10-digit mobile number"
               />
               {/* Customer Suggestions Dropdown */}
               {showSuggestions && suggestions.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                  {suggestions.map(s => (
+                  {suggestions.map((s, idx) => (
                     <button
                       key={s.id}
                       onClick={() => handleSelectCustomer(s)}
-                      className="w-full px-3 py-3 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 min-h-[60px]"
+                      className={`w-full px-3 py-3 text-left border-b border-slate-100 last:border-0 min-h-[60px] ${
+                        highlightedSuggestionRef.current === idx ? 'bg-emerald-50' : 'hover:bg-slate-50'
+                      }`}
                     >
                       <div className="font-medium text-slate-800">{s.name}</div>
                       <div className="text-xs text-slate-500">
@@ -309,18 +368,19 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                 </div>
               )}
             </div>
-            <div>
+            <div data-field-id="customerGst">
               <label className="block text-sm font-medium text-slate-700 mb-1">GST Number (Optional)</label>
               <input
                 type="text"
                 value={customer.gstNumber || ''}
                 onChange={(e) => onChange({ ...customer, gstNumber: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'customerGst')}
                 className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                 placeholder="GSTIN number"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+              <div data-field-id="customerVillage">
                 <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                   <MapPinned className="w-4 h-4" /> Village
                 </label>
@@ -328,11 +388,12 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                   type="text"
                   value={customer.village}
                   onChange={(e) => onChange({ ...customer, village: e.target.value })}
+                  onKeyDown={(e) => handleFieldKeyDown(e, 'customerVillage')}
                   className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                   placeholder="Village/Town"
                 />
               </div>
-              <div>
+              <div data-field-id="customerDistrict">
                 <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                   <MapPin className="w-4 h-4" /> District
                 </label>
@@ -340,16 +401,18 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                   type="text"
                   value={customer.district}
                   onChange={(e) => onChange({ ...customer, district: e.target.value })}
+                  onKeyDown={(e) => handleFieldKeyDown(e, 'customerDistrict')}
                   className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                   placeholder="District"
                 />
               </div>
             </div>
-            <div>
+            <div data-field-id="customerAddress">
               <label className="block text-sm font-medium text-slate-700 mb-1">Billing Address</label>
               <textarea
                 value={customer.billingAddress}
                 onChange={(e) => onChange({ ...customer, billingAddress: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'customerAddress')}
                 className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 rows={2}
                 placeholder="Full address with pincode"

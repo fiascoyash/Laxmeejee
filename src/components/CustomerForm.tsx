@@ -1,6 +1,6 @@
 import { CustomerData } from '../types';
 import { X, Save } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface Props {
   customer: CustomerData | null;
@@ -21,6 +21,28 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
     deliveryAddress: '',
     notes: '',
   });
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Field navigation with Enter/Shift+Enter
+  const FIELD_IDS = ['name', 'mobile', 'gstNumber', 'email', 'village', 'district', 'billingAddress', 'deliveryAddress', 'notes'];
+
+  const handleFieldKeyDown = useCallback((e: React.KeyboardEvent, currentFieldId: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const currentIndex = FIELD_IDS.indexOf(currentFieldId);
+      if (currentIndex >= 0 && currentIndex < FIELD_IDS.length - 1) {
+        const nextField = formRef.current?.querySelector(`[data-field-id="${FIELD_IDS[currentIndex + 1]}"] input, [data-field-id="${FIELD_IDS[currentIndex + 1]}"] textarea`) as HTMLElement;
+        nextField?.focus();
+      }
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      const currentIndex = FIELD_IDS.indexOf(currentFieldId);
+      if (currentIndex > 0) {
+        const prevField = formRef.current?.querySelector(`[data-field-id="${FIELD_IDS[currentIndex - 1]}"] input, [data-field-id="${FIELD_IDS[currentIndex - 1]}"] textarea`) as HTMLElement;
+        prevField?.focus();
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (customer) {
@@ -68,14 +90,14 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <form ref={formRef} onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)]">
           {isExistingCustomer && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
               A customer with this mobile number already exists. You can update their details.
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+            <div data-field-id="name">
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Customer Name <span className="text-red-500">*</span>
               </label>
@@ -83,12 +105,14 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'name')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="Enter customer name"
                 required
+                autoFocus
               />
             </div>
-            <div>
+            <div data-field-id="mobile">
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Mobile Number <span className="text-red-500">*</span>
               </label>
@@ -96,6 +120,7 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
                 type="tel"
                 value={formData.mobile}
                 onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'mobile')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="10-digit mobile number"
                 required
@@ -103,74 +128,81 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+            <div data-field-id="gstNumber">
               <label className="block text-sm font-medium text-slate-700 mb-1">GST Number (Optional)</label>
               <input
                 type="text"
                 value={formData.gstNumber || ''}
                 onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'gstNumber')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="GSTIN number"
               />
             </div>
-            <div>
+            <div data-field-id="email">
               <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>
               <input
                 type="email"
                 value={formData.email || ''}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'email')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="Email address"
               />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+            <div data-field-id="village">
               <label className="block text-sm font-medium text-slate-700 mb-1">Village/Town</label>
               <input
                 type="text"
                 value={formData.village}
                 onChange={(e) => setFormData({ ...formData, village: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'village')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="Village or town name"
               />
             </div>
-            <div>
+            <div data-field-id="district">
               <label className="block text-sm font-medium text-slate-700 mb-1">District</label>
               <input
                 type="text"
                 value={formData.district}
                 onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                onKeyDown={(e) => handleFieldKeyDown(e, 'district')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="District name"
               />
             </div>
           </div>
-          <div>
+          <div data-field-id="billingAddress">
             <label className="block text-sm font-medium text-slate-700 mb-1">Billing Address</label>
             <textarea
               value={formData.billingAddress}
               onChange={(e) => setFormData({ ...formData, billingAddress: e.target.value })}
+              onKeyDown={(e) => handleFieldKeyDown(e, 'billingAddress')}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               rows={2}
               placeholder="Full billing address with pincode"
             />
           </div>
-          <div>
+          <div data-field-id="deliveryAddress">
             <label className="block text-sm font-medium text-slate-700 mb-1">Delivery Address (Optional)</label>
             <textarea
               value={formData.deliveryAddress || ''}
               onChange={(e) => setFormData({ ...formData, deliveryAddress: e.target.value })}
+              onKeyDown={(e) => handleFieldKeyDown(e, 'deliveryAddress')}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               rows={2}
               placeholder="Delivery address if different from billing"
             />
           </div>
-          <div>
+          <div data-field-id="notes">
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes (Optional)</label>
             <textarea
               value={formData.notes || ''}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onKeyDown={(e) => handleFieldKeyDown(e, 'notes')}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               rows={2}
               placeholder="Additional notes about this customer"

@@ -1,24 +1,33 @@
 import { useState, useMemo } from 'react';
 import {
   ProductCatalogItem, IndustryType, UnitType, ExpiryStatus, BusinessType,
-  UNIT_OPTIONS, INDUSTRY_OPTIONS, INDUSTRY_FIELDS, BUSINESS_TYPE_FIELDS, getIndustryTypeFromBusinessType
+  UNIT_OPTIONS, INDUSTRY_OPTIONS, INDUSTRY_FIELDS, BUSINESS_TYPE_FIELDS, getIndustryTypeFromBusinessType, SupplierData
 } from '../types';
 import {
   generateId, getExpiryStatus, getExpiryStatusLabel, isLowStock, getDaysUntilExpiry, generateSku, getDefaultUnit
 } from '../utils/storage';
 import {
-  Package, Plus, Trash2, Edit, X, Save, Search, Filter, AlertTriangle, Clock, AlertCircle, ChevronDown, Building2, Briefcase
+  Package, Plus, Trash2, Edit, X, Save, Search, Filter, AlertTriangle, Clock, AlertCircle, ChevronDown, Building2, Briefcase, Upload
 } from 'lucide-react';
+import { BulkImportModal } from './BulkImportModal';
+import { AddExistingStockModal } from './AddExistingStockModal';
+import { ProductLedgerModal } from './ProductLedgerModal';
 
 interface Props {
   catalog: ProductCatalogItem[];
   onSave: (catalog: ProductCatalogItem[]) => void;
   businessType?: BusinessType;
+  suppliers?: SupplierData[];
 }
 
-export function ProductCatalog({ catalog, onSave, businessType }: Props) {
+export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }: Props) {
   const [editing, setEditing] = useState<ProductCatalogItem | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showAddStock, setShowAddStock] = useState(false);
+  const [addingStockProduct, setAddingStockProduct] = useState<ProductCatalogItem | null>(null);
+  const [showProductLedger, setShowProductLedger] = useState(false);
+  const [ledgerProduct, setLedgerProduct] = useState<ProductCatalogItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedGstRate, setSelectedGstRate] = useState<string>('');
@@ -154,6 +163,25 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
 
     const now = new Date().toISOString();
     if (!editing.id) {
+      // Check for existing product with same name
+      const existingProduct = catalog.find(p => p.name.toLowerCase().trim() === editing!.name.toLowerCase().trim());
+      if (existingProduct) {
+        const action = confirm(
+          `A product named "${editing.name}" already exists.\n\n` +
+          `Click OK to increase existing stock\n` +
+          `Click Cancel to create as new product with different name`
+        );
+        if (action) {
+          // Add to existing stock
+          setAddingStockProduct(existingProduct);
+          setShowAddStock(true);
+          setEditing(null);
+          setShowForm(false);
+          return;
+        }
+        // Continue with new product - modify name
+        editing.name = `${editing.name} (New)`;
+      }
       editing.id = generateId();
       editing.createdAt = now;
       editing.sku = editing.sku || generateSku(editing.name);
@@ -164,6 +192,31 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
 
     setEditing(null);
     setShowForm(false);
+  };
+
+  const handleAddStock = (item: ProductCatalogItem) => {
+    setAddingStockProduct(item);
+    setShowAddStock(true);
+  };
+
+  const handleSaveStock = (updatedProduct: ProductCatalogItem) => {
+    onSave(catalog.map(c => c.id === updatedProduct.id ? updatedProduct : c));
+    setAddingStockProduct(null);
+    setShowAddStock(false);
+  };
+
+  const handleBulkImport = (newProducts: ProductCatalogItem[]) => {
+    onSave(newProducts);
+    setShowBulkImport(false);
+  };
+
+  const handleViewProductLedger = (item: ProductCatalogItem) => {
+    setLedgerProduct(item);
+    setShowProductLedger(true);
+  };
+
+  const handleUpdateFromLedger = (updatedProduct: ProductCatalogItem) => {
+    onSave(catalog.map(c => c.id === updatedProduct.id ? updatedProduct : c));
   };
 
   const handleDelete = (id: string) => {
@@ -529,13 +582,22 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
             <Package className="w-5 h-5 text-blue-600" />
             Product Catalog
           </h3>
-          <button
-            onClick={handleAdd}
-            className="px-3 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add Product
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleAdd}
+              className="px-3 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Product
+            </button>
+            <button
+              onClick={() => setShowBulkImport(true)}
+              className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+            >
+              <Upload className="w-4 h-4" />
+              Bulk Import
+            </button>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -673,7 +735,13 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
               return (
                 <tr key={item.id} className="border-b border-gray-100 hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-800">{item.name}</div>
+                    <button
+                      onClick={() => handleViewProductLedger(item)}
+                      className="font-medium text-slate-800 hover:text-emerald-600 transition-colors text-left"
+                      title="Click to view product details"
+                    >
+                      {item.name}
+                    </button>
                     {item.brand && (
                       <div className="text-xs text-slate-500">{item.brand}</div>
                     )}
@@ -710,6 +778,13 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button
+                      onClick={() => handleViewProductLedger(item)}
+                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                      title="View Details"
+                    >
+                      <Package className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => handleEdit(item)}
                       className="p-1.5 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
                       title="Edit"
@@ -717,9 +792,9 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDuplicate(item)}
+                      onClick={() => handleAddStock(item)}
                       className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      title="Duplicate"
+                      title="Add Stock"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -994,6 +1069,39 @@ export function ProductCatalog({ catalog, onSave, businessType }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Import Modal */}
+      <BulkImportModal
+        isOpen={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        onSave={handleBulkImport}
+        existingCatalog={catalog}
+        suppliers={suppliers.map(s => s.firmName)}
+        categories={Array.from(new Set(catalog.map(p => p.category).filter(Boolean)))}
+        businessType={businessType}
+      />
+
+      {/* Add Existing Stock Modal */}
+      {addingStockProduct && (
+        <AddExistingStockModal
+          isOpen={showAddStock}
+          onClose={() => { setShowAddStock(false); setAddingStockProduct(null); }}
+          onSave={handleSaveStock}
+          product={addingStockProduct}
+          suppliers={suppliers}
+        />
+      )}
+
+      {/* Product Ledger Modal */}
+      {ledgerProduct && (
+        <ProductLedgerModal
+          isOpen={showProductLedger}
+          onClose={() => { setShowProductLedger(false); setLedgerProduct(null); }}
+          product={ledgerProduct}
+          suppliers={suppliers}
+          onUpdateProduct={handleUpdateFromLedger}
+        />
       )}
     </div>
   );

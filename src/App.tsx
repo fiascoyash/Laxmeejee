@@ -21,6 +21,7 @@ import { SupplierForm } from './components/SupplierForm';
 import { SupplierLedger } from './components/SupplierLedger';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers';
 
@@ -495,7 +496,7 @@ function App() {
   };
 
   // Save invoice
-  const saveInvoice = () => {
+  const saveInvoice = async () => {
     if (!editingInvoice) return;
     if (!editingInvoice.customer.name) {
       alert('Please enter customer name');
@@ -527,9 +528,47 @@ function App() {
     storage.saveInvoice(toSave);
     if (!invoices.find(i => i.id === toSave.id)) incrementInvoiceNumber();
     setInvoices(storage.getInvoices());
+
+    // Record stock movements for sales (only for new invoices or when status changes to non-Draft)
+    const isNewInvoice = !invoices.find(i => i.id === toSave.id);
+    if (isNewInvoice && toSave.status !== 'Draft') {
+      await recordStockMovementsForSale(toSave);
+    }
+
     alert('Invoice saved successfully!');
     setEditingInvoice(null);
     setView('invoiceList');
+  };
+
+  // Record stock movements when an invoice is finalized (sold)
+  const recordStockMovementsForSale = async (invoice: Invoice) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) return;
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    for (const product of invoice.products) {
+      if (!product.name || product.quantity <= 0) continue;
+
+      // Find the product in catalog to get its ID
+      const catalogItem = catalog.find(c => c.name.toLowerCase() === product.name.toLowerCase());
+      if (!catalogItem) continue;
+
+      const newStock = catalogItem.stockQuantity - product.quantity;
+
+      // Create stock movement record for sale
+      await supabase.from('product_stock_movements').insert({
+        product_id: catalogItem.id,
+        movement_type: 'sale',
+        quantity_change: -product.quantity,
+        balance_after: newStock,
+        reference_type: 'invoice',
+        reference_id: invoice.id,
+        notes: `Invoice: ${invoice.invoiceNumber}, Customer: ${invoice.customer.name}`,
+      });
+    }
   };
 
   // Delete invoice
@@ -551,6 +590,17 @@ function App() {
 
   // Edit invoice
   const editInvoice = (invoice: Invoice) => {
+    // Ensure productColumns are properly initialized for existing invoices
+    if (!invoice.productColumns || invoice.productColumns.length === 0) {
+      const savedColumns = storage.getLastUsedColumns();
+      const template = invoice.selectedTemplateId
+        ? storage.getTemplateById(invoice.selectedTemplateId)
+        : storage.getDefaultTemplate();
+      const schemaColumns = savedColumns && savedColumns.length > 0
+        ? savedColumns
+        : template?.schema?.productColumns || getDefaultProductColumns();
+      invoice = { ...invoice, productColumns: schemaColumns };
+    }
     setEditingInvoice(invoice);
     setView('editInvoice');
   };
@@ -1583,7 +1633,7 @@ function App() {
           {view === 'catalog' && (
             <div className="max-w-4xl mx-auto">
               <h2 className="text-xl font-bold text-gray-800 mb-6">Product Catalog</h2>
-              <ProductCatalog catalog={catalog} onSave={handleSaveCatalog} businessType={companyProfile.businessType} />
+              <ProductCatalog catalog={catalog} onSave={handleSaveCatalog} businessType={companyProfile.businessType} suppliers={suppliers} />
             </div>
           )}
 
@@ -1740,6 +1790,35 @@ function App() {
                 <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm">
                   <span className="text-slate-700">Go Back / Dashboard</span>
                   <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">ESC</kbd>
+                </div>
+              </div>
+              <div className="space-y-2 pt-2 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Field Navigation</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Next Field</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Enter</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Previous Field</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Shift+Enter</kbd>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 pt-2 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Catalog Dropdown</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Navigate</span>
+                    <div className="flex gap-1">
+                      <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Up</kbd>
+                      <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Down</kbd>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-700">Select Item</span>
+                    <kbd className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs font-mono">Enter</kbd>
+                  </div>
                 </div>
               </div>
             </div>
