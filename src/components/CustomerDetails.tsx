@@ -40,6 +40,15 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
     setRecentCustomers(storage.getRecentCustomers(5));
   }, []);
 
+  // Sync shipTo with customer when sameAsBillTo is true
+  // This ensures shipTo is populated on initial load and when customer changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (sameAsBillTo && onShipToChange && customer.name) {
+      onShipToChange(createShipToFromCustomer(customer));
+    }
+  }, [sameAsBillTo, customer.name, customer.billingAddress, customer.village, customer.district, customer.mobile, customer.gstNumber]);
+
   // Auto-detect customer by mobile number
   useEffect(() => {
     if (customer.mobile.length >= 4) {

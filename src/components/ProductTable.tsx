@@ -120,7 +120,14 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
 
   const toggleColumn = (colId: string) => {
     if (!onColumnsChange) return;
-    onColumnsChange(activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } as TableColumn : c));
+    const updatedColumns = activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } as TableColumn : c);
+    onColumnsChange(updatedColumns);
+
+    // If GST column is being hidden, reset all products' GST to 0%
+    const gstColumn = updatedColumns.find(c => c.key === 'gstPercent');
+    if (gstColumn && !gstColumn.visible) {
+      onChange(products.map(p => ({ ...p, gstPercent: 0 })));
+    }
   };
 
   // Get visible column keys from activeColumns (single source of truth)
@@ -136,7 +143,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       name: '',
       description: visibleKeys.has('description') ? '' : undefined,
       hsnSacCode: '',
-      gstPercent: 18,
+      gstPercent: 0,
       quantity: 1,
       unit: 'piece',
       unitPrice: 0,
@@ -216,6 +223,12 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
   };
 
   const isColumnVisible = (key: string) => visibleColumns.some(c => c.key === key);
+
+  // GST visibility logic: Check if GST column is visible AND if any product has GST > 0
+  const gstColumnVisible = isColumnVisible('gstPercent');
+  const hasAnyGst = products.some(p => (p.gstPercent || 0) > 0);
+  // Show tax summary and CGST/SGST only if GST column is visible AND some products have GST > 0
+  const showGstDetails = gstColumnVisible && hasAnyGst;
 
   const taxSummary = calculateTaxSummary(products, gstMode);
   const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
@@ -914,8 +927,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
         </table>
       </div>
 
-      {/* Tax Summary Table */}
-      {products.length > 0 && (
+      {/* Tax Summary Table - Hidden when GST column is hidden OR all GST = 0 */}
+      {products.length > 0 && showGstDetails && (
         <div className="mt-4 sm:mt-6">
           <h4 className="text-sm font-semibold text-slate-700 mb-3">Tax Summary (HSN/SAC-wise)</h4>
           {/* Mobile Card Layout */}
@@ -932,18 +945,16 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                       <span className="text-slate-500">Taxable:</span>
                       <span className="font-medium">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
-                    {isColumnVisible('gstPercent') && (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">CGST:</span>
-                          <span className="font-medium">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">SGST:</span>
-                          <span className="font-medium">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      </>
-                    )}
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">CGST:</span>
+                        <span className="font-medium">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">SGST:</span>
+                        <span className="font-medium">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </>
                     <div className="flex justify-between font-bold">
                       <span className="text-slate-700">Total:</span>
                       <span>{(data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -962,14 +973,12 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     <th className="px-3 py-2 text-left font-semibold text-slate-700">HSN/SAC</th>
                   )}
                   <th className="px-3 py-2 text-right font-semibold text-slate-700">Taxable Amount</th>
-                  {isColumnVisible('gstPercent') && (
-                    <>
-                      <th className="px-3 py-2 text-center font-semibold text-slate-700">CGST %</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">CGST Amt</th>
-                      <th className="px-3 py-2 text-center font-semibold text-slate-700">SGST %</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">SGST Amt</th>
-                    </>
-                  )}
+                  <>
+                    <th className="px-3 py-2 text-center font-semibold text-slate-700">CGST %</th>
+                    <th className="px-3 py-2 text-right font-semibold text-slate-700">CGST Amt</th>
+                    <th className="px-3 py-2 text-center font-semibold text-slate-700">SGST %</th>
+                    <th className="px-3 py-2 text-right font-semibold text-slate-700">SGST Amt</th>
+                  </>
                   <th className="px-3 py-2 text-right font-semibold text-slate-700">Total Amt</th>
                 </tr>
               </thead>
@@ -982,14 +991,12 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                         <td className="px-3 py-2 font-mono">{hsnSacCode}</td>
                       )}
                       <td className="px-3 py-2 text-right">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      {isColumnVisible('gstPercent') && (
-                        <>
-                          <td className="px-3 py-2 text-center">{data.cgstRate}%</td>
-                          <td className="px-3 py-2 text-right">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                          <td className="px-3 py-2 text-center">{data.sgstRate}%</td>
-                          <td className="px-3 py-2 text-right">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                        </>
-                      )}
+                      <>
+                        <td className="px-3 py-2 text-center">{data.cgstRate}%</td>
+                        <td className="px-3 py-2 text-right">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2 text-center">{data.sgstRate}%</td>
+                        <td className="px-3 py-2 text-right">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      </>
                       <td className="px-3 py-2 text-right font-medium">
                         {(data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
@@ -1038,7 +1045,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               <span className="text-slate-600">Taxable Amount:</span>
               <span className="font-medium">Rs. {totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
-            {isColumnVisible('gstPercent') && (
+            {showGstDetails && (
               <>
                 <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
                   <span className="text-slate-600">CGST:</span>

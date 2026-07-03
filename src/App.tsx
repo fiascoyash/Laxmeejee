@@ -48,7 +48,10 @@ function App() {
     gstNumber: '',
   });
   const [products, setProducts] = useState<Product[]>([]);
-  const [productColumns, setProductColumns] = useState<TableColumn[]>(getDefaultProductColumns());
+  const [productColumns, setProductColumns] = useState<TableColumn[]>(() => {
+    const saved = storage.getLastUsedColumns();
+    return saved && saved.length > 0 ? saved : getDefaultProductColumns();
+  });
   const [gstMode, setGstMode] = useState<GstMode>('inclusive');
   const [shipTo, setShipTo] = useState<ShipTo>({ name: '', address: '', mobile: '', gstNumber: '' });
 
@@ -110,6 +113,21 @@ function App() {
       setSelectedTemplateId(defaultTemplate.id);
     }
   }, []);
+
+  // Persist column configuration whenever it changes
+  // Persist column configuration whenever it changes
+  useEffect(() => {
+    if (productColumns && productColumns.length > 0) {
+      storage.saveLastUsedColumns(productColumns);
+    }
+  }, [productColumns]);
+
+  // Persist invoice column configuration when editing invoice changes
+  useEffect(() => {
+    if (editingInvoice?.productColumns && editingInvoice.productColumns.length > 0) {
+      storage.saveLastUsedColumns(editingInvoice.productColumns);
+    }
+  }, [editingInvoice?.productColumns]);
 
   // Global keyboard shortcuts handler
   useEffect(() => {
@@ -342,14 +360,16 @@ function App() {
     setCatalog(catalogItems);
   };
 
-  // Reset quotation form
+  // Reset quotation form - keeps last used column configuration
   const resetForm = () => {
     setEditingQuotationId(null);
     setQuotationNumber(generateQuotationNumber());
     setQuotationDate(new Date().toISOString().split('T')[0]);
     setCustomer({ name: '', billingAddress: '', mobile: '', district: '', village: '', gstNumber: '' });
     setProducts([]);
-    setProductColumns(getDefaultProductColumns());
+    // Keep last used columns instead of resetting to defaults
+    const savedColumns = storage.getLastUsedColumns();
+    setProductColumns(savedColumns && savedColumns.length > 0 ? savedColumns : getDefaultProductColumns());
     setGstMode('inclusive');
     setShipTo({ name: '', address: '', mobile: '', gstNumber: '' });
     setQuotation({ notes: '', signature: '', paymentQr: '', terms: '' });
@@ -596,7 +616,11 @@ function App() {
   // Start new invoice - uses selected template schema
   const startNewInvoice = () => {
     const template = selectedTemplateId ? storage.getTemplateById(selectedTemplateId) : storage.getDefaultTemplate();
-    const schemaColumns = template?.schema?.productColumns || getDefaultProductColumns();
+    // Prefer user's persisted columns, then template schema, then defaults
+    const savedColumns = storage.getLastUsedColumns();
+    const schemaColumns = savedColumns && savedColumns.length > 0
+      ? savedColumns
+      : template?.schema?.productColumns || getDefaultProductColumns();
 
     const newInvoice: Invoice = {
       id: generateId(),
@@ -813,9 +837,13 @@ function App() {
 
   const handleSelectTemplate = (templateId: string) => {
     setSelectedTemplateId(templateId);
-    // Apply template schema to form
+    // Apply template schema to form - but prefer user's persisted columns
     const template = storage.getTemplateById(templateId);
-    if (template?.schema?.productColumns) {
+    const savedColumns = storage.getLastUsedColumns();
+    // Use saved columns if available, otherwise use template schema columns
+    if (savedColumns && savedColumns.length > 0) {
+      setProductColumns(savedColumns);
+    } else if (template?.schema?.productColumns) {
       setProductColumns(template.schema.productColumns);
     }
     if (template?.schema?.defaultGstMode) {

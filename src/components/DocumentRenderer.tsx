@@ -194,6 +194,12 @@ export function DocumentRenderer({
     return settingsMap[columnKey] ?? false;
   };
 
+  // GST visibility logic: Check if GST column is visible AND if any product has GST > 0
+  const gstColumnVisible = isColumnVisible('gstPercent');
+  const hasAnyGst = products.some(p => (p.gstPercent || 0) > 0);
+  // Show tax summary and CGST/SGST only if GST column is visible AND some products have GST > 0
+  const showGstDetails = gstColumnVisible && hasAnyGst;
+
   // Global default font size (paper-size-scaled)
   const globalDefaultFontSize = (settings.globalDefaultFontSize ?? 12) * fontScale;
 
@@ -1038,7 +1044,8 @@ export function DocumentRenderer({
   );
 
   // ── SECTION 5: Tax Summary + Grand Total ─────────────────────────────────
-  const showTaxSummary = settings.showTaxSummary !== false;
+  // Show Tax Summary only if settings allow AND (GST column visible AND some products have GST > 0)
+  const showTaxSummary = settings.showTaxSummary !== false && showGstDetails;
   const TotalsSection = (
     <div
       style={{
@@ -1046,7 +1053,7 @@ export function DocumentRenderer({
         display: 'flex',
       }}
     >
-      {/* HSN / Tax Summary */}
+      {/* HSN / Tax Summary - Hidden when GST column is hidden OR all GST = 0 */}
       {showTaxSummary && (
         <div
           style={{
@@ -1094,14 +1101,18 @@ export function DocumentRenderer({
           <T id="subtotal_label" style={{ fontWeight: 600 }}>Sub Total</T>
           <T id="subtotal_value">₹{fmt(totalTaxable)}</T>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-          <T id="cgst_label" style={{ fontWeight: 600 }}>CGST</T>
-          <T id="cgst_value">₹{fmt(totalCgst)}</T>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-          <T id="sgst_label" style={{ fontWeight: 600 }}>SGST</T>
-          <T id="sgst_value">₹{fmt(totalSgst)}</T>
-        </div>
+        {showGstDetails && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <T id="cgst_label" style={{ fontWeight: 600 }}>CGST</T>
+              <T id="cgst_value">₹{fmt(totalCgst)}</T>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <T id="sgst_label" style={{ fontWeight: 600 }}>SGST</T>
+              <T id="sgst_value">₹{fmt(totalSgst)}</T>
+            </div>
+          </>
+        )}
         {roundOff !== 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
             <T id="round_off_label" style={{ fontWeight: 600 }}>Round Off</T>

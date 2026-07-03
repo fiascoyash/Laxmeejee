@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   CUSTOMERS: 'solar_customers',
   SUPPLIERS: 'laxmeejee_suppliers',
   SUPPLIER_TRANSACTIONS: 'laxmeejee_supplier_transactions',
+  LAST_USED_COLUMNS: 'laxmeejee_last_used_columns',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -378,6 +379,20 @@ export const storage = {
 
     const allTxns = storage.getSupplierTransactions().filter(t => t.supplierId !== supplierId);
     localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify([...allTxns, ...updatedTxns]));
+  },
+
+  // Last Used Column Configuration - persists user's preferred column visibility
+  getLastUsedColumns: (): TableColumn[] | null => {
+    const data = localStorage.getItem(STORAGE_KEYS.LAST_USED_COLUMNS);
+    return data ? JSON.parse(data) : null;
+  },
+
+  saveLastUsedColumns: (columns: TableColumn[]): void => {
+    localStorage.setItem(STORAGE_KEYS.LAST_USED_COLUMNS, JSON.stringify(columns));
+  },
+
+  clearLastUsedColumns: (): void => {
+    localStorage.removeItem(STORAGE_KEYS.LAST_USED_COLUMNS);
   },
 };
 
