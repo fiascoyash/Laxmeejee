@@ -19,11 +19,12 @@ import { CustomerHistory } from './components/CustomerHistory';
 import { SupplierList } from './components/SupplierList';
 import { SupplierForm } from './components/SupplierForm';
 import { SupplierLedger } from './components/SupplierLedger';
+import { SmartPurchaseImport } from './components/SmartPurchaseImport';
 import { exportTemplatePDF } from './utils/templatePdfExport';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers';
+type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport';
 
 function App() {
   const [view, setView] = useState<View>('home');
@@ -1100,6 +1101,7 @@ function App() {
               <li><NavItem icon={Truck} label="Suppliers" currentView={view} targetView="suppliers" /></li>
               <li><NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" /></li>
               <li><NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" /></li>
+              <li><NavItem icon={Zap} label="Smart Purchase Import" currentView={view} targetView="smartImport" /></li>
               <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" /></li>
             </ul>
           </div>
@@ -1133,7 +1135,7 @@ function App() {
                 <>
                   <ChevronRight className="w-4 h-4" />
                   <span className="text-slate-800 font-medium capitalize">
-                    {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view}
+                    {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view === 'smartImport' ? 'Smart Purchase Import' : view}
                   </span>
                 </>
               )}
@@ -1634,6 +1636,18 @@ function App() {
             <div className="max-w-4xl mx-auto">
               <h2 className="text-xl font-bold text-gray-800 mb-6">Product Catalog</h2>
               <ProductCatalog catalog={catalog} onSave={handleSaveCatalog} businessType={companyProfile.businessType} suppliers={suppliers} />
+            </div>
+          )}
+
+          {/* Smart Purchase Import */}
+          {view === 'smartImport' && (
+            <div className="max-w-6xl mx-auto">
+              <SmartPurchaseImport
+                catalog={catalog}
+                suppliers={suppliers}
+                onCatalogChange={setCatalog}
+                onSuppliersChange={setSuppliers}
+              />
             </div>
           )}
 

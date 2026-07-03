@@ -1217,6 +1217,154 @@ export interface ProductLedgerSummary {
 
 // ─── End Product Inventory History ────────────────────────────────────────────
 
+// ─── Smart Purchase Import Engine ─────────────────────────────────────────────
+
+// Supported import file formats. Architecture is extensible — add new values
+// here when new parsers (e.g. image OCR, barcode, email) are implemented.
+export type ImportFormat = 'csv' | 'xlsx' | 'pdf';
+
+// Canonical fields the import engine understands. Every supplier column gets
+// mapped to one of these. Keep this list in sync with FIELD_DEFINITIONS.
+export type ImportFieldKey =
+  | 'productName'
+  | 'description'
+  | 'quantity'
+  | 'purchasePrice'
+  | 'gstPercent'
+  | 'hsnSac'
+  | 'batch'
+  | 'expiry'
+  | 'mrp'
+  | 'amount'
+  | 'supplierInvoiceNumber';
+
+export interface ImportFieldDefinition {
+  key: ImportFieldKey;
+  label: string;
+  description: string;
+  required: boolean;
+  type: 'text' | 'number' | 'date';
+}
+
+export const IMPORT_FIELD_DEFINITIONS: ImportFieldDefinition[] = [
+  { key: 'productName', label: 'Product Name', description: 'Item name as printed on the bill', required: true, type: 'text' },
+  { key: 'description', label: 'Description', description: 'Additional item description', required: false, type: 'text' },
+  { key: 'quantity', label: 'Quantity', description: 'Number of units purchased', required: true, type: 'number' },
+  { key: 'purchasePrice', label: 'Purchase Price', description: 'Per-unit purchase rate', required: true, type: 'number' },
+  { key: 'gstPercent', label: 'GST %', description: 'GST rate applied to the item', required: false, type: 'number' },
+  { key: 'hsnSac', label: 'HSN/SAC', description: 'HSN or SAC code', required: false, type: 'text' },
+  { key: 'batch', label: 'Batch', description: 'Batch number', required: false, type: 'text' },
+  { key: 'expiry', label: 'Expiry', description: 'Expiry date', required: false, type: 'date' },
+  { key: 'mrp', label: 'MRP', description: 'Maximum retail price', required: false, type: 'number' },
+  { key: 'amount', label: 'Amount', description: 'Line total (qty x rate)', required: false, type: 'number' },
+  { key: 'supplierInvoiceNumber', label: 'Supplier Invoice Number', description: 'Bill/invoice number from supplier', required: false, type: 'text' },
+];
+
+// A single row extracted from the uploaded document, before mapping.
+// Keys are the original column headers from the source file.
+export type ExtractedRow = Record<string, string | number>;
+
+// Result of parsing an uploaded file.
+export interface ParseResult {
+  format: ImportFormat;
+  fileName: string;
+  headers: string[];
+  rows: ExtractedRow[];
+  // Warnings generated during parsing (e.g. low OCR confidence, empty rows).
+  warnings: string[];
+  // 0-100 confidence score for the extraction. PDFs with messy text get a
+  // lower score so the UI can ask the user to confirm before importing.
+  confidence: number;
+}
+
+// Maps a source column header to a canonical import field.
+// sourceColumn is the header text from the file; fieldKey is null when the
+// column is unmapped (will be ignored during import).
+export interface FieldMapping {
+  sourceColumn: string;
+  fieldKey: ImportFieldKey | null;
+}
+
+// A saved supplier template remembers the column mapping for a specific
+// supplier so the next import auto-applies it.
+export interface SupplierImportTemplate {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  // Ordered list of mappings. Stored as a snapshot so renaming a column in a
+  // future bill does not silently break the template.
+  mappings: FieldMapping[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Match decision for a single imported row against the product catalog.
+export type MatchDecision = 'match_existing' | 'create_new' | 'skip';
+
+// Confidence bucket used for the badge color in the UI.
+export type MatchConfidenceLevel = 'high' | 'medium' | 'low' | 'none';
+
+export interface ProductMatchCandidate {
+  product: ProductCatalogItem;
+  score: number; // 0-100
+  level: MatchConfidenceLevel;
+}
+
+// A row that has been mapped, matched, and is ready for the preview table.
+export interface ImportPreviewRow {
+  // Stable id for React keys and drag/drop.
+  id: string;
+  // Raw mapped values pulled from the source row.
+  importedProductName: string;
+  importedDescription?: string;
+  quantity: number;
+  purchasePrice: number;
+  gstPercent: number;
+  hsnSac?: string;
+  batch?: string;
+  expiry?: string;
+  mrp?: number;
+  amount?: number;
+  supplierInvoiceNumber?: string;
+  // Match resolution.
+  candidates: ProductMatchCandidate[];
+  selectedCandidateId: string | null;
+  decision: MatchDecision;
+  // Resolved product (either the matched catalog product or a draft new product).
+  resolvedProduct: ProductCatalogItem | null;
+  // Per-row warnings (e.g. missing quantity, low OCR confidence).
+  warnings: string[];
+}
+
+export type ImportLogStatus = 'success' | 'partial' | 'failed';
+
+export interface ImportLogEntry {
+  id: string;
+  importDate: string;
+  importedBy: string;
+  fileName: string;
+  format: ImportFormat;
+  supplierId?: string;
+  supplierName?: string;
+  invoiceNumber?: string;
+  productsImported: number;
+  totalValue: number;
+  status: ImportLogStatus;
+  errors: string[];
+  // Snapshot of the rows that were actually committed, for audit.
+  rows: {
+    productName: string;
+    matchedProductId?: string;
+    matchedProductName?: string;
+    quantity: number;
+    purchasePrice: number;
+    gstPercent: number;
+    decision: MatchDecision;
+  }[];
+}
+
+// ─── End Smart Purchase Import Engine ─────────────────────────────────────────
+
 export const PLACEHOLDERS = {
   '{{customer_name}}': 'Customer Name',
   '{{quotation_no}}': 'QT-2024-0001',

@@ -3,6 +3,7 @@ import {
   Invoice, NumberingSettings, GstMode, CustomerData,
   DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UnitType, IndustryType, ExpiryStatus, UNIT_OPTIONS,
   SupplierData, SupplierTransaction,
+  SupplierImportTemplate, ImportLogEntry,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -16,6 +17,8 @@ const STORAGE_KEYS = {
   SUPPLIERS: 'laxmeejee_suppliers',
   SUPPLIER_TRANSACTIONS: 'laxmeejee_supplier_transactions',
   LAST_USED_COLUMNS: 'laxmeejee_last_used_columns',
+  SUPPLIER_IMPORT_TEMPLATES: 'laxmeejee_supplier_import_templates',
+  PURCHASE_IMPORT_LOGS: 'laxmeejee_purchase_import_logs',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -393,6 +396,62 @@ export const storage = {
 
   clearLastUsedColumns: (): void => {
     localStorage.removeItem(STORAGE_KEYS.LAST_USED_COLUMNS);
+  },
+
+  // ─── Smart Purchase Import Engine ────────────────────────────────────────
+
+  getSupplierImportTemplates: (): SupplierImportTemplate[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.SUPPLIER_IMPORT_TEMPLATES);
+    return data ? JSON.parse(data) : [];
+  },
+
+  getSupplierImportTemplateBySupplierId: (supplierId: string): SupplierImportTemplate | undefined => {
+    return storage.getSupplierImportTemplates().find(t => t.supplierId === supplierId);
+  },
+
+  saveSupplierImportTemplate: (template: SupplierImportTemplate): void => {
+    const templates = storage.getSupplierImportTemplates();
+    const existingIndex = templates.findIndex(t => t.id === template.id);
+    if (existingIndex >= 0) {
+      templates[existingIndex] = { ...template, updatedAt: new Date().toISOString() };
+    } else {
+      templates.push(template);
+    }
+    localStorage.setItem(STORAGE_KEYS.SUPPLIER_IMPORT_TEMPLATES, JSON.stringify(templates));
+  },
+
+  deleteSupplierImportTemplate: (id: string): void => {
+    const templates = storage.getSupplierImportTemplates().filter(t => t.id !== id);
+    localStorage.setItem(STORAGE_KEYS.SUPPLIER_IMPORT_TEMPLATES, JSON.stringify(templates));
+  },
+
+  getImportLogs: (): ImportLogEntry[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.PURCHASE_IMPORT_LOGS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  saveImportLog: (entry: ImportLogEntry): void => {
+    const logs = storage.getImportLogs();
+    const existingIndex = logs.findIndex(l => l.id === entry.id);
+    if (existingIndex >= 0) {
+      logs[existingIndex] = entry;
+    } else {
+      logs.unshift(entry);
+    }
+    localStorage.setItem(STORAGE_KEYS.PURCHASE_IMPORT_LOGS, JSON.stringify(logs));
+  },
+
+  deleteImportLog: (id: string): void => {
+    const logs = storage.getImportLogs().filter(l => l.id !== id);
+    localStorage.setItem(STORAGE_KEYS.PURCHASE_IMPORT_LOGS, JSON.stringify(logs));
+  },
+
+  // Returns true if a given supplier invoice number has already been imported.
+  isInvoiceAlreadyImported: (supplierName: string | undefined, invoiceNumber: string | undefined): boolean => {
+    if (!supplierName || !invoiceNumber) return false;
+    return storage.getImportLogs().some(
+      l => l.supplierName === supplierName && l.invoiceNumber === invoiceNumber && l.status !== 'failed'
+    );
   },
 };
 
