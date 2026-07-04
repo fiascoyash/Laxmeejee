@@ -20,11 +20,12 @@ import { SupplierList } from './components/SupplierList';
 import { SupplierForm } from './components/SupplierForm';
 import { SupplierLedger } from './components/SupplierLedger';
 import { SmartPurchaseImport } from './components/SmartPurchaseImport';
+import { GstReports } from './components/GstReports';
 import { exportTemplatePDF } from './utils/templatePdfExport';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport';
+type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports';
 
 function App() {
   const [view, setView] = useState<View>('home');
@@ -1105,6 +1106,12 @@ function App() {
               <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" /></li>
             </ul>
           </div>
+          <div className="mt-4 px-3">
+            <p className="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">GST Reports</p>
+            <ul className="space-y-1">
+              <li><NavItem icon={BarChart3} label="GST Reports" currentView={view} targetView="gstReports" /></li>
+            </ul>
+          </div>
         </nav>
 
         <div className="p-4 border-t border-slate-700">
@@ -1205,6 +1212,17 @@ function App() {
                   </div>
                   <h3 className="font-semibold text-slate-800 mb-1">Templates</h3>
                   <p className="text-sm text-slate-500">{templates.length} templates</p>
+                </button>
+
+                <button
+                  onClick={() => navigateTo('gstReports')}
+                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-indigo-400 transition-all group"
+                >
+                  <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-500 transition-colors">
+                    <BarChart3 className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
+                  </div>
+                  <h3 className="font-semibold text-slate-800 mb-1">GST Reports</h3>
+                  <p className="text-sm text-slate-500">Tax analysis & reports</p>
                 </button>
               </div>
 
@@ -1649,6 +1667,15 @@ function App() {
                 onSuppliersChange={setSuppliers}
               />
             </div>
+          )}
+
+          {/* GST Reports */}
+          {view === 'gstReports' && (
+            <GstReports
+              invoices={invoices}
+              companyProfile={companyProfile}
+              purchaseHistory={storage.getPurchaseHistory()}
+            />
           )}
 
           {/* Settings */}
