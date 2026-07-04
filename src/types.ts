@@ -1223,6 +1223,17 @@ export interface ProductLedgerSummary {
 // here when new parsers (e.g. image OCR, barcode, email) are implemented.
 export type ImportFormat = 'csv' | 'xlsx' | 'pdf';
 
+// Parser plugin interface for future extensibility (OCR/AI ready)
+export interface ImportParserPlugin {
+  id: string;
+  name: string;
+  supportedFormats: ImportFormat[];
+  priority: number; // Higher priority plugins are tried first
+  parse(file: File): Promise<ParseResult>;
+  detectMetadata?(file: File): Promise<DocumentMetadata>;
+  detectScanned?(file: File): Promise<boolean>;
+}
+
 // Canonical fields the import engine understands. Every supplier column gets
 // mapped to one of these. Keep this list in sync with FIELD_DEFINITIONS.
 export type ImportFieldKey =
@@ -1236,7 +1247,10 @@ export type ImportFieldKey =
   | 'expiry'
   | 'mrp'
   | 'amount'
-  | 'supplierInvoiceNumber';
+  | 'supplierInvoiceNumber'
+  | 'unit'
+  | 'serialNumber'
+  | 'discount';
 
 export interface ImportFieldDefinition {
   key: ImportFieldKey;
@@ -1258,11 +1272,33 @@ export const IMPORT_FIELD_DEFINITIONS: ImportFieldDefinition[] = [
   { key: 'mrp', label: 'MRP', description: 'Maximum retail price', required: false, type: 'number' },
   { key: 'amount', label: 'Amount', description: 'Line total (qty x rate)', required: false, type: 'number' },
   { key: 'supplierInvoiceNumber', label: 'Supplier Invoice Number', description: 'Bill/invoice number from supplier', required: false, type: 'text' },
+  { key: 'unit', label: 'Unit', description: 'Unit of measurement (piece, box, kg, etc.)', required: false, type: 'text' },
+  { key: 'serialNumber', label: 'Serial Number', description: 'Serial number or IMEI', required: false, type: 'text' },
+  { key: 'discount', label: 'Discount', description: 'Discount percentage or amount', required: false, type: 'number' },
 ];
 
 // A single row extracted from the uploaded document, before mapping.
 // Keys are the original column headers from the source file.
 export type ExtractedRow = Record<string, string | number>;
+
+// Document metadata detected from the uploaded file
+export interface DocumentMetadata {
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  supplierName?: string;
+  supplierGstin?: string;
+  currency: string;
+  pageCount: number;
+  isScanned: boolean;
+  detectedKeywords: string[];
+}
+
+// Confidence reasons for low confidence scores
+export interface ConfidenceIssue {
+  field: string;
+  reason: string;
+  severity: 'critical' | 'warning' | 'info';
+}
 
 // Result of parsing an uploaded file.
 export interface ParseResult {
@@ -1275,6 +1311,12 @@ export interface ParseResult {
   // 0-100 confidence score for the extraction. PDFs with messy text get a
   // lower score so the UI can ask the user to confirm before importing.
   confidence: number;
+  // Specific issues explaining why confidence might be low
+  confidenceIssues: ConfidenceIssue[];
+  // Document metadata detected from the file
+  metadata?: DocumentMetadata;
+  // Raw text content (for PDF text extraction display)
+  rawTextLines?: string[];
 }
 
 // Maps a source column header to a canonical import field.
@@ -1291,11 +1333,19 @@ export interface SupplierImportTemplate {
   id: string;
   supplierId: string;
   supplierName: string;
+  supplierGstin?: string;
   // Ordered list of mappings. Stored as a snapshot so renaming a column in a
   // future bill does not silently break the template.
   mappings: FieldMapping[];
+  // Column positions for layout detection (x coordinates or column indices)
+  columnPositions?: number[];
+  // Original header names as saved
+  originalHeaders?: string[];
   createdAt: string;
   updatedAt: string;
+  // Usage statistics
+  useCount?: number;
+  lastUsedAt?: string;
 }
 
 // Match decision for a single imported row against the product catalog.
@@ -1314,6 +1364,8 @@ export interface ProductMatchCandidate {
 export interface ImportPreviewRow {
   // Stable id for React keys and drag/drop.
   id: string;
+  // Row index in original file
+  rowIndex: number;
   // Raw mapped values pulled from the source row.
   importedProductName: string;
   importedDescription?: string;
@@ -1326,6 +1378,9 @@ export interface ImportPreviewRow {
   mrp?: number;
   amount?: number;
   supplierInvoiceNumber?: string;
+  unit?: string;
+  serialNumber?: string;
+  discount?: number;
   // Match resolution.
   candidates: ProductMatchCandidate[];
   selectedCandidateId: string | null;
@@ -1334,6 +1389,56 @@ export interface ImportPreviewRow {
   resolvedProduct: ProductCatalogItem | null;
   // Per-row warnings (e.g. missing quantity, low OCR confidence).
   warnings: string[];
+  // Stock tracking for audit
+  stockBefore?: number;
+  stockAfter?: number;
+}
+
+// Import validation summary statistics
+export interface ImportValidationSummary {
+  totalProducts: number;
+  matchedProducts: number;
+  newProducts: number;
+  duplicateProducts: number;
+  missingHsn: number;
+  missingGst: number;
+  missingQty: number;
+  missingPrice: number;
+  warnings: number;
+}
+
+// Stock movement record for audit trail
+export interface StockMovementRecord {
+  date: string;
+  supplierId?: string;
+  supplierName?: string;
+  invoiceNumber?: string;
+  productId: string;
+  productName: string;
+  purchaseQty: number;
+  purchasePrice: number;
+  stockBefore: number;
+  stockAfter: number;
+  user: string;
+  importSource: ImportFormat;
+}
+
+// Purchase history entry for a product
+export interface PurchaseHistoryEntry {
+  id: string;
+  productId: string;
+  supplierId?: string;
+  supplierName?: string;
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  purchasePrice: number;
+  quantityPurchased: number;
+  gstPercent?: number;
+  batch?: string;
+  expiry?: string;
+  importedBy: string;
+  importTime: string;
+  importSource: ImportFormat;
 }
 
 export type ImportLogStatus = 'success' | 'partial' | 'failed';
@@ -1360,7 +1465,13 @@ export interface ImportLogEntry {
     purchasePrice: number;
     gstPercent: number;
     decision: MatchDecision;
+    stockBefore?: number;
+    stockAfter?: number;
   }[];
+  // Confidence score at import time
+  confidence?: number;
+  // Document metadata captured
+  metadata?: DocumentMetadata;
 }
 
 // ─── End Smart Purchase Import Engine ─────────────────────────────────────────

@@ -9,6 +9,9 @@ import {
   ImportFieldKey,
   SupplierImportTemplate,
   MatchDecision,
+  StockMovementRecord,
+  PurchaseHistoryEntry,
+  UnitType,
 } from '../types';
 import { IMPORT_FIELD_DEFINITIONS } from '../types';
 import { storage, generateId } from '../utils/storage';
@@ -29,11 +32,15 @@ import {
   File as FileIcon,
   RefreshCw,
   Zap,
+  Save,
 } from 'lucide-react';
 import { FieldMappingStep } from './import/FieldMappingStep';
 import { ProductMatchingStep } from './import/ProductMatchingStep';
 import { ImportPreviewStep } from './import/ImportPreviewStep';
 import { ImportLogView } from './import/ImportLogView';
+import { ConfidenceScoreDisplay } from './import/ConfidenceScoreDisplay';
+import { ImportValidationSummary } from './import/ImportValidationSummary';
+import { DocumentMetadataPreview } from './import/DocumentMetadataPreview';
 
 type Step = 'upload' | 'mapping' | 'matching' | 'preview' | 'done';
 
@@ -71,6 +78,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
   const [showLogView, setShowLogView] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState<boolean>(false);
   const [forceImport, setForceImport] = useState<boolean>(false);
+  const [saveTemplateAfterImport, setSaveTemplateAfterImport] = useState<boolean>(false);
 
   const selectedSupplier = useMemo(
     () => suppliers.find((s) => s.id === selectedSupplierId) || null,
@@ -84,27 +92,60 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
     try {
       const result = await parseFile(file);
       setParseResult(result);
+
+      // Check for scanned PDF
+      if (result.metadata?.isScanned) {
+        setParseError('Scanned PDFs are not supported yet. Please upload a text-based PDF or Excel file.');
+        return;
+      }
+
       if (result.rows.length === 0) {
         setParseError(result.warnings.join(' ') || 'No data rows found in the file.');
         return;
       }
+
       // Auto-suggest mappings, then apply any saved supplier template.
       const suggested = suggestMappings(result.headers);
       setMappings(suggested);
+
+      // Auto-fill metadata from detected document
+      if (result.metadata) {
+        if (result.metadata.invoiceNumber) {
+          setInvoiceNumber(result.metadata.invoiceNumber);
+        }
+        if (result.metadata.supplierName) {
+          // Try to match supplier by name
+          const matchedSupplier = suppliers.find(s =>
+            s.firmName.toLowerCase().includes(result.metadata!.supplierName!.toLowerCase()) ||
+            result.metadata!.supplierName!.toLowerCase().includes(s.firmName.toLowerCase())
+          );
+          if (matchedSupplier) {
+            setSelectedSupplierId(matchedSupplier.id);
+          }
+        }
+      }
     } catch (err) {
       setParseError(err instanceof Error ? err.message : 'Failed to read file.');
     } finally {
       setParsing(false);
     }
-  }, []);
+  }, [suppliers]);
 
   const applySupplierTemplate = useCallback(
     (supplierId: string) => {
       if (!supplierId || !parseResult) return;
       const template = storage.getSupplierImportTemplateBySupplierId(supplierId);
       if (!template) return;
-      // Only carry over mappings whose source column still exists in the
-      // current file — suppliers sometimes rename columns between bills.
+
+      // Update template usage stats
+      const updatedTemplate = {
+        ...template,
+        useCount: (template.useCount || 0) + 1,
+        lastUsedAt: new Date().toISOString(),
+      };
+      storage.saveSupplierImportTemplate(updatedTemplate);
+
+      // Only carry over mappings whose source column still exists
       const headerSet = new Set(parseResult.headers);
       const merged: FieldMapping[] = parseResult.headers.map((h) => {
         const fromTemplate = template.mappings.find((m) => m.sourceColumn === h);
@@ -125,6 +166,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
   // ─── Step 2: Field mapping → build preview rows ──────────────────────────
   const goToMatching = () => {
     if (!parseResult) return;
+
     // Validate required fields.
     const mappedKeys = new Set(mappings.filter((m) => m.fieldKey).map((m) => m.fieldKey));
     const missingRequired = IMPORT_FIELD_DEFINITIONS.filter((f) => f.required && !mappedKeys.has(f.key));
@@ -139,6 +181,10 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
       if (m.fieldKey) fieldByKey.set(m.fieldKey, m.sourceColumn);
     }
 
+    // Create stock snapshot for tracking
+    const stockSnapshot = new Map<string, number>();
+    catalog.forEach(p => stockSnapshot.set(p.id, p.stockQuantity));
+
     const rows: ImportPreviewRow[] = parseResult.rows.map((raw, idx) => {
       const get = (key: ImportFieldKey): string | number | null => {
         const col = fieldByKey.get(key);
@@ -146,6 +192,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
         const def = IMPORT_FIELD_DEFINITIONS.find((f) => f.key === key)!;
         return coerceValue(raw[col], def.type);
       };
+
       const productName = (get('productName') as string) || '';
       const quantity = (get('quantity') as number) ?? 0;
       const purchasePrice = (get('purchasePrice') as number) ?? 0;
@@ -159,18 +206,20 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
       const top = bestCandidate(productName, catalog);
       const decision: MatchDecision = top && top.level !== 'none' ? 'match_existing' : 'create_new';
 
-      // Pre-resolve the product: either the matched candidate or a draft new
-      // product built from the imported values.
+      // Pre-resolve the product
       let resolvedProduct: ProductCatalogItem | null = null;
+      let stockBefore = 0;
+
       if (decision === 'match_existing' && top) {
         resolvedProduct = { ...top.product };
+        stockBefore = stockSnapshot.get(top.product.id) || 0;
       } else {
         const now = new Date().toISOString();
         resolvedProduct = {
           id: generateId(),
           name: productName || `Imported Product ${idx + 1}`,
           category: 'Imported',
-          unit: 'piece',
+          unit: ((get('unit') as string) || 'piece') as UnitType,
           purchasePrice,
           sellingPrice: (get('mrp') as number) || purchasePrice,
           gstPercent: (get('gstPercent') as number) || 0,
@@ -181,10 +230,12 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
           createdAt: now,
           updatedAt: now,
         };
+        stockBefore = 0;
       }
 
       return {
         id: `${Date.now()}-${idx}`,
+        rowIndex: idx + 1,
         importedProductName: productName,
         importedDescription: (get('description') as string) || undefined,
         quantity,
@@ -196,11 +247,16 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
         mrp: (get('mrp') as number) || undefined,
         amount: (get('amount') as number) || undefined,
         supplierInvoiceNumber: (get('supplierInvoiceNumber') as string) || undefined,
+        unit: (get('unit') as string) || undefined,
+        serialNumber: (get('serialNumber') as string) || undefined,
+        discount: (get('discount') as number) || undefined,
         candidates,
         selectedCandidateId: top && top.level !== 'none' ? top.product.id : null,
         decision,
         resolvedProduct,
         warnings,
+        stockBefore,
+        stockAfter: stockBefore + quantity,
       };
     });
 
@@ -213,6 +269,12 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
     setPreviewRows((rows) =>
       rows.map((r) => {
         if (r.id !== rowId) return r;
+
+        // Get current stock for before/after tracking
+        const currentStock = selectedCandidateId
+          ? catalog.find(p => p.id === selectedCandidateId)?.stockQuantity || 0
+          : 0;
+
         let resolvedProduct: ProductCatalogItem | null = null;
         if (decision === 'match_existing' && selectedCandidateId) {
           const candidate = r.candidates.find((c) => c.product.id === selectedCandidateId);
@@ -225,7 +287,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
             id: generateId(),
             name: r.importedProductName || 'Imported Product',
             category: 'Imported',
-            unit: 'piece',
+            unit: (r.unit || 'piece') as UnitType,
             purchasePrice: r.purchasePrice,
             sellingPrice: r.mrp || r.purchasePrice,
             gstPercent: r.gstPercent,
@@ -237,7 +299,15 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
             updatedAt: now,
           };
         }
-        return { ...r, decision, selectedCandidateId, resolvedProduct };
+
+        return {
+          ...r,
+          decision,
+          selectedCandidateId,
+          resolvedProduct,
+          stockBefore: decision === 'match_existing' && selectedCandidateId ? currentStock : 0,
+          stockAfter: decision === 'match_existing' && selectedCandidateId ? currentStock + r.quantity : r.quantity,
+        };
       })
     );
   };
@@ -247,6 +317,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
       rows.map((r) => {
         if (r.id !== rowId) return r;
         const updated = { ...r, [field]: value };
+
         // Keep resolved new-product in sync when editable fields change.
         if (r.decision === 'create_new' && r.resolvedProduct) {
           updated.resolvedProduct = {
@@ -266,8 +337,6 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
   };
 
   // ─── Step 4: Preview → Confirm Import ────────────────────────────────────
-  // This is the ONLY place inventory is mutated. Nothing before this point
-  // touches the catalog, stock, or history tables.
   const checkDuplicate = useCallback((): boolean => {
     const supplierName = selectedSupplier?.firmName;
     const inv = invoiceNumber || previewRows[0]?.supplierInvoiceNumber;
@@ -310,24 +379,64 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
     const errors: string[] = [];
     let totalValue = 0;
 
+    // Stock movements and purchase history for audit
+    const stockMovements: StockMovementRecord[] = [];
+    const purchaseHistory: PurchaseHistoryEntry[] = [];
+
     for (const row of committedRows) {
       const product = row.resolvedProduct!;
+      const rowValue = row.quantity * row.purchasePrice;
+      totalValue += rowValue;
+
       if (row.decision === 'match_existing' && catalogMap.has(product.id)) {
         const existing = catalogMap.get(product.id)!;
-        // Update stock and purchase-related fields WITHOUT touching selling
-        // price logic, GST calc, or any other existing field. We only touch
-        // stock + purchase metadata, per the strict no-touch rule.
+
+        // Update product with all tracking fields
         const updated: ProductCatalogItem = {
           ...existing,
           stockQuantity: existing.stockQuantity + row.quantity,
           purchasePrice: row.purchasePrice || existing.purchasePrice,
-          // Refresh batch/expiry only when the import provides them; never
-          // overwrite existing values with blanks.
+          // Refresh batch/expiry only when the import provides them
           ...(row.batch ? { batchNumber: row.batch } : {}),
           ...(row.expiry ? { expiryDate: row.expiry } : {}),
+          // Update tracking fields
           updatedAt: now,
         };
         catalogMap.set(existing.id, updated);
+
+        // Record stock movement
+        stockMovements.push({
+          date: importDate,
+          supplierId: selectedSupplier?.id,
+          supplierName,
+          invoiceNumber: invNumber,
+          productId: product.id,
+          productName: product.name,
+          purchaseQty: row.quantity,
+          purchasePrice: row.purchasePrice,
+          stockBefore: existing.stockQuantity,
+          stockAfter: existing.stockQuantity + row.quantity,
+          user: importedBy,
+          importSource: parseResult.format,
+        });
+
+        // Record purchase history
+        purchaseHistory.push({
+          id: generateId(),
+          productId: product.id,
+          supplierId: selectedSupplier?.id,
+          supplierName,
+          invoiceNumber: invNumber,
+          invoiceDate: parseResult.metadata?.invoiceDate || importDate,
+          purchasePrice: row.purchasePrice,
+          quantityPurchased: row.quantity,
+          gstPercent: row.gstPercent,
+          batch: row.batch,
+          expiry: row.expiry,
+          importedBy,
+          importTime: now,
+          importSource: parseResult.format,
+        });
       } else if (row.decision === 'create_new') {
         const newProduct: ProductCatalogItem = {
           ...product,
@@ -337,8 +446,41 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
         };
         catalogMap.set(newProduct.id, newProduct);
         newProducts.push(newProduct);
+
+        // Record stock movement for new product
+        stockMovements.push({
+          date: importDate,
+          supplierId: selectedSupplier?.id,
+          supplierName,
+          invoiceNumber: invNumber,
+          productId: newProduct.id,
+          productName: newProduct.name,
+          purchaseQty: row.quantity,
+          purchasePrice: row.purchasePrice,
+          stockBefore: 0,
+          stockAfter: row.quantity,
+          user: importedBy,
+          importSource: parseResult.format,
+        });
+
+        // Record purchase history
+        purchaseHistory.push({
+          id: generateId(),
+          productId: newProduct.id,
+          supplierId: selectedSupplier?.id,
+          supplierName,
+          invoiceNumber: invNumber,
+          invoiceDate: parseResult.metadata?.invoiceDate || importDate,
+          purchasePrice: row.purchasePrice,
+          quantityPurchased: row.quantity,
+          gstPercent: row.gstPercent,
+          batch: row.batch,
+          expiry: row.expiry,
+          importedBy,
+          importTime: now,
+          importSource: parseResult.format,
+        });
       }
-      totalValue += row.quantity * row.purchasePrice;
     }
 
     const updatedCatalog = Array.from(catalogMap.values());
@@ -347,8 +489,17 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
     storage.saveProductCatalog(updatedCatalog);
     onCatalogChange(updatedCatalog);
 
-    // If a supplier is selected and the import created a purchase, record a
-    // supplier transaction so the supplier ledger reflects the purchase.
+    // Save purchase history to storage
+    purchaseHistory.forEach(entry => {
+      storage.savePurchaseHistory(entry);
+    });
+
+    // Save stock movements to storage
+    stockMovements.forEach(movement => {
+      storage.saveStockMovement(movement);
+    });
+
+    // If a supplier is selected and the import created a purchase, record a supplier transaction
     if (selectedSupplier && totalValue > 0) {
       const txns = storage.getSupplierTransactions();
       const opening = selectedSupplier.openingBalanceType === 'to_pay' ? selectedSupplier.openingBalance : -selectedSupplier.openingBalance;
@@ -372,12 +523,12 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
       onSuppliersChange(storage.getSuppliers());
     }
 
-    // Save supplier template if requested (handled in FieldMappingStep via a
-    // callback that writes to storage directly).
+    // Save supplier template if requested
+    if (saveTemplateAfterImport && selectedSupplier) {
+      saveSupplierTemplateInternal();
+    }
 
-    // Write purchase history + stock movements to Supabase for each committed
-    // row. These mirror the existing AddExistingStockModal flow so the new
-    // module reuses the same audit tables.
+    // Write to Supabase for audit trail
     if (supabase) {
       for (const row of committedRows) {
         const product = row.resolvedProduct!;
@@ -410,8 +561,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
       }
     }
 
-    // Build the import log entry (Step 11) — stored both locally and in
-    // Supabase for a durable audit trail.
+    // Build the import log entry
     const logEntry: ImportLogEntry = {
       id: generateId(),
       importDate: now,
@@ -425,6 +575,8 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
       totalValue,
       status: errors.length === 0 ? 'success' : errors.length === committedRows.length ? 'failed' : 'partial',
       errors,
+      confidence: parseResult.confidence,
+      metadata: parseResult.metadata,
       rows: committedRows.map((r) => ({
         productName: r.importedProductName,
         matchedProductId: r.decision === 'match_existing' ? r.resolvedProduct?.id : undefined,
@@ -433,9 +585,12 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
         purchasePrice: r.purchasePrice,
         gstPercent: r.gstPercent,
         decision: r.decision,
+        stockBefore: r.stockBefore,
+        stockAfter: r.stockAfter,
       })),
     };
     storage.saveImportLog(logEntry);
+
     if (supabase) {
       try {
         await supabase.from('purchase_import_logs').insert({
@@ -454,7 +609,6 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
           rows: logEntry.rows,
         });
       } catch (e) {
-        // Local log already saved — Supabase failure is non-fatal.
         console.warn('Supabase import log write failed:', e);
       }
     }
@@ -463,23 +617,30 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
     setStep('done');
   };
 
-  // ─── Save supplier template (Step 5) ─────────────────────────────────────
-  const saveSupplierTemplate = () => {
-    if (!selectedSupplier) {
-      alert('Select a supplier to save the mapping template.');
-      return;
-    }
+  // ─── Save supplier template ─────────────────────────────────────────────
+  const saveSupplierTemplateInternal = () => {
+    if (!selectedSupplier) return;
+
     const existing = storage.getSupplierImportTemplateBySupplierId(selectedSupplier.id);
     const template: SupplierImportTemplate = {
       id: existing?.id || generateId(),
       supplierId: selectedSupplier.id,
       supplierName: selectedSupplier.firmName,
+      supplierGstin: selectedSupplier.gstNumber,
       mappings,
+      columnPositions: parseResult?.headers.map((_, i) => i),
+      originalHeaders: parseResult?.headers,
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      useCount: (existing?.useCount || 0) + 1,
+      lastUsedAt: new Date().toISOString(),
     };
     storage.saveSupplierImportTemplate(template);
-    alert(`Mapping saved for ${selectedSupplier.firmName}. Future imports from this supplier will auto-apply this mapping.`);
+  };
+
+  const saveSupplierTemplate = () => {
+    saveSupplierTemplateInternal();
+    alert(`Mapping saved for ${selectedSupplier?.firmName}. Future imports from this supplier will auto-apply this mapping.`);
   };
 
   // ─── Reset ───────────────────────────────────────────────────────────────
@@ -495,10 +656,18 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
     setParseError('');
     setDuplicateWarning(false);
     setForceImport(false);
+    setSaveTemplateAfterImport(false);
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────
   const currentStepIndex = STEPS.findIndex((s) => s.key === step);
+
+  // Build validation summary for preview step
+  const existingProductsMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    catalog.forEach(p => map.set(p.id, true));
+    return map;
+  }, [catalog]);
 
   return (
     <div className="space-y-6">
@@ -592,44 +761,84 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
           importedBy={importedBy}
           setImportedBy={setImportedBy}
           onNext={() => setStep('mapping')}
-          canProceed={!!parseResult && parseResult.rows.length > 0}
+          canProceed={!!parseResult && parseResult.rows.length > 0 && !parseResult.metadata?.isScanned}
         />
       )}
 
       {step === 'mapping' && parseResult && (
-        <FieldMappingStep
-          parseResult={parseResult}
-          mappings={mappings}
-          setMappings={setMappings}
-          selectedSupplier={selectedSupplier}
-          onSaveTemplate={saveSupplierTemplate}
-          onBack={() => setStep('upload')}
-          onNext={goToMatching}
-        />
+        <div className="space-y-4">
+          {/* Confidence Score Display */}
+          <ConfidenceScoreDisplay
+            score={parseResult.confidence}
+            issues={parseResult.confidenceIssues}
+          />
+
+          {/* Document Metadata Preview */}
+          {parseResult.metadata && (
+            <DocumentMetadataPreview
+              metadata={parseResult.metadata}
+              fileName={parseResult.fileName}
+              format={parseResult.format}
+            />
+          )}
+
+          <FieldMappingStep
+            parseResult={parseResult}
+            mappings={mappings}
+            setMappings={setMappings}
+            selectedSupplier={selectedSupplier}
+            onSaveTemplate={saveSupplierTemplate}
+            onBack={() => setStep('upload')}
+            onNext={goToMatching}
+          />
+        </div>
       )}
 
       {step === 'matching' && (
-        <ProductMatchingStep
-          rows={previewRows}
-          onUpdateDecision={updateRowDecision}
-          onUpdateField={updateRowField}
-          onBack={() => setStep('mapping')}
-          onNext={goToPreview}
-        />
+        <div className="space-y-4">
+          <ImportValidationSummary
+            rows={previewRows}
+            existingProducts={existingProductsMap}
+          />
+          <ProductMatchingStep
+            rows={previewRows}
+            onUpdateDecision={updateRowDecision}
+            onUpdateField={updateRowField}
+            onBack={() => setStep('mapping')}
+            onNext={goToPreview}
+          />
+        </div>
       )}
 
       {step === 'preview' && (
-        <ImportPreviewStep
-          rows={previewRows}
-          selectedSupplier={selectedSupplier}
-          invoiceNumber={invoiceNumber || previewRows[0]?.supplierInvoiceNumber || ''}
-          importDate={importDate}
-          duplicateWarning={duplicateWarning}
-          forceImport={forceImport}
-          setForceImport={setForceImport}
-          onBack={() => setStep('matching')}
-          onConfirm={confirmImport}
-        />
+        <div className="space-y-4">
+          {/* Save template checkbox */}
+          {selectedSupplier && (
+            <label className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer">
+              <input
+                type="checkbox"
+                checked={saveTemplateAfterImport}
+                onChange={(e) => setSaveTemplateAfterImport(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <Save className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-700">
+                Save this supplier layout for future imports from {selectedSupplier.firmName}
+              </span>
+            </label>
+          )}
+          <ImportPreviewStep
+            rows={previewRows}
+            selectedSupplier={selectedSupplier}
+            invoiceNumber={invoiceNumber || previewRows[0]?.supplierInvoiceNumber || ''}
+            importDate={importDate}
+            duplicateWarning={duplicateWarning}
+            forceImport={forceImport}
+            setForceImport={setForceImport}
+            onBack={() => setStep('matching')}
+            onConfirm={confirmImport}
+          />
+        </div>
       )}
 
       {step === 'done' && importLog && (
@@ -641,7 +850,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
   );
 }
 
-// ─── Upload step (kept in this file because it's small) ─────────────────────
+// ─── Upload step ─────────────────────────────────────────────────────────────
 
 function UploadStep({
   parsing,
@@ -690,7 +899,7 @@ function UploadStep({
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
         <h3 className="font-semibold text-slate-800 mb-1">Upload Supplier Bill</h3>
         <p className="text-sm text-slate-500 mb-4">
-          Drag and drop a file, or click to browse. Supported formats: CSV, Excel (.xlsx), PDF.
+          Drag and drop a file, or click to browse. Supported formats: CSV, Excel (.xlsx), text-based PDF.
         </p>
         <label
           onDragOver={(e) => {
@@ -715,7 +924,7 @@ function UploadStep({
           {parsing ? (
             <div className="flex flex-col items-center gap-2">
               <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
-              <p className="text-sm text-slate-600">Reading file…</p>
+              <p className="text-sm text-slate-600">Reading file...</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
@@ -723,7 +932,7 @@ function UploadStep({
                 <Upload className="w-6 h-6 text-emerald-600" />
               </div>
               <p className="text-sm font-medium text-slate-700">Drop file here or click to upload</p>
-              <p className="text-xs text-slate-400">CSV, Excel, or PDF</p>
+              <p className="text-xs text-slate-400">CSV, Excel, or text-based PDF (no scanned PDFs)</p>
             </div>
           )}
         </label>
@@ -735,7 +944,7 @@ function UploadStep({
           </div>
         )}
 
-        {parseResult && parseResult.rows.length > 0 && (
+        {parseResult && parseResult.rows.length > 0 && !parseResult.metadata?.isScanned && (
           <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <Check className="w-4 h-4 text-emerald-600" />
@@ -744,7 +953,13 @@ function UploadStep({
               </p>
             </div>
             <div className="flex items-center gap-2 text-xs text-emerald-700">
-              {parseResult.format === 'pdf' ? <FileIcon className="w-3.5 h-3.5" /> : parseResult.format === 'xlsx' ? <FileSpreadsheet className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+              {parseResult.format === 'pdf' ? (
+                <FileIcon className="w-3.5 h-3.5" />
+              ) : parseResult.format === 'xlsx' ? (
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+              ) : (
+                <FileText className="w-3.5 h-3.5" />
+              )}
               <span>{parseResult.fileName}</span>
               <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">
                 Confidence: {parseResult.confidence}%
@@ -757,6 +972,17 @@ function UploadStep({
                 ))}
               </ul>
             )}
+          </div>
+        )}
+
+        {/* Document metadata preview */}
+        {parseResult?.metadata && !parseResult.metadata.isScanned && (
+          <div className="mt-4">
+            <DocumentMetadataPreview
+              metadata={parseResult.metadata}
+              fileName={parseResult.fileName}
+              format={parseResult.format}
+            />
           </div>
         )}
       </div>
@@ -772,7 +998,7 @@ function UploadStep({
               onChange={(e) => onSupplierChange(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
-              <option value="">— Select supplier (optional) —</option>
+              <option value="">- Select supplier (optional) -</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.firmName}
@@ -829,7 +1055,7 @@ function UploadStep({
   );
 }
 
-// ─── Done view (kept in this file because it's small) ──────────────────────
+// ─── Done view ──────────────────────────────────────────────────────────────
 
 function ImportDoneView({
   log,
@@ -842,6 +1068,7 @@ function ImportDoneView({
 }) {
   const isSuccess = log.status === 'success';
   const isPartial = log.status === 'partial';
+
   return (
     <div className="space-y-4">
       <div
@@ -870,6 +1097,11 @@ function ImportDoneView({
         <p className="text-sm text-slate-600 mt-1">
           Total purchase value: <strong>Rs. {log.totalValue.toLocaleString()}</strong>
         </p>
+        {log.confidence !== undefined && (
+          <p className="text-sm text-slate-500 mt-1">
+            Import confidence: <strong>{log.confidence}%</strong>
+          </p>
+        )}
         {log.errors.length > 0 && (
           <div className="mt-3 p-3 bg-white/60 rounded-lg border border-amber-200">
             <p className="text-xs font-semibold text-amber-800 mb-1">Errors ({log.errors.length}):</p>
@@ -877,7 +1109,7 @@ function ImportDoneView({
               {log.errors.slice(0, 5).map((e, i) => (
                 <li key={i}>{e}</li>
               ))}
-              {log.errors.length > 5 && <li>… and {log.errors.length - 5} more</li>}
+              {log.errors.length > 5 && <li>... and {log.errors.length - 5} more</li>}
             </ul>
           </div>
         )}

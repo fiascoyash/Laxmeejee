@@ -4,6 +4,7 @@ import {
   DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UnitType, IndustryType, ExpiryStatus, UNIT_OPTIONS,
   SupplierData, SupplierTransaction,
   SupplierImportTemplate, ImportLogEntry,
+  PurchaseHistoryEntry, StockMovementRecord,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -19,6 +20,8 @@ const STORAGE_KEYS = {
   LAST_USED_COLUMNS: 'laxmeejee_last_used_columns',
   SUPPLIER_IMPORT_TEMPLATES: 'laxmeejee_supplier_import_templates',
   PURCHASE_IMPORT_LOGS: 'laxmeejee_purchase_import_logs',
+  PURCHASE_HISTORY: 'laxmeejee_purchase_history',
+  STOCK_MOVEMENTS: 'laxmeejee_stock_movements',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -452,6 +455,107 @@ export const storage = {
     return storage.getImportLogs().some(
       l => l.supplierName === supplierName && l.invoiceNumber === invoiceNumber && l.status !== 'failed'
     );
+  },
+
+  // ─── Purchase History ─────────────────────────────────────────────────────
+
+  getPurchaseHistory: (): PurchaseHistoryEntry[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.PURCHASE_HISTORY);
+    return data ? JSON.parse(data) : [];
+  },
+
+  getPurchaseHistoryByProductId: (productId: string): PurchaseHistoryEntry[] => {
+    return storage.getPurchaseHistory()
+      .filter(e => e.productId === productId)
+      .sort((a, b) => new Date(b.importTime).getTime() - new Date(a.importTime).getTime());
+  },
+
+  savePurchaseHistory: (entry: PurchaseHistoryEntry): void => {
+    const history = storage.getPurchaseHistory();
+    const existingIndex = history.findIndex(e => e.id === entry.id);
+    if (existingIndex >= 0) {
+      history[existingIndex] = entry;
+    } else {
+      history.unshift(entry);
+    }
+    localStorage.setItem(STORAGE_KEYS.PURCHASE_HISTORY, JSON.stringify(history));
+  },
+
+  deletePurchaseHistory: (id: string): void => {
+    const history = storage.getPurchaseHistory().filter(e => e.id !== id);
+    localStorage.setItem(STORAGE_KEYS.PURCHASE_HISTORY, JSON.stringify(history));
+  },
+
+  // ─── Stock Movements ──────────────────────────────────────────────────────
+
+  getStockMovements: (): StockMovementRecord[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.STOCK_MOVEMENTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  getStockMovementsByProductId: (productId: string): StockMovementRecord[] => {
+    return storage.getStockMovements()
+      .filter(m => m.productId === productId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  },
+
+  saveStockMovement: (movement: StockMovementRecord): void => {
+    const movements = storage.getStockMovements();
+    movements.unshift(movement);
+    localStorage.setItem(STORAGE_KEYS.STOCK_MOVEMENTS, JSON.stringify(movements));
+  },
+
+  deleteStockMovement: (_id: string): void => {
+    // Note: we don't have id in StockMovementRecord, this is for future use
+    const movements = storage.getStockMovements();
+    localStorage.setItem(STORAGE_KEYS.STOCK_MOVEMENTS, JSON.stringify(movements));
+  },
+
+  // ─── Product Purchase Statistics ───────────────────────────────────────────
+
+  getProductPurchaseStats: (productId: string): {
+    lastPurchaseDate?: string;
+    lastPurchasePrice?: number;
+    averagePurchasePrice: number;
+    totalPurchased: number;
+    primarySupplier?: string;
+  } => {
+    const history = storage.getPurchaseHistoryByProductId(productId);
+
+    if (history.length === 0) {
+      return {
+        averagePurchasePrice: 0,
+        totalPurchased: 0,
+      };
+    }
+
+    const totalPurchased = history.reduce((sum, e) => sum + e.quantityPurchased, 0);
+    const weightedSum = history.reduce((sum, e) => sum + (e.purchasePrice * e.quantityPurchased), 0);
+    const averagePurchasePrice = totalPurchased > 0 ? weightedSum / totalPurchased : 0;
+
+    // Find primary supplier (most frequent)
+    const supplierCounts = new Map<string, number>();
+    history.forEach(e => {
+      if (e.supplierName) {
+        supplierCounts.set(e.supplierName, (supplierCounts.get(e.supplierName) || 0) + 1);
+      }
+    });
+    let primarySupplier: string | undefined;
+    let maxCount = 0;
+    supplierCounts.forEach((count, supplier) => {
+      if (count > maxCount) {
+        maxCount = count;
+        primarySupplier = supplier;
+      }
+    });
+
+    return {
+      lastPurchaseDate: history[0]?.invoiceDate || history[0]?.importTime,
+      lastPurchasePrice: history[0]?.purchasePrice,
+      averagePurchasePrice,
+      totalPurchased,
+      primarySupplier,
+    };
   },
 };
 
