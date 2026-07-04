@@ -689,27 +689,6 @@ const HEADER_PATTERNS: Record<ImportFieldKey, string[]> = {
   ],
 };
 
-// Mapping from normalized standard header names (output of normalizeHeaderToStandard)
-// directly to ImportFieldKey. This enables automatic field selection when the header
-// normalization engine has already identified the field type.
-const STANDARD_NAME_TO_FIELD_KEY: Record<string, ImportFieldKey> = {
-  'Product Name': 'productName',
-  'Quantity': 'quantity',
-  'Purchase Price': 'purchasePrice',
-  'GST': 'gstPercent',
-  'HSN/SAC': 'hsnSac',
-  'MRP': 'mrp',
-  'Expiry': 'expiry',
-  'Batch': 'batch',
-  'Unit': 'unit',
-  'Serial': 'serialNumber',
-  'Discount': 'discount',
-  'Amount': 'amount',
-  'Invoice No': 'supplierInvoiceNumber',
-  'Brand': 'description', // Brand maps to description as fallback
-  'S.No': 'serialNumber', // S.No can sometimes be serial number context
-};
-
 // ─── Document Metadata Detection ─────────────────────────────────────────────
 
 const Gstin_PATTERN = /[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}/gi;
@@ -718,558 +697,17 @@ const Invoice_NUMBER_PATTERNS = [
   /(?:invoice|bill|inv|challan)[\s\-:.]*number[\s\-:]*([A-Z0-9\/\-]+)/i,
   /\b(?:inv|bill)[\s\-:.]*([A-Z0-9\/\-]+)/i,
 ];
-
-// Date label patterns - labels that indicate a date follows
-const DATE_LABEL_PATTERNS = [
-  // Explicit date labels with colon/space
-  /(?:invoice\s*date|bill\s*date|dated|date|dt\.?|inv\.?\s*date|challan\s*date)[\s\-:.:]+/i,
-  // Standalone labels
-  /^(invoice\s*date|bill\s*date|dated|date|dt\.?)\s*[:\-:]?\s*/i,
+const DATE_PATTERNS = [
+  /(?:date|dated)[\s\-:.]*([0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{2,4})/i,
+  /(?:date|dated)[\s\-:.]*([0-9]{2,4}[\/\-][0-9]{1,2}[\/\-][0-9]{1,2})/i,
+  /([0-9]{1,2}[\/\-][A-Za-z]{3}[\/\-][0-9]{2,4})/,
+  /([0-9]{1,2}[\-\/][0-9]{1,2}[\-\/][0-9]{2,4})/,
 ];
-
-// Standalone date patterns (DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, etc.)
-const STANDALONE_DATE_PATTERNS = [
-  // DD-MM-YYYY or DD/MM/YYYY (Indian format - most common)
-  { pattern: /\b([0-9]{1,2})[\-\/]([0-9]{1,2})[\-\/]([0-9]{4})\b/, format: 'dmy' },
-  // DD-MM-YY or DD/MM/YY (short year)
-  { pattern: /\b([0-9]{1,2})[\-\/]([0-9]{1,2})[\-\/]([0-9]{2})\b/, format: 'dmy-short' },
-  // YYYY-MM-DD (ISO format)
-  { pattern: /\b([0-9]{4})[\-\/]([0-9]{1,2})[\-\/]([0-9]{1,2})\b/, format: 'ymd' },
-  // DD-Mon-YYYY or DD/Mon/YYYY (e.g., 03-Jul-2026)
-  { pattern: /\b([0-9]{1,2})[\-\/]([A-Za-z]{3,9})[\-\/]([0-9]{2,4})\b/, format: 'd-mon-y' },
-  // Mon DD, YYYY (e.g., Jul 03, 2026)
-  { pattern: /\b([A-Za-z]{3,9})\s+([0-9]{1,2}),?\s+([0-9]{4})\b/, format: 'mon-d-y' },
-];
-
 const CURRENCY_PATTERNS = [
   { pattern: /₹|rs\.?|inr|indian rupees/i, currency: 'INR' },
   { pattern: /\$|usd|dollars?/i, currency: 'USD' },
   { pattern: /€|eur|euros?/i, currency: 'EUR' },
 ];
-
-// ─── Enhanced Date Detection ───────────────────────────────────────────────────
-
-interface DetectedDate {
-  date: string;
-  confidence: number;
-  lineIndex: number;
-  distanceToInvoice: number;
-}
-
-const MONTH_NAMES: Record<string, number> = {
-  'jan': 1, 'january': 1, 'feb': 2, 'february': 2, 'mar': 3, 'march': 3,
-  'apr': 4, 'april': 4, 'may': 5, 'jun': 6, 'june': 6,
-  'jul': 7, 'july': 7, 'aug': 8, 'august': 8, 'sep': 9, 'sept': 9, 'september': 9,
-  'oct': 10, 'october': 10, 'nov': 11, 'november': 11, 'dec': 12, 'december': 12,
-};
-
-/**
- * Normalizes a detected date to ISO format (YYYY-MM-DD).
- * Returns null if the date is invalid.
- */
-const normalizeDate = (
-  match: RegExpMatchArray,
-  format: string
-): string | null => {
-  let day: number, month: number, year: number;
-
-  switch (format) {
-    case 'dmy': {
-      day = parseInt(match[1], 10);
-      month = parseInt(match[2], 10);
-      year = parseInt(match[3], 10);
-      break;
-    }
-    case 'dmy-short': {
-      day = parseInt(match[1], 10);
-      month = parseInt(match[2], 10);
-      year = parseInt(match[3], 10);
-      // Convert 2-digit year to 4-digit (assume 20xx for years 00-99)
-      if (year < 100) year += 2000;
-      break;
-    }
-    case 'ymd': {
-      year = parseInt(match[1], 10);
-      month = parseInt(match[2], 10);
-      day = parseInt(match[3], 10);
-      break;
-    }
-    case 'd-mon-y': {
-      day = parseInt(match[1], 10);
-      const monthName = match[2].toLowerCase();
-      month = MONTH_NAMES[monthName] || 0;
-      year = parseInt(match[3], 10);
-      if (year < 100) year += 2000;
-      break;
-    }
-    case 'mon-d-y': {
-      const monthName = match[1].toLowerCase();
-      month = MONTH_NAMES[monthName] || 0;
-      day = parseInt(match[2], 10);
-      year = parseInt(match[3], 10);
-      break;
-    }
-    default:
-      return null;
-  }
-
-  // Validate date components
-  if (month < 1 || month > 12) return null;
-  if (day < 1 || day > 31) return null;
-  if (year < 1900 || year > 2100) return null;
-
-  // Check days in month (basic validation)
-  const daysInMonth = new Date(year, month, 0).getDate();
-  if (day > daysInMonth) return null;
-
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-};
-
-/**
- * Detects invoice dates from the header block.
- * Prioritizes dates near invoice number occurrences and returns confidence score.
- */
-const detectInvoiceDate = (
-  textLines: string[]
-): { date: string | null; confidence: number } => {
-  if (textLines.length === 0) {
-    return { date: null, confidence: 0 };
-  }
-
-  // Search the first 35% of the document (header block)
-  const headerEndLine = Math.ceil(textLines.length * 0.35);
-  const headerLines = textLines.slice(0, headerEndLine);
-
-  // Find all invoice number occurrences with their line positions
-  const invoicePositions: { lineIndex: number }[] = [];
-  headerLines.forEach((line, idx) => {
-    for (const pattern of Invoice_NUMBER_PATTERNS) {
-      if (pattern.test(line)) {
-        invoicePositions.push({ lineIndex: idx });
-        break;
-      }
-    }
-  });
-
-  // Also search full text for invoice numbers if not found in header
-  if (invoicePositions.length === 0) {
-    textLines.forEach((line, idx) => {
-      for (const pattern of Invoice_NUMBER_PATTERNS) {
-        if (pattern.test(line)) {
-          invoicePositions.push({ lineIndex: idx });
-          break;
-        }
-      }
-    });
-  }
-
-  const detectedDates: DetectedDate[] = [];
-
-  // First pass: Look for dates with explicit labels (high confidence)
-  headerLines.forEach((line, idx) => {
-    for (const labelPattern of DATE_LABEL_PATTERNS) {
-      const labelMatch = line.match(labelPattern);
-      if (labelMatch) {
-        // Found a date label, now extract the date after it
-        const afterLabel = line.slice(line.indexOf(labelMatch[0]) + labelMatch[0].length);
-
-        for (const { pattern, format } of STANDALONE_DATE_PATTERNS) {
-          const dateMatch = afterLabel.match(pattern);
-          if (dateMatch) {
-            const normalized = normalizeDate(dateMatch, format);
-            if (normalized) {
-              // Calculate distance to nearest invoice number
-              const distanceToInvoice = invoicePositions.reduce((min, pos) => {
-                const dist = Math.abs(pos.lineIndex - idx);
-                return dist < min ? dist : min;
-              }, Infinity);
-
-              let confidence = 70; // Base confidence for labeled date
-
-              // Bonus for proximity to invoice number
-              if (distanceToInvoice <= 2) confidence += 25;
-              else if (distanceToInvoice <= 5) confidence += 15;
-              else if (distanceToInvoice <= 10) confidence += 5;
-
-              detectedDates.push({
-                date: normalized,
-                confidence,
-                lineIndex: idx,
-                distanceToInvoice,
-              });
-              return; // Stop after first match on this line
-            }
-          }
-        }
-      }
-    }
-  });
-
-  // Second pass: Look for standalone dates near invoice numbers
-  headerLines.forEach((line, idx) => {
-    // Skip if we already found a labeled date on this line
-    if (detectedDates.some(d => d.lineIndex === idx)) return;
-
-    for (const { pattern, format } of STANDALONE_DATE_PATTERNS) {
-      const matches = [...line.matchAll(new RegExp(pattern.source, 'g'))];
-      for (const match of matches) {
-        const normalized = normalizeDate(match as unknown as RegExpMatchArray, format);
-        if (normalized) {
-          // Calculate distance to nearest invoice number
-          const distanceToInvoice = invoicePositions.reduce((min, pos) => {
-            const dist = Math.abs(pos.lineIndex - idx);
-            return dist < min ? dist : min;
-          }, Infinity);
-
-          // Only consider standalone dates close to invoice numbers
-          if (distanceToInvoice <= 5) {
-            let confidence = 30; // Lower base confidence for unlabeled date
-
-            // Bonus for proximity to invoice number
-            if (distanceToInvoice <= 1) confidence += 35;
-            else if (distanceToInvoice <= 2) confidence += 25;
-            else if (distanceToInvoice <= 3) confidence += 15;
-
-            // Check if this line or nearby lines have "date" related keywords
-            const nearbyLines = headerLines.slice(Math.max(0, idx - 1), idx + 2);
-            const hasDateKeyword = nearbyLines.some(l =>
-              /\b(date|dated|dt\.?|invoice\s*date|bill\s*date)\b/i.test(l)
-            );
-            if (hasDateKeyword) confidence += 10;
-
-            detectedDates.push({
-              date: normalized,
-              confidence,
-              lineIndex: idx,
-              distanceToInvoice,
-            });
-          }
-        }
-      }
-    }
-  });
-
-  // Third pass: Look for dates in same line as invoice number
-  invoicePositions.forEach(({ lineIndex }) => {
-    const line = textLines[lineIndex];
-    if (!line) return;
-
-    for (const { pattern, format } of STANDALONE_DATE_PATTERNS) {
-      const dateMatch = line.match(pattern);
-      if (dateMatch) {
-        const normalized = normalizeDate(dateMatch, format);
-        if (normalized) {
-          // Skip if we already have this date
-          if (detectedDates.some(d => d.date === normalized && d.confidence >= 60)) continue;
-
-          let confidence = 50;
-          // Check if invoice number pattern also has "date" nearby in the line
-          if (/\b(date|dated|dt\.?)\b/i.test(line)) confidence += 20;
-
-          detectedDates.push({
-            date: normalized,
-            confidence,
-            lineIndex,
-            distanceToInvoice: 0,
-          });
-          break;
-        }
-      }
-    }
-  });
-
-  // Sort by confidence (descending), then by distance to invoice (ascending)
-  detectedDates.sort((a, b) => {
-    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-    return a.distanceToInvoice - b.distanceToInvoice;
-  });
-
-  const bestMatch = detectedDates[0];
-  if (!bestMatch) {
-    return { date: null, confidence: 0 };
-  }
-
-  // Cap confidence at 95
-  const finalConfidence = Math.min(95, bestMatch.confidence);
-
-  return {
-    date: bestMatch.date,
-    confidence: finalConfidence,
-  };
-};
-
-// ─── Header Block Detection for Supplier Name ─────────────────────────────────
-// Business entity suffixes that indicate a company/supplier name
-const COMPANY_SUFFIX_PATTERNS = [
-  /\bPVT\.?\s*LTD\.?\b/i,
-  /\bPRIVATE\s*LIMITED\b/i,
-  /\bLTD\.?\b/i,
-  /\bLIMITED\b/i,
-  /\bLLP\b/i,
-  /\bLLC\b/i,
-  /\bINC\.?\b/i,
-  /\bCORP\.?\b/i,
-  /\bCORPORATION\b/i,
-  /\bCO\.?\b/i,
-  /\bCOMPANY\b/i,
-  /\bENTERPRISES?\b/i,
-  /\bTRADERS?\b/i,
-  /\bTRADING\b/i,
-  /\bTRADNG\b/i,
-  /\bINDUSTRIES?\b/i,
-  /\bINDUSTRIAL\b/i,
-  /\bDISTRIBUTORS?\b/i,
-  /\bDISTRIBUTION\b/i,
-  /\bAGENCY\b/i,
-  /\bAGENCIES\b/i,
-  /\bMEDICALS?\b/i,
-  /\bPHARMA\b/i,
-  /\bPHARMACEUTICALS?\b/i,
-  /\bHEALTHCARE\b/i,
-  /\bSALES\b/i,
-  /\bSUPPLIES?\b/i,
-  /\bSUPPLIERS?\b/i,
-  /\bMART\b/i,
-  /\bSTORES?\b/i,
-  /\bSHOP\b/i,
-];
-
-// Prefix patterns that indicate a company name
-const COMPANY_PREFIX_PATTERNS = [
-  /^M\/S\.?\s+/i,
-  /^MS\.?\s+/i,
-  /^SHRI\s+/i,
-  /^SHREE\s+/i,
-  /^SRI\s+/i,
-];
-
-interface DetectedCompany {
-  name: string;
-  lineIndex: number;
-  confidence: number;
-  distanceToGstin: number;
-}
-
-/**
- * Detects supplier/company names from the header block (first 35% of PDF).
- * Prioritizes names near GSTIN occurrences and returns confidence score.
- */
-const detectSupplierFromHeaderBlock = (
-  textLines: string[]
-): { name: string | null; confidence: number; gstin: string | null } => {
-  if (textLines.length === 0) {
-    return { name: null, confidence: 0, gstin: null };
-  }
-
-  // Search only the first 35% of the document (header block)
-  const headerEndLine = Math.ceil(textLines.length * 0.35);
-  const headerLines = textLines.slice(0, headerEndLine);
-
-  // Find all GSTIN occurrences with their line positions
-  const gstinPositions: { gstin: string; lineIndex: number }[] = [];
-  headerLines.forEach((line, idx) => {
-    const matches = line.match(Gstin_PATTERN);
-    if (matches) {
-      matches.forEach(gstin => {
-        gstinPositions.push({ gstin: gstin.toUpperCase(), lineIndex: idx });
-      });
-    }
-  });
-
-  // Also search full text for GSTIN if not found in header
-  if (gstinPositions.length === 0) {
-    textLines.forEach((line, idx) => {
-      const matches = line.match(Gstin_PATTERN);
-      if (matches) {
-        matches.forEach(gstin => {
-          gstinPositions.push({ gstin: gstin.toUpperCase(), lineIndex: idx });
-        });
-      }
-    });
-  }
-
-  const primaryGstin = gstinPositions.length > 0 ? gstinPositions[0].gstin : null;
-
-  // Detect potential company names in header block
-  const detectedCompanies: DetectedCompany[] = [];
-
-  headerLines.forEach((line, idx) => {
-    const trimmedLine = line.trim();
-    if (trimmedLine.length < 4 || trimmedLine.length > 100) return;
-
-    // Skip lines that are clearly data (numbers, dates, etc.)
-    if (/^[0-9\s\-.\/,]+$/.test(trimmedLine)) return;
-    if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(trimmedLine)) return;
-
-    let confidence = 0;
-    let hasCompanyIndicator = false;
-
-    // Check for company suffix patterns (strong indicator)
-    for (const pattern of COMPANY_SUFFIX_PATTERNS) {
-      if (pattern.test(trimmedLine)) {
-        confidence += 40;
-        hasCompanyIndicator = true;
-        break;
-      }
-    }
-
-    // Check for M/S prefix (strong indicator)
-    for (const pattern of COMPANY_PREFIX_PATTERNS) {
-      if (pattern.test(trimmedLine)) {
-        confidence += 35;
-        hasCompanyIndicator = true;
-        // Remove the prefix from the name
-        const cleanedName = trimmedLine.replace(pattern, '').trim();
-        if (cleanedName.length >= 3) {
-          // Recurse with cleaned name but keep original for final output
-          const cleanedCompany: DetectedCompany = {
-            name: cleanedName,
-            lineIndex: idx,
-            confidence: confidence + 10,
-            distanceToGstin: Infinity,
-          };
-          // Calculate distance to nearest GSTIN
-          const nearestGstin = gstinPositions.reduce((min, pos) => {
-            const dist = Math.abs(pos.lineIndex - idx);
-            return dist < min ? dist : min;
-          }, Infinity);
-          cleanedCompany.distanceToGstin = nearestGstin;
-          // Bonus for proximity to GSTIN
-          if (nearestGstin <= 2) cleanedCompany.confidence += 30;
-          else if (nearestGstin <= 5) cleanedCompany.confidence += 20;
-          else if (nearestGstin <= 10) cleanedCompany.confidence += 10;
-          detectedCompanies.push(cleanedCompany);
-          return; // Skip adding the original line
-        }
-        break;
-      }
-    }
-
-    // Check for capitalized multi-word names (medium indicator)
-    // A company name typically has multiple capitalized words
-    const words = trimmedLine.split(/\s+/);
-    const capitalizedWords = words.filter(w => /^[A-Z][a-zA-Z&]+$/.test(w));
-    if (capitalizedWords.length >= 2 && words.length >= 2 && words.length <= 8) {
-      confidence += 15;
-      hasCompanyIndicator = true;
-    }
-
-    // Bonus for all caps (common in invoices)
-    if (/^[A-Z\s&.,]+$/.test(trimmedLine) && trimmedLine.length > 5) {
-      confidence += 10;
-      hasCompanyIndicator = true;
-    }
-
-    // Skip if no company indicators found
-    if (!hasCompanyIndicator) return;
-
-    // Calculate distance to nearest GSTIN
-    const nearestGstinDistance = gstinPositions.reduce((min, pos) => {
-      const dist = Math.abs(pos.lineIndex - idx);
-      return dist < min ? dist : min;
-    }, Infinity);
-
-    // Bonus for proximity to GSTIN
-    if (nearestGstinDistance <= 2) confidence += 30;
-    else if (nearestGstinDistance <= 5) confidence += 20;
-    else if (nearestGstinDistance <= 10) confidence += 10;
-
-    detectedCompanies.push({
-      name: trimmedLine,
-      lineIndex: idx,
-      confidence,
-      distanceToGstin: nearestGstinDistance,
-    });
-  });
-
-  // If no companies with suffix/prefix found, try alternative patterns
-  if (detectedCompanies.length === 0 && headerLines.length > 0) {
-    // Look for lines following "From:", "Supplier:", "Vendor:", "Party:" labels
-    for (let idx = 0; idx < headerLines.length - 1; idx++) {
-      const line = headerLines[idx].trim().toLowerCase();
-      if (/^(from|supplier|vendor|party|seller|consignor|sold\s*by)[:\s]*$/i.test(line)) {
-        const nextLine = headerLines[idx + 1]?.trim();
-        if (nextLine && nextLine.length >= 3 && nextLine.length <= 100) {
-          detectedCompanies.push({
-            name: nextLine,
-            lineIndex: idx + 1,
-            confidence: 50,
-            distanceToGstin: gstinPositions.reduce((min, pos) => {
-              const dist = Math.abs(pos.lineIndex - (idx + 1));
-              return dist < min ? dist : min;
-            }, Infinity),
-          });
-        }
-      }
-    }
-
-    // Look for standalone business name patterns
-    for (let idx = 0; idx < headerLines.length; idx++) {
-      const line = headerLines[idx].trim();
-      // Check if line looks like a business name (capitalized, reasonable length)
-      if (line.length >= 5 && line.length <= 80) {
-        // Skip lines that are addresses, phone numbers, etc.
-        if (/^(address|phone|mobile|email|tel|fax|pin|state|city)[:\s]/i.test(line)) continue;
-        if (/\d{6,}/.test(line)) continue; // Contains long numbers (phone, pincode)
-        if (/@\w+\.\w+/.test(line)) continue; // Email address
-
-        // Check for standalone business indicators
-        const hasBusinessWord = /\b(enterprises?|traders?|industries?|distributors?|medical|pharma|agency|agencies|sales|supplies?)\b/i.test(line);
-        const isCapitalized = /^[A-Z][A-Z\s&.,]+$/.test(line) || /^[A-Z][a-z]+(\s+[A-Z][a-z]+)+$/.test(line);
-
-        if (hasBusinessWord || isCapitalized) {
-          const distanceToGstin = gstinPositions.reduce((min, pos) => {
-            const dist = Math.abs(pos.lineIndex - idx);
-            return dist < min ? dist : min;
-          }, Infinity);
-
-          let confidence = hasBusinessWord ? 30 : 15;
-          if (distanceToGstin <= 2) confidence += 25;
-          else if (distanceToGstin <= 5) confidence += 15;
-
-          detectedCompanies.push({
-            name: line,
-            lineIndex: idx,
-            confidence,
-            distanceToGstin,
-          });
-        }
-      }
-    }
-  }
-
-  // Sort by confidence (descending), then by distance to GSTIN (ascending)
-  detectedCompanies.sort((a, b) => {
-    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-    return a.distanceToGstin - b.distanceToGstin;
-  });
-
-  const bestMatch = detectedCompanies[0];
-  if (!bestMatch) {
-    return { name: null, confidence: 0, gstin: primaryGstin };
-  }
-
-  // Clean up the name
-  let cleanedName = bestMatch.name
-    .replace(/^(M\/S\.?\s*|MS\.?\s*|SHRI\s*|SHREE\s*|SRI\s*)/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  // Remove trailing business type if it appears duplicated or malformed
-  cleanedName = cleanedName
-    .replace(/,\s*$/, '')
-    .replace(/\s*\([^)]*\)\s*$/, '')
-    .trim();
-
-  // Cap confidence at 95
-  const finalConfidence = Math.min(95, bestMatch.confidence);
-
-  return {
-    name: cleanedName || null,
-    confidence: finalConfidence,
-    gstin: primaryGstin,
-  };
-};
 
 const detectMetadata = (textLines: string[], pageCount: number): DocumentMetadata => {
   const fullText = textLines.join('\n');
@@ -1280,19 +718,10 @@ const detectMetadata = (textLines: string[], pageCount: number): DocumentMetadat
     detectedKeywords: [],
   };
 
-  // Use enhanced header block detection for supplier name and GSTIN
-  const supplierDetection = detectSupplierFromHeaderBlock(textLines);
-  if (supplierDetection.gstin) {
-    metadata.supplierGstin = supplierDetection.gstin;
-  }
-  if (supplierDetection.name) {
-    metadata.supplierName = supplierDetection.name;
-  }
-
-  // Use enhanced date detection
-  const dateDetection = detectInvoiceDate(textLines);
-  if (dateDetection.date) {
-    metadata.invoiceDate = dateDetection.date;
+  // Detect GSTIN
+  const gstinMatch = fullText.match(Gstin_PATTERN);
+  if (gstinMatch) {
+    metadata.supplierGstin = gstinMatch[0].toUpperCase();
   }
 
   // Detect invoice number
@@ -1300,6 +729,28 @@ const detectMetadata = (textLines: string[], pageCount: number): DocumentMetadat
     const match = fullText.match(pattern);
     if (match) {
       metadata.invoiceNumber = match[1].trim();
+      break;
+    }
+  }
+
+  // Detect date
+  for (const pattern of DATE_PATTERNS) {
+    const match = fullText.match(pattern);
+    if (match) {
+      metadata.invoiceDate = match[1];
+      break;
+    }
+  }
+
+  // Detect supplier name (heuristic: first non-trivial line before GSTIN or near "from" or "supplier")
+  const supplierPatterns = [
+    /(?:from|supplier|vendor|party|consignor)[\s:]+([A-Za-z0-9\s&.,]+?)(?:\n|$)/i,
+    /^([A-Z][A-Za-z\s&.,]+(?:PVT|LLP|LTD|CO|CORP|INDUSTRIES|ENTERPRISES|TRADERS|TRADNG|SALES|MEDICAL|PHARMA|HEALTHCARE)[A-Za-z\s&.,]*)/m,
+  ];
+  for (const pattern of supplierPatterns) {
+    const match = fullText.match(pattern);
+    if (match && match[1].length > 3) {
+      metadata.supplierName = match[1].trim().substring(0, 100);
       break;
     }
   }
@@ -1858,18 +1309,6 @@ export const suggestMappings = (headers: string[]): FieldMapping[] => {
   const used = new Set<ImportFieldKey>();
   const mappings: FieldMapping[] = headers.map((header) => {
     let bestKey: ImportFieldKey | null = null;
-
-    // First, check if the header is already a normalized standard name
-    // This provides automatic mapping for headers that have been normalized
-    // by the header detection engine (e.g., "Product Name", "Quantity", "GST")
-    const directMapping = STANDARD_NAME_TO_FIELD_KEY[header];
-    if (directMapping && !used.has(directMapping)) {
-      bestKey = directMapping;
-      used.add(bestKey);
-      return { sourceColumn: header, fieldKey: bestKey };
-    }
-
-    // Fallback to fuzzy keyword matching for non-standard headers
     let bestScore = 0;
     for (const field of IMPORT_FIELD_DEFINITIONS) {
       if (used.has(field.key)) continue;

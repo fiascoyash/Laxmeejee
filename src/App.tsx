@@ -26,18 +26,9 @@ import { createClient } from '@supabase/supabase-js';
 
 type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport';
 
-const SIDEBAR_STORAGE_KEY = 'sidebar_collapsed';
-const SIDEBAR_EXPANDED_WIDTH = 280;
-const SIDEBAR_COLLAPSED_WIDTH = 72;
-
 function App() {
   const [view, setView] = useState<View>('home');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    // Initialize from localStorage
-    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    return stored === 'true';
-  });
 
   // Company Profile State
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(storage.getCompanyProfile);
@@ -293,11 +284,6 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        // Close mobile sidebar first (mobile only)
-        if (sidebarOpen) {
-          setSidebarOpen(false);
-          return;
-        }
         // Close keyboard shortcuts modal first
         if (showShortcutsModal) {
           setShowShortcutsModal(false);
@@ -350,7 +336,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [sidebarOpen, showShortcutsModal, previewingTemplate, showTemplateBuilder, showCompanyProfile, editingInvoice, view, editingQuotationId]);
+  }, [showShortcutsModal, previewingTemplate, showTemplateBuilder, showCompanyProfile, editingInvoice, view, editingQuotationId]);
 
   // Navigate to a view, clearing any edit states
   const navigateTo = (targetView: View) => {
@@ -1028,49 +1014,24 @@ function App() {
     setViewingSupplier(supplierData);
   };
 
-  const NavItem = ({ icon: Icon, label, currentView, targetView, collapsed }: {
+  const NavItem = ({ icon: Icon, label, currentView, targetView }: {
     icon: LucideIcon;
     label: string;
     currentView: View;
     targetView: View;
-    collapsed?: boolean;
-  }) => {
-    const isActive = currentView === targetView;
-
-    if (collapsed) {
-      return (
-        <button
-          onClick={() => navigateTo(targetView)}
-          title={label}
-          className={`w-full flex items-center justify-center p-3 rounded-lg transition-all duration-200 group relative ${
-            isActive
-              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-          }`}
-        >
-          <Icon className="w-5 h-5" />
-          {/* Tooltip */}
-          <span className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-sm rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
-            {label}
-          </span>
-        </button>
-      );
-    }
-
-    return (
-      <button
-        onClick={() => navigateTo(targetView)}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-          isActive
-            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-        }`}
-      >
-        <Icon className="w-5 h-5 flex-shrink-0" />
-        <span className="font-medium truncate">{label}</span>
-      </button>
-    );
-  };
+  }) => (
+    <button
+      onClick={() => navigateTo(targetView)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+        currentView === targetView
+          ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+      }`}
+    >
+      <Icon className="w-5 h-5" />
+      <span className="font-medium">{label}</span>
+    </button>
+  );
 
   const selectedTemplate = getCurrentTemplate();
   const invoiceTemplate = editingInvoice?.selectedTemplateId
@@ -1111,136 +1072,73 @@ function App() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full bg-slate-900 text-white flex flex-col shadow-xl z-50 transform transition-all duration-200 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } ${sidebarCollapsed ? 'lg:w-[72px]' : 'lg:w-[280px]'}`}
-        style={{ width: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH }}
+        className={`fixed top-0 left-0 h-full w-64 bg-slate-900 text-white flex flex-col shadow-xl z-50 transform transition-transform lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
       >
-        {/* Sidebar Header */}
-        <div className={`border-b border-slate-700 flex items-center ${sidebarCollapsed ? 'justify-center p-4' : 'justify-between p-6'}`}>
-          {sidebarCollapsed ? (
-            <>
-              <Sun className="w-6 h-6 text-emerald-500" />
-            </>
-          ) : (
-            <>
-              <div>
-                <h1 className="text-xl font-bold text-white tracking-tight">Laxmeejee</h1>
-                <p className="text-slate-400 text-sm">GST Invoice System</p>
-              </div>
-            </>
-          )}
+        <div className="p-6 border-b border-slate-700">
+          <h1 className="text-2xl font-bold text-white tracking-tight">Laxmeejee</h1>
+          <p className="text-slate-400 text-sm mt-1">GST Invoice System</p>
         </div>
 
-        {/* Collapse Toggle Button (Desktop only) */}
-        <button
-          onClick={() => {
-            const newState = !sidebarCollapsed;
-            setSidebarCollapsed(newState);
-            localStorage.setItem(SIDEBAR_STORAGE_KEY, String(newState));
-          }}
-          className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-slate-800 border border-slate-600 rounded-full items-center justify-center hover:bg-slate-700 transition-colors z-10"
-          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <ChevronRight className={`w-4 h-4 text-slate-300 transition-transform duration-200 ${sidebarCollapsed ? '' : 'rotate-180'}`} />
-        </button>
-
-        <nav className="flex-1 py-4 overflow-y-auto overflow-x-hidden">
-          <ul className="space-y-1 px-2">
-            <li><NavItem icon={Home} label="Dashboard" currentView={view} targetView="home" collapsed={sidebarCollapsed} /></li>
-            <li><NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" collapsed={sidebarCollapsed} /></li>
-            <li><NavItem icon={List} label="Quotation History" currentView={view} targetView="list" collapsed={sidebarCollapsed} /></li>
+        <nav className="flex-1 py-6 overflow-y-auto">
+          <ul className="space-y-1 px-3">
+            <li><NavItem icon={Home} label="Dashboard" currentView={view} targetView="home" /></li>
+            <li><NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" /></li>
+            <li><NavItem icon={List} label="Quotation History" currentView={view} targetView="list" /></li>
           </ul>
-          <div className="mt-4 px-2">
-            {!sidebarCollapsed && (
-              <p className="px-3 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Invoices</p>
-            )}
+          <div className="mt-4 px-3">
+            <p className="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Invoices</p>
             <ul className="space-y-1">
-              <li><NavItem icon={Receipt} label="New Invoice" currentView={view} targetView="newInvoice" collapsed={sidebarCollapsed} /></li>
-              <li><NavItem icon={Receipt} label="Invoice History" currentView={view} targetView="invoiceList" collapsed={sidebarCollapsed} /></li>
+              <li><NavItem icon={Receipt} label="New Invoice" currentView={view} targetView="newInvoice" /></li>
+              <li><NavItem icon={Receipt} label="Invoice History" currentView={view} targetView="invoiceList" /></li>
             </ul>
           </div>
-          <div className="mt-4 px-2">
-            {!sidebarCollapsed && (
-              <p className="px-3 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Management</p>
-            )}
+          <div className="mt-4 px-3">
+            <p className="px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Management</p>
             <ul className="space-y-1">
-              <li><NavItem icon={Users} label="Customers" currentView={view} targetView="customers" collapsed={sidebarCollapsed} /></li>
-              <li><NavItem icon={Truck} label="Suppliers" currentView={view} targetView="suppliers" collapsed={sidebarCollapsed} /></li>
-              <li><NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" collapsed={sidebarCollapsed} /></li>
-              <li><NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" collapsed={sidebarCollapsed} /></li>
-              <li><NavItem icon={Zap} label="Smart Import" currentView={view} targetView="smartImport" collapsed={sidebarCollapsed} /></li>
-              <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" collapsed={sidebarCollapsed} /></li>
+              <li><NavItem icon={Users} label="Customers" currentView={view} targetView="customers" /></li>
+              <li><NavItem icon={Truck} label="Suppliers" currentView={view} targetView="suppliers" /></li>
+              <li><NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" /></li>
+              <li><NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" /></li>
+              <li><NavItem icon={Zap} label="Smart Purchase Import" currentView={view} targetView="smartImport" /></li>
+              <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" /></li>
             </ul>
           </div>
         </nav>
 
-        <div className={`border-t border-slate-700 ${sidebarCollapsed ? 'p-2' : 'p-4'}`}>
-          {sidebarCollapsed ? (
-            <button
-              onClick={() => setShowShortcutsModal(true)}
-              title="Keyboard Shortcuts"
-              className="w-full flex items-center justify-center p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors relative group"
-            >
-              <Keyboard className="w-5 h-5" />
-              <span className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-sm rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
-                Keyboard Shortcuts
-              </span>
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => setShowShortcutsModal(true)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-xs"
-              >
-                <Keyboard className="w-4 h-4" />
-                <span>Keyboard Shortcuts</span>
-              </button>
-              <p className="text-slate-500 text-xs mt-2 px-3">Press ESC to go to Dashboard</p>
-            </>
-          )}
+        <div className="p-4 border-t border-slate-700">
+          <button
+            onClick={() => setShowShortcutsModal(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-xs"
+          >
+            <Keyboard className="w-4 h-4" />
+            <span>Keyboard Shortcuts</span>
+          </button>
+          <p className="text-slate-500 text-xs mt-2 px-3">Press ESC to go to Dashboard</p>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main
-        className="min-h-screen transition-all duration-200 ease-in-out lg:ml-0"
-        style={{
-          marginLeft: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH,
-        }}
-      >
+      <main className="lg:ml-64 min-h-screen">
         {/* Desktop Header */}
         <header className="hidden lg:block bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-30">
           <div className="flex items-center justify-between">
-            {/* Hamburger Menu + Breadcrumb */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
               <button
-                onClick={() => {
-                  const newState = !sidebarCollapsed;
-                  setSidebarCollapsed(newState);
-                  localStorage.setItem(SIDEBAR_STORAGE_KEY, String(newState));
-                }}
-                className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                onClick={() => navigateTo('home')}
+                className="hover:text-emerald-600 transition-colors"
               >
-                <Menu className="w-5 h-5 text-slate-600" />
+                Dashboard
               </button>
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <button
-                  onClick={() => navigateTo('home')}
-                  className="hover:text-emerald-600 transition-colors"
-                >
-                  Dashboard
-                </button>
-                {view !== 'home' && (
-                  <>
-                    <ChevronRight className="w-4 h-4" />
-                    <span className="text-slate-800 font-medium capitalize">
-                      {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view === 'smartImport' ? 'Smart Purchase Import' : view}
-                    </span>
-                  </>
-                )}
-              </div>
+              {view !== 'home' && (
+                <>
+                  <ChevronRight className="w-4 h-4" />
+                  <span className="text-slate-800 font-medium capitalize">
+                    {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view === 'smartImport' ? 'Smart Purchase Import' : view}
+                  </span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button
