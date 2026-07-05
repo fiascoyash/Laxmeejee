@@ -19,7 +19,7 @@ import { CustomerHistory } from './components/CustomerHistory';
 import { SupplierList } from './components/SupplierList';
 import { SupplierForm } from './components/SupplierForm';
 import { SupplierLedger } from './components/SupplierLedger';
-import { SmartPurchaseImport } from './components/SmartPurchaseImport';
+import { SmartPurchaseImport } from './components/smart-import';
 import { GstReports } from './components/GstReports';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3 } from 'lucide-react';
