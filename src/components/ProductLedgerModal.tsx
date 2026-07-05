@@ -3,6 +3,7 @@ import { X, Package, TrendingUp, DollarSign, Calendar, Truck, ArrowUp, ArrowDown
 import { ProductCatalogItem, ProductPurchase, ProductStockMovement, ProductLedgerSummary, SupplierData } from '../types';
 import { createClient } from '@supabase/supabase-js';
 import { AddExistingStockModal } from './AddExistingStockModal';
+import { storage } from '../utils/storage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -35,7 +36,7 @@ export function ProductLedgerModal({ isOpen, onClose, product, suppliers, onUpda
 
   const fetchHistory = async () => {
     if (!supabase) {
-      // Fallback to mock data if no Supabase
+      // Fallback to localStorage if no Supabase
       calculateSummaryFromLocalStorage();
       return;
     }
@@ -49,7 +50,15 @@ export function ProductLedgerModal({ isOpen, onClose, product, suppliers, onUpda
         .eq('product_id', product.id)
         .order('purchase_date', { ascending: false });
 
-      if (!purchaseError && purchaseData) {
+      // Fetch stock movements
+      const { data: movementData, error: movementError } = await supabase
+        .from('product_stock_movements')
+        .select('*')
+        .eq('product_id', product.id)
+        .order('created_at', { ascending: false });
+
+      // If Supabase returns data, use it
+      if (!purchaseError && purchaseData && purchaseData.length > 0) {
         setPurchases(purchaseData.map(p => ({
           id: p.id,
           productId: p.product_id,
@@ -61,16 +70,13 @@ export function ProductLedgerModal({ isOpen, onClose, product, suppliers, onUpda
           notes: p.notes,
           createdAt: p.created_at,
         })));
+      } else {
+        // Fallback to localStorage
+        const localPurchases = storage.getProductPurchasesByProductId(product.id);
+        setPurchases(localPurchases);
       }
 
-      // Fetch stock movements
-      const { data: movementData, error: movementError } = await supabase
-        .from('product_stock_movements')
-        .select('*')
-        .eq('product_id', product.id)
-        .order('created_at', { ascending: false });
-
-      if (!movementError && movementData) {
+      if (!movementError && movementData && movementData.length > 0) {
         setMovements(movementData.map(m => ({
           id: m.id,
           productId: m.product_id,
@@ -82,6 +88,10 @@ export function ProductLedgerModal({ isOpen, onClose, product, suppliers, onUpda
           notes: m.notes,
           createdAt: m.created_at,
         })));
+      } else {
+        // Fallback to localStorage
+        const localMovements = storage.getProductStockMovementsByProductId(product.id);
+        setMovements(localMovements);
       }
 
       // Calculate summary
@@ -124,16 +134,39 @@ export function ProductLedgerModal({ isOpen, onClose, product, suppliers, onUpda
   };
 
   const calculateSummaryFromLocalStorage = () => {
-    // Use only current product data if no history exists
-    setPurchases([]);
-    setMovements([]);
+    // Read from localStorage using the storage functions
+    const productPurchases = storage.getProductPurchasesByProductId(product.id);
+    const productMovements = storage.getProductStockMovementsByProductId(product.id);
+
+    setPurchases(productPurchases);
+    setMovements(productMovements);
+
+    // Calculate summary from purchases
+    const totalPurchaseValue = productPurchases.reduce((sum, p) => sum + (p.totalValue || 0), 0);
+    const totalQuantity = productPurchases.reduce((sum, p) => sum + (p.quantity || 0), 0);
+    const avgPurchasePrice = totalQuantity > 0 ? totalPurchaseValue / totalQuantity : product.purchasePrice;
+
+    // Find primary supplier (most frequent)
+    const supplierCounts: Record<string, number> = {};
+    productPurchases.forEach(p => {
+      if (p.supplierName) {
+        supplierCounts[p.supplierName] = (supplierCounts[p.supplierName] || 0) + 1;
+      }
+    });
+    const primarySupplier = Object.entries(supplierCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || product.brand;
+
+    // Find last purchase date
+    const lastPurchaseDate = productPurchases.length > 0
+      ? productPurchases[0].purchaseDate
+      : undefined;
+
     setSummary({
       currentStock: product.stockQuantity,
-      averagePurchasePrice: product.purchasePrice,
+      averagePurchasePrice: avgPurchasePrice,
       sellingPrice: product.sellingPrice,
       totalStockValue: product.purchasePrice * product.stockQuantity,
-      lastPurchaseDate: undefined,
-      primarySupplier: product.brand,
+      lastPurchaseDate,
+      primarySupplier,
     });
   };
 

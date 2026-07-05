@@ -19,7 +19,7 @@ import { CustomerHistory } from './components/CustomerHistory';
 import { SupplierList } from './components/SupplierList';
 import { SupplierForm } from './components/SupplierForm';
 import { SupplierLedger } from './components/SupplierLedger';
-import { SmartBillImport } from './components/smart-bill-import';
+import { SmartBillImport } from './features/smart-bill-import';
 import { GstReports } from './components/GstReports';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3 } from 'lucide-react';
@@ -1659,14 +1659,11 @@ function App() {
 
           {/* Smart Bill Import */}
           {view === 'smartImport' && (
-            <div className="max-w-6xl mx-auto">
-              <SmartBillImport
+            <SmartBillImport
                 catalog={catalog}
+                onCatalogChange={handleSaveCatalog}
                 suppliers={suppliers}
-                onCatalogChange={setCatalog}
-                onSuppliersChange={setSuppliers}
               />
-            </div>
           )}
 
           {/* GST Reports */}

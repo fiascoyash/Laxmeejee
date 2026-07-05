@@ -2,7 +2,7 @@ import {
   CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn,
   Invoice, NumberingSettings, GstMode, CustomerData,
   DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UnitType, IndustryType, ExpiryStatus, UNIT_OPTIONS,
-  SupplierData, SupplierTransaction,
+  SupplierData, SupplierTransaction, ProductPurchase, ProductStockMovement, StockMovementType,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -16,6 +16,8 @@ const STORAGE_KEYS = {
   SUPPLIERS: 'laxmeejee_suppliers',
   SUPPLIER_TRANSACTIONS: 'laxmeejee_supplier_transactions',
   LAST_USED_COLUMNS: 'laxmeejee_last_used_columns',
+  PRODUCT_PURCHASES: 'laxmeejee_product_purchases',
+  PRODUCT_STOCK_MOVEMENTS: 'laxmeejee_product_stock_movements',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -393,6 +395,79 @@ export const storage = {
 
   clearLastUsedColumns: (): void => {
     localStorage.removeItem(STORAGE_KEYS.LAST_USED_COLUMNS);
+  },
+
+  // ─── Product Purchases (Stock History) ─────────────────────────────────────
+
+  getProductPurchases: (): ProductPurchase[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.PRODUCT_PURCHASES);
+    return data ? JSON.parse(data) : [];
+  },
+
+  saveProductPurchase: (purchase: ProductPurchase): void => {
+    const purchases = storage.getProductPurchases();
+    const existingIndex = purchases.findIndex(p => p.id === purchase.id);
+    if (existingIndex >= 0) {
+      purchases[existingIndex] = purchase;
+    } else {
+      purchases.unshift(purchase);
+    }
+    localStorage.setItem(STORAGE_KEYS.PRODUCT_PURCHASES, JSON.stringify(purchases));
+  },
+
+  getProductPurchasesByProductId: (productId: string): ProductPurchase[] => {
+    return storage.getProductPurchases()
+      .filter(p => p.productId === productId)
+      .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+  },
+
+  // ─── Product Stock Movements ───────────────────────────────────────────────
+
+  getProductStockMovements: (): ProductStockMovement[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.PRODUCT_STOCK_MOVEMENTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  saveProductStockMovement: (movement: ProductStockMovement): void => {
+    const movements = storage.getProductStockMovements();
+    const existingIndex = movements.findIndex(m => m.id === movement.id);
+    if (existingIndex >= 0) {
+      movements[existingIndex] = movement;
+    } else {
+      movements.unshift(movement);
+    }
+    localStorage.setItem(STORAGE_KEYS.PRODUCT_STOCK_MOVEMENTS, JSON.stringify(movements));
+  },
+
+  getProductStockMovementsByProductId: (productId: string): ProductStockMovement[] => {
+    return storage.getProductStockMovements()
+      .filter(m => m.productId === productId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  // Create a stock movement and return the balance after
+  createStockMovement: (
+    productId: string,
+    movementType: StockMovementType,
+    quantityChange: number,
+    balanceAfter: number,
+    referenceType?: string,
+    referenceId?: string,
+    notes?: string
+  ): ProductStockMovement => {
+    const movement: ProductStockMovement = {
+      id: generateId(),
+      productId,
+      movementType,
+      quantityChange,
+      balanceAfter,
+      referenceType,
+      referenceId,
+      notes,
+      createdAt: new Date().toISOString(),
+    };
+    storage.saveProductStockMovement(movement);
+    return movement;
   },
 };
 
