@@ -440,6 +440,15 @@ export function InteractivePdfMapping({
       });
       console.log('[InteractivePdfMapping] Products Extracted from PDF columns:', rows);
       console.log('[InteractivePdfMapping] Data passed to Preview:', rows);
+      for (const row of rows) {
+        console.log('===== Product Object =====');
+        console.log('Product:', row.productName);
+        console.log('Qty:', row.quantity);
+        console.log('HSN:', row.hsnSac);
+        console.log('Purchase Price:', row.purchasePrice);
+        console.log('GST:', row.gstPercent);
+        console.log('Amount:', row.amount);
+      }
       setProductRows(rows);
     }
   }, [phase, alignedRows, productRows.length, detectedColumns]);

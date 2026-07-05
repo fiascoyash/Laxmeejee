@@ -148,20 +148,28 @@ const estimateColumnBounds = (
     .filter(it => it.page === headerItem.page && Math.abs(it.y - headerY) < 3)
     .sort((a, b) => a.x - b.x);
 
-  // Find the header's position in the sorted line
-  const headerIdx = sameLineItems.findIndex(
-    it => it.x === headerItem.x && it.str === headerItem.str
+  // Find the header's position in the sorted line (with tolerance for x)
+  const X_TOLERANCE = 2;
+  let headerIdx = sameLineItems.findIndex(
+    it => Math.abs(it.x - headerItem.x) < X_TOLERANCE && it.str === headerItem.str
   );
 
-  // Default bounds: the header text width with some padding
-  let xStart = headerItem.x;
-  let xEnd = headerItem.x + headerItem.width;
+  // If not found with tolerance, try just matching the text (header might have slightly different x)
+  if (headerIdx < 0) {
+    headerIdx = sameLineItems.findIndex(it => it.str.trim() === headerItem.str.trim());
+  }
+
+  // Default bounds: generous padding around the header text
+  const generousPadding = 20;
+  let xStart = headerItem.x - generousPadding;
+  let xEnd = headerItem.x + headerItem.width + generousPadding;
 
   // Look at the gap to the left neighbor to set xStart
   if (headerIdx > 0) {
     const leftNeighbor = sameLineItems[headerIdx - 1];
     const gap = headerItem.x - (leftNeighbor.x + leftNeighbor.width);
     if (gap > 0) {
+      // Midpoint between left neighbor and this column
       xStart = Math.max(xStart, leftNeighbor.x + leftNeighbor.width + gap * 0.5);
     }
   }
@@ -171,18 +179,30 @@ const estimateColumnBounds = (
     const rightNeighbor = sameLineItems[headerIdx + 1];
     const gap = rightNeighbor.x - (headerItem.x + headerItem.width);
     if (gap > 0) {
+      // Midpoint between this column and right neighbor
       xEnd = Math.min(xEnd, headerItem.x + headerItem.width + gap * 0.5);
     }
-  } else if (headerIdx >= 0) {
-    // Last item on the line — give it a generous right bound
-    xEnd = Math.max(xEnd, headerItem.x + headerItem.width + 50);
   }
 
-  // Ensure minimum width
-  const minWidth = 30;
-  if (xEnd - xStart < minWidth) {
-    xEnd = xStart + minWidth;
+  // If last item on the line or headerIdx not found, extend right bound generously
+  if (headerIdx < 0 || headerIdx >= sameLineItems.length - 1) {
+    xEnd = Math.max(xEnd, headerItem.x + headerItem.width + 80);
   }
+
+  // Ensure minimum width for data columns (numbers need space)
+  const minWidth = 50;
+  if (xEnd - xStart < minWidth) {
+    // Expand symmetrically
+    const center = (xStart + xEnd) / 2;
+    xStart = center - minWidth / 2;
+    xEnd = center + minWidth / 2;
+  }
+
+  console.log('[estimateColumnBounds] Header:', headerItem.str,
+    '| headerIdx:', headerIdx,
+    '| xStart:', xStart.toFixed(1),
+    '| xEnd:', xEnd.toFixed(1),
+    '| width:', (xEnd - xStart).toFixed(1));
 
   return { xStart, xEnd };
 };
@@ -252,8 +272,11 @@ export const detectColumnFromHeader = (
   headerItem: PdfTextItem,
   allPageText: PageTextData[]
 ): DetectedColumn => {
+  console.log('[detectColumnFromHeader] START Header:', headerItem.str, '| page:', headerItem.page);
+
   const pageData = allPageText.find(p => p.page === headerItem.page);
   if (!pageData) {
+    console.warn('[detectColumnFromHeader] No page data found');
     return {
       headerItem,
       xStart: headerItem.x,
@@ -264,16 +287,55 @@ export const detectColumnFromHeader = (
     };
   }
 
-  const { xStart, xEnd } = estimateColumnBounds(headerItem, pageData.items);
+  let { xStart, xEnd } = estimateColumnBounds(headerItem, pageData.items);
 
   // Find all items below the header on the same page, within the column's
   // x-extent. In pdfjs, lower y values are further down the page.
-  const itemsBelow = pageData.items
+  // Use a more permissive overlap check: value is in column if it STARTS within
+  // the column bounds OR if it ENDS within the column bounds OR overlaps.
+  // This handles left-aligned, right-aligned, and center-aligned values.
+  let itemsBelow = pageData.items
     .filter(it => it.y < headerItem.y - 2) // strictly below the header
-    .filter(it => it.x + it.width >= xStart && it.x <= xEnd); // overlaps column
+    .filter(it => {
+      const itemEnd = it.x + it.width;
+      const overlapsLeft = it.x >= xStart && it.x <= xEnd;  // value starts in column
+      const overlapsRight = itemEnd >= xStart && itemEnd <= xEnd;  // value ends in column
+      const overlapsMiddle = it.x < xStart && itemEnd > xEnd;  // value spans column
+      return overlapsLeft || overlapsRight || overlapsMiddle;
+    });
+
+  // If very few items found, expand bounds progressively
+  // Many invoice formats have misaligned values
+  if (itemsBelow.length < 3) {
+    console.log('[detectColumnFromHeader] Only', itemsBelow.length, 'items found, expanding bounds');
+
+    // First expansion: generous padding
+    const expandBy = 30;
+    xStart = Math.max(0, xStart - expandBy);
+    xEnd = xEnd + expandBy;
+
+    itemsBelow = pageData.items
+      .filter(it => it.y < headerItem.y - 2)
+      .filter(it => it.x + it.width >= xStart && it.x <= xEnd);
+
+    // If still too few, try even more aggressive expansion
+    if (itemsBelow.length < 3) {
+      xStart = Math.max(0, xStart - 50);
+      xEnd = xEnd + 50;
+
+      itemsBelow = pageData.items
+        .filter(it => it.y < headerItem.y - 2)
+        .filter(it => it.x + it.width >= xStart && it.x <= xEnd);
+
+      console.log('[detectColumnFromHeader] After aggressive expansion:', itemsBelow.length, 'items');
+    }
+  }
+
+  console.log('[detectColumnFromHeader] Found', itemsBelow.length, 'items below header within bounds');
 
   // Group into rows
   const rawRows = groupItemsIntoRows(itemsBelow);
+  console.log('[detectColumnFromHeader] Grouped into', rawRows.length, 'raw rows');
 
   // Detect the table boundary — the first footer row ends the table
   const tableBottomY = detectTableBottomY(rawRows);
@@ -296,6 +358,9 @@ export const detectColumnFromHeader = (
     values.push(row.text);
     rowYPositions.push(row.y);
   }
+
+  console.log('[detectColumnFromHeader] Final values count:', values.length, '| first few:', values.slice(0, 3));
+  console.log('[detectColumnFromHeader] yPositions:', rowYPositions);
 
   return {
     headerItem,
@@ -340,10 +405,22 @@ const isProductNameColumn = (col: DetectedColumn): boolean => {
 export const alignColumnRows = (
   columns: DetectedColumn[]
 ): { rowValues: Record<string, string>; yPosition: number }[] => {
+  console.log('[alignColumnRows] START with', columns.length, 'columns');
   if (columns.length === 0) return [];
+
+  // Log what each column detected
+  for (const col of columns) {
+    console.log('[alignColumnRows] Column:', col.headerItem.str.trim(),
+      '| values:', col.values.length,
+      '| yPositions:', col.rowYPositions.length,
+      '| first 3 values:', col.values.slice(0, 3));
+  }
 
   const productNameCol = columns.find(isProductNameColumn) || null;
   const dataColumns = columns.filter(c => c !== productNameCol);
+
+  console.log('[alignColumnRows] Product name col:', productNameCol?.headerItem.str.trim() || 'none');
+  console.log('[alignColumnRows] Data columns:', dataColumns.map(c => c.headerItem.str.trim()));
 
   // Choose the anchor: prefer Quantity, then Amount, then the first data column.
   // The anchor must have at least one value to define row positions.
@@ -358,13 +435,23 @@ export const alignColumnRows = (
   if (!anchorCol && productNameCol) {
     anchorCol = productNameCol;
   }
-  if (!anchorCol) return [];
+  if (!anchorCol) {
+    console.warn('[alignColumnRows] No anchor column found');
+    return [];
+  }
+
+  console.log('[alignColumnRows] Anchor column:', anchorCol.headerItem.str.trim(),
+    '| yPositions:', anchorCol.rowYPositions.length);
 
   const anchorYs = anchorCol.rowYPositions;
-  if (anchorYs.length === 0) return [];
+  if (anchorYs.length === 0) {
+    console.warn('[alignColumnRows] Anchor has no yPositions');
+    return [];
+  }
 
   // Sort anchor y-positions top-to-bottom (descending in pdfjs coords)
   const sortedAnchorYs = [...anchorYs].sort((a, b) => b - a);
+  console.log('[alignColumnRows] Sorted anchor Ys:', sortedAnchorYs);
 
   // For multi-line name merging, we need the y-boundaries of each product row.
   // A product row spans from the y just below the previous anchor, down to
@@ -378,8 +465,11 @@ export const alignColumnRows = (
     const anchorY = sortedAnchorYs[rowIdx];
     const rowValues: Record<string, string> = {};
 
+    console.log(`[alignColumnRows] Processing row ${rowIdx} at y=${anchorY.toFixed(1)}`);
+
     // ── Pull values from each data column at this y-position ──────────────
     for (const col of dataColumns) {
+      // Find corresponding value in this column at same y
       let bestIdx = -1;
       let bestDist = Infinity;
       for (let i = 0; i < col.rowYPositions.length; i++) {
@@ -390,7 +480,12 @@ export const alignColumnRows = (
         }
       }
       if (bestIdx >= 0) {
-        rowValues[col.headerItem.str.trim()] = col.values[bestIdx];
+        const header = col.headerItem.str.trim();
+        const value = col.values[bestIdx];
+        rowValues[header] = value;
+        console.log(`[alignColumnRows]   ${header}: "${value}" (dist=${bestDist.toFixed(1)})`);
+      } else {
+        console.log(`[alignColumnRows]   ${col.headerItem.str.trim()}: NO MATCH (closest dist was > ${ROW_Y_TOLERANCE})`);
       }
     }
 
@@ -405,49 +500,62 @@ export const alignColumnRows = (
       // Name items at the same y as the anchor (the first line of the name)
       // plus any items below the anchor down to (but not including) the next row.
       const nameYs = productNameCol.rowYPositions;
-      const collected: string[] = [];
+      const fragmentsWithY: { y: number; text: string }[] = [];
+
       for (let i = 0; i < nameYs.length; i++) {
         const ny = nameYs[i];
         // Must be at or below the anchor's first line (within tolerance) and
         // above the next anchor row
         if (ny <= anchorY + ROW_Y_TOLERANCE) {
           if (nextAnchorY === null || ny > nextAnchorY + ROW_Y_TOLERANCE) {
-            collected.push(productNameCol.values[i]);
+            fragmentsWithY.push({ y: ny, text: productNameCol.values[i] });
           }
         }
       }
       // Sort collected name fragments by their y descending (top-to-bottom)
       // so the name reads in the correct order
-      const fragmentsWithY: { y: number; text: string }[] = [];
-      for (let i = 0; i < nameYs.length; i++) {
-        const ny = nameYs[i];
-        if (ny <= anchorY + ROW_Y_TOLERANCE) {
-          if (nextAnchorY === null || ny > nextAnchorY + ROW_Y_TOLERANCE) {
-            fragmentsWithY.push({ y: ny, text: productNameCol.values[i] });
-          }
-        }
-      }
       fragmentsWithY.sort((a, b) => b.y - a.y);
       productNameValue = fragmentsWithY.map(f => f.text).join(' ').replace(/\s+/g, ' ').trim();
       if (productNameValue) {
         rowValues[productNameCol.headerItem.str.trim()] = productNameValue;
+        console.log(`[alignColumnRows]   Product Name: "${productNameValue}"`);
       }
     }
 
     // ── Discard rows with no product name AND no data values ──────────────
-    const hasData = Object.keys(rowValues).some(k => k !== (productNameCol?.headerItem.str.trim() ?? '') && rowValues[k] && rowValues[k].trim());
+    const productNameHeader = productNameCol?.headerItem.str.trim() ?? '';
+    const hasData = Object.keys(rowValues).some(k => k !== productNameHeader && rowValues[k] && rowValues[k].trim());
+    const hasProductName = productNameValue.trim().length > 0;
+
     if (!productNameValue.trim() && !hasData) {
+      console.log(`[alignColumnRows]   SKIPPING row ${rowIdx} - no product name and no data`);
       continue;
     }
 
     // ── Filter footer/summary rows ─────────────────────────────────────────
     if (productNameValue && isFooterLine(productNameValue)) {
+      console.log(`[alignColumnRows]   SKIPPING row ${rowIdx} - footer line`);
       continue;
     }
 
+    console.log(`[alignColumnRows]   KEEPING row ${rowIdx}:`, rowValues);
     rows.push({ rowValues, yPosition: anchorY });
   }
 
+  console.log('[alignColumnRows] FINAL rows:', rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    console.log(`[alignColumnRows] ===== ROW ${i} =====`);
+    console.log('[alignColumnRows] Detected row bounds: y=', r.yPosition.toFixed(1));
+    console.log('[alignColumnRows] Row Y coordinate:', r.yPosition);
+    console.log('[alignColumnRows] Product cell:', r.rowValues[productNameCol?.headerItem.str.trim() || ''] || 'N/A');
+    console.log('[alignColumnRows] Qty cell:', Object.entries(r.rowValues).find(([k]) => k.toLowerCase().includes('qty'))?.[1] || 'N/A');
+    console.log('[alignColumnRows] HSN cell:', Object.entries(r.rowValues).find(([k]) => k.toLowerCase().includes('hsn'))?.[1] || 'N/A');
+    console.log('[alignColumnRows] Rate cell:', Object.entries(r.rowValues).find(([k]) => k.toLowerCase().includes('rate') || k.toLowerCase().includes('price'))?.[1] || 'N/A');
+    console.log('[alignColumnRows] GST cell:', Object.entries(r.rowValues).find(([k]) => k.toLowerCase().includes('gst'))?.[1] || 'N/A');
+    console.log('[alignColumnRows] Amount cell:', Object.entries(r.rowValues).find(([k]) => k.toLowerCase().includes('amount'))?.[1] || 'N/A');
+    console.log('[alignColumnRows] Final Product Object:', r.rowValues);
+  }
   return rows;
 };
 
