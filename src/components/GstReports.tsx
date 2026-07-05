@@ -17,7 +17,7 @@ import {
   HelpCircle,
   ArrowRight,
 } from 'lucide-react';
-import { Invoice, CompanyProfile, PurchaseHistoryEntry } from '../types';
+import { Invoice, CompanyProfile } from '../types';
 import {
   DateFilterType,
   DateRange,
@@ -58,13 +58,11 @@ type GstReportView =
 interface GstReportsProps {
   invoices: Invoice[];
   companyProfile: CompanyProfile;
-  purchaseHistory?: PurchaseHistoryEntry[];
 }
 
 export const GstReports: React.FC<GstReportsProps> = ({
   invoices,
   companyProfile,
-  purchaseHistory = [],
 }) => {
   const [activeView, setActiveView] = useState<GstReportView>('dashboard');
   const [filterType, setFilterType] = useState<DateFilterType>('this_month');
@@ -92,11 +90,11 @@ export const GstReports: React.FC<GstReportsProps> = ({
       gstSummary: calculateGstRateSummary(filteredInvoices, companyGstin),
       hsnSacSummary: calculateHsnSacSummary(filteredInvoices, companyGstin),
       salesRegister: generateSalesRegister(filteredInvoices, companyGstin),
-      purchaseRegister: generatePurchaseRegister(purchaseHistory),
+      purchaseRegister: generatePurchaseRegister([]),
       gstr1: generateGstr1Report(filteredInvoices, companyGstin),
       validation: validateInvoices(filteredInvoices, companyGstin),
     };
-  }, [filteredInvoices, companyProfile, purchaseHistory]);
+  }, [filteredInvoices, companyProfile]);
 
   // Modal state for viewing affected invoices
   const [selectedIssue, setSelectedIssue] = useState<ValidationIssue | null>(null);

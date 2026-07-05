@@ -19,7 +19,7 @@ import { CustomerHistory } from './components/CustomerHistory';
 import { SupplierList } from './components/SupplierList';
 import { SupplierForm } from './components/SupplierForm';
 import { SupplierLedger } from './components/SupplierLedger';
-import { SmartPurchaseImport } from './components/smart-import';
+import { SmartBillImport } from './components/smart-bill-import';
 import { GstReports } from './components/GstReports';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3 } from 'lucide-react';
@@ -1102,7 +1102,7 @@ function App() {
               <li><NavItem icon={Truck} label="Suppliers" currentView={view} targetView="suppliers" /></li>
               <li><NavItem icon={Layout} label="Templates" currentView={view} targetView="templates" /></li>
               <li><NavItem icon={Package} label="Product Catalog" currentView={view} targetView="catalog" /></li>
-              <li><NavItem icon={Zap} label="Smart Purchase Import" currentView={view} targetView="smartImport" /></li>
+              <li><NavItem icon={Zap} label="Smart Bill Import" currentView={view} targetView="smartImport" /></li>
               <li><NavItem icon={Settings} label="Settings" currentView={view} targetView="settings" /></li>
             </ul>
           </div>
@@ -1142,7 +1142,7 @@ function App() {
                 <>
                   <ChevronRight className="w-4 h-4" />
                   <span className="text-slate-800 font-medium capitalize">
-                    {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view === 'smartImport' ? 'Smart Purchase Import' : view}
+                    {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view === 'smartImport' ? 'Smart Bill Import' : view}
                   </span>
                 </>
               )}
@@ -1657,10 +1657,10 @@ function App() {
             </div>
           )}
 
-          {/* Smart Purchase Import */}
+          {/* Smart Bill Import */}
           {view === 'smartImport' && (
             <div className="max-w-6xl mx-auto">
-              <SmartPurchaseImport
+              <SmartBillImport
                 catalog={catalog}
                 suppliers={suppliers}
                 onCatalogChange={setCatalog}
@@ -1674,7 +1674,6 @@ function App() {
             <GstReports
               invoices={invoices}
               companyProfile={companyProfile}
-              purchaseHistory={storage.getPurchaseHistory()}
             />
           )}
 

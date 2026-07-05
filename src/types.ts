@@ -1217,306 +1217,69 @@ export interface ProductLedgerSummary {
 
 // ─── End Product Inventory History ────────────────────────────────────────────
 
-// ─── Smart Purchase Import Engine ─────────────────────────────────────────────
+// ─── Smart Bill Import Engine ──────────────────────────────────────────────────
 
-// Supported import file formats. Architecture is extensible — add new values
-// here when new parsers (e.g. image OCR, barcode, email) are implemented.
-export type ImportFormat = 'csv' | 'xlsx' | 'pdf';
+// Supported import file formats (PDF only for now)
+export type BillImportFormat = 'pdf';
 
-// Parser plugin interface for future extensibility (OCR/AI ready)
-export interface ImportParserPlugin {
-  id: string;
-  name: string;
-  supportedFormats: ImportFormat[];
-  priority: number; // Higher priority plugins are tried first
-  parse(file: File): Promise<ParseResult>;
-  detectMetadata?(file: File): Promise<DocumentMetadata>;
-  detectScanned?(file: File): Promise<boolean>;
-}
-
-// Canonical fields the import engine understands. Every supplier column gets
-// mapped to one of these. Keep this list in sync with FIELD_DEFINITIONS.
-export type ImportFieldKey =
+// Fields that can be mapped from PDF text
+export type BillFieldKey =
   | 'productName'
-  | 'description'
   | 'quantity'
   | 'purchasePrice'
   | 'gstPercent'
   | 'hsnSac'
-  | 'batch'
-  | 'expiry'
-  | 'mrp'
-  | 'amount'
-  | 'supplierInvoiceNumber'
   | 'unit'
-  | 'serialNumber'
-  | 'discount';
+  | 'amount';
 
-export interface ImportFieldDefinition {
-  key: ImportFieldKey;
+export interface BillFieldDefinition {
+  key: BillFieldKey;
   label: string;
   description: string;
   required: boolean;
-  type: 'text' | 'number' | 'date';
+  type: 'text' | 'number';
 }
 
-export const IMPORT_FIELD_DEFINITIONS: ImportFieldDefinition[] = [
-  { key: 'productName', label: 'Product Name', description: 'Item name as printed on the bill', required: true, type: 'text' },
-  { key: 'description', label: 'Description', description: 'Additional item description', required: false, type: 'text' },
-  { key: 'quantity', label: 'Quantity', description: 'Number of units purchased', required: true, type: 'number' },
-  { key: 'purchasePrice', label: 'Purchase Price', description: 'Per-unit purchase rate', required: true, type: 'number' },
-  { key: 'gstPercent', label: 'GST %', description: 'GST rate applied to the item', required: false, type: 'number' },
-  { key: 'hsnSac', label: 'HSN/SAC', description: 'HSN or SAC code', required: false, type: 'text' },
-  { key: 'batch', label: 'Batch', description: 'Batch number', required: false, type: 'text' },
-  { key: 'expiry', label: 'Expiry', description: 'Expiry date', required: false, type: 'date' },
-  { key: 'mrp', label: 'MRP', description: 'Maximum retail price', required: false, type: 'number' },
-  { key: 'amount', label: 'Amount', description: 'Line total (qty x rate)', required: false, type: 'number' },
-  { key: 'supplierInvoiceNumber', label: 'Supplier Invoice Number', description: 'Bill/invoice number from supplier', required: false, type: 'text' },
-  { key: 'unit', label: 'Unit', description: 'Unit of measurement (piece, box, kg, etc.)', required: false, type: 'text' },
-  { key: 'serialNumber', label: 'Serial Number', description: 'Serial number or IMEI', required: false, type: 'text' },
-  { key: 'discount', label: 'Discount', description: 'Discount percentage or amount', required: false, type: 'number' },
+export const BILL_FIELD_DEFINITIONS: BillFieldDefinition[] = [
+  { key: 'productName', label: 'Product Name', description: 'Item name', required: true, type: 'text' },
+  { key: 'quantity', label: 'Quantity', description: 'Number of units', required: true, type: 'number' },
+  { key: 'purchasePrice', label: 'Purchase Rate', description: 'Per-unit rate', required: true, type: 'number' },
+  { key: 'gstPercent', label: 'GST %', description: 'GST rate', required: true, type: 'number' },
+  { key: 'hsnSac', label: 'HSN', description: 'HSN/SAC code', required: false, type: 'text' },
+  { key: 'unit', label: 'Unit', description: 'Unit of measurement', required: false, type: 'text' },
+  { key: 'amount', label: 'Amount', description: 'Line total', required: false, type: 'number' },
 ];
 
-// A single row extracted from the uploaded document, before mapping.
-// Keys are the original column headers from the source file.
-export type ExtractedRow = Record<string, string | number>;
-
-// Document metadata detected from the uploaded file
-export interface DocumentMetadata {
-  invoiceNumber?: string;
-  invoiceDate?: string;
-  supplierName?: string;
-  supplierGstin?: string;
-  invoiceTotal?: string;
-  currency: string;
-  pageCount: number;
-  isScanned: boolean;
-  detectedKeywords: string[];
-}
-
-// Confidence reasons for low confidence scores
-export interface ConfidenceIssue {
-  field: string;
-  reason: string;
-  severity: 'critical' | 'warning' | 'info';
-}
-
-// Result of parsing an uploaded file.
-export interface ParseResult {
-  format: ImportFormat;
-  fileName: string;
-  headers: string[];
-  rows: ExtractedRow[];
-  // Warnings generated during parsing (e.g. low OCR confidence, empty rows).
-  warnings: string[];
-  // 0-100 confidence score for the extraction. PDFs with messy text get a
-  // lower score so the UI can ask the user to confirm before importing.
-  confidence: number;
-  // Specific issues explaining why confidence might be low
-  confidenceIssues: ConfidenceIssue[];
-  // Document metadata detected from the file
-  metadata?: DocumentMetadata;
-  // Raw text content (for PDF text extraction display)
-  rawTextLines?: string[];
-}
-
-// Maps a source column header to a canonical import field.
-// sourceColumn is the header text from the file; fieldKey is null when the
-// column is unmapped (will be ignored during import).
-export interface FieldMapping {
-  sourceColumn: string;
-  fieldKey: ImportFieldKey | null;
-}
-
-// A saved supplier template remembers the column mapping for a specific
-// supplier so the next import auto-applies it.
-export interface SupplierImportTemplate {
+// A single mapped product from the PDF
+export interface BillMappedProduct {
   id: string;
-  supplierId: string;
-  supplierName: string;
-  supplierGstin?: string;
-  // Ordered list of mappings. Stored as a snapshot so renaming a column in a
-  // future bill does not silently break the template.
-  mappings: FieldMapping[];
-  // Column positions for layout detection (x coordinates or column indices)
-  columnPositions?: number[];
-  // Original header names as saved
-  originalHeaders?: string[];
-  createdAt: string;
-  updatedAt: string;
-  // Usage statistics
-  useCount?: number;
-  lastUsedAt?: string;
-}
-
-// ─── PDF Visual Mapping Layout Memory ─────────────────────────────────────────
-// Remembers the visual column positions a user taught the parser for a specific
-// supplier's PDF invoices, so the next import auto-applies the same layout.
-
-// Coordinates of a single taught column in PDF coordinate space (pdfjs
-// bottom-left origin, scale 1). Used to re-detect the same column in a future
-// PDF from this supplier without requiring the user to re-teach it.
-export interface PdfColumnCoordinate {
-  fieldKey: ImportFieldKey;
-  // Header text the user clicked (e.g. "Description of Goods")
-  headerText: string;
-  // X position of the header text item in PDF coords
-  x: number;
-  // Y position of the header text item in PDF coords
-  y: number;
-  // Width of the detected column (for hit-testing rows beneath)
-  width: number;
-  // Page number where the header was found (1-indexed)
-  page: number;
-}
-
-export interface SupplierPdfLayout {
-  id: string;
-  supplierId: string;
-  supplierName: string;
-  supplierGstin?: string;
-  // Taught column coordinates, one per mapped field
-  columns: PdfColumnCoordinate[];
-  // Metadata values the user confirmed (invoice number, date, etc.)
-  metadata?: {
-    invoiceNumber?: string;
-    invoiceDate?: string;
-    supplierName?: string;
-    supplierGstin?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-  useCount?: number;
-  lastUsedAt?: string;
-}
-
-// Match decision for a single imported row against the product catalog.
-export type MatchDecision = 'match_existing' | 'create_new' | 'skip';
-
-// Confidence bucket used for the badge color in the UI.
-export type MatchConfidenceLevel = 'high' | 'medium' | 'low' | 'none';
-
-export interface ProductMatchCandidate {
-  product: ProductCatalogItem;
-  score: number; // 0-100
-  level: MatchConfidenceLevel;
-}
-
-// A row that has been mapped, matched, and is ready for the preview table.
-export interface ImportPreviewRow {
-  // Stable id for React keys and drag/drop.
-  id: string;
-  // Row index in original file
-  rowIndex: number;
-  // Raw mapped values pulled from the source row.
-  importedProductName: string;
-  importedDescription?: string;
+  productName: string;
   quantity: number;
   purchasePrice: number;
   gstPercent: number;
   hsnSac?: string;
-  batch?: string;
-  expiry?: string;
-  mrp?: number;
-  amount?: number;
-  supplierInvoiceNumber?: string;
   unit?: string;
-  serialNumber?: string;
-  discount?: number;
-  // Match resolution.
-  candidates: ProductMatchCandidate[];
-  selectedCandidateId: string | null;
-  decision: MatchDecision;
-  // Resolved product (either the matched catalog product or a draft new product).
-  resolvedProduct: ProductCatalogItem | null;
-  // Per-row warnings (e.g. missing quantity, low OCR confidence).
-  warnings: string[];
-  // Stock tracking for audit
-  stockBefore?: number;
-  stockAfter?: number;
+  amount?: number;
+  // For matching
+  matchedProductId?: string;
+  decision: 'match_existing' | 'create_new' | 'skip';
 }
 
-// Import validation summary statistics
-export interface ImportValidationSummary {
-  totalProducts: number;
-  matchedProducts: number;
-  newProducts: number;
-  duplicateProducts: number;
-  missingHsn: number;
-  missingGst: number;
-  missingQty: number;
-  missingPrice: number;
-  warnings: number;
-}
-
-// Stock movement record for audit trail
-export interface StockMovementRecord {
-  date: string;
-  supplierId?: string;
-  supplierName?: string;
-  invoiceNumber?: string;
-  productId: string;
-  productName: string;
-  purchaseQty: number;
-  purchasePrice: number;
-  stockBefore: number;
-  stockAfter: number;
-  user: string;
-  importSource: ImportFormat;
-}
-
-// Purchase history entry for a product
-export interface PurchaseHistoryEntry {
-  id: string;
-  productId: string;
-  supplierId?: string;
-  supplierName?: string;
-  invoiceNumber?: string;
-  invoiceDate?: string;
-  purchasePrice: number;
-  quantityPurchased: number;
-  gstPercent?: number;
-  batch?: string;
-  expiry?: string;
-  importedBy: string;
-  importTime: string;
-  importSource: ImportFormat;
-}
-
-export type ImportLogStatus = 'success' | 'partial' | 'failed';
-
-export interface ImportLogEntry {
+// Import log for Smart Bill Import
+export interface BillImportLog {
   id: string;
   importDate: string;
-  importedBy: string;
   fileName: string;
-  format: ImportFormat;
   supplierId?: string;
   supplierName?: string;
   invoiceNumber?: string;
   productsImported: number;
   totalValue: number;
-  status: ImportLogStatus;
+  status: 'success' | 'partial' | 'failed';
   errors: string[];
-  // Snapshot of the rows that were actually committed, for audit.
-  rows: {
-    productName: string;
-    matchedProductId?: string;
-    matchedProductName?: string;
-    quantity: number;
-    purchasePrice: number;
-    gstPercent: number;
-    decision: MatchDecision;
-    stockBefore?: number;
-    stockAfter?: number;
-  }[];
-  // Confidence score at import time
-  confidence?: number;
-  // Document metadata captured
-  metadata?: DocumentMetadata;
 }
 
-// ─── End Smart Purchase Import Engine ─────────────────────────────────────────
+// ─── End Smart Bill Import Engine ──────────────────────────────────────────────
 
 export const PLACEHOLDERS = {
   '{{customer_name}}': 'Customer Name',
