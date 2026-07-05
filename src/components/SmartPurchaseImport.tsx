@@ -8,6 +8,7 @@ import {
   ImportLogEntry,
   ImportFieldKey,
   SupplierImportTemplate,
+  SupplierPdfLayout,
   MatchDecision,
   StockMovementRecord,
   PurchaseHistoryEntry,
@@ -41,6 +42,10 @@ import { ImportLogView } from './import/ImportLogView';
 import { ConfidenceScoreDisplay } from './import/ConfidenceScoreDisplay';
 import { ImportValidationSummary } from './import/ImportValidationSummary';
 import { DocumentMetadataPreview } from './import/DocumentMetadataPreview';
+import {
+  InteractivePdfMapping,
+  InteractivePdfMappingResult,
+} from './import/InteractivePdfMapping';
 
 type Step = 'upload' | 'mapping' | 'matching' | 'preview' | 'done';
 
@@ -79,6 +84,9 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
   const [duplicateWarning, setDuplicateWarning] = useState<boolean>(false);
   const [forceImport, setForceImport] = useState<boolean>(false);
   const [saveTemplateAfterImport, setSaveTemplateAfterImport] = useState<boolean>(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [showInteractiveMapping, setShowInteractiveMapping] = useState<boolean>(false);
+  const [savedPdfLayout, setSavedPdfLayout] = useState<SupplierPdfLayout | null>(null);
 
   const selectedSupplier = useMemo(
     () => suppliers.find((s) => s.id === selectedSupplierId) || null,
@@ -86,9 +94,14 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
   );
 
   // ─── Step 1: Upload ──────────────────────────────────────────────────────
+  // PDF and Excel/CSV follow different workflows:
+  //   - PDF: parser extracts metadata only, then opens Interactive PDF Mapping
+  //     for visual column selection. No dropdown mapping.
+  //   - Excel/CSV: automatic parser extracts rows, dropdown mapping applies.
   const handleFile = useCallback(async (file: File) => {
     setParsing(true);
     setParseError('');
+    setUploadedFile(file);
     try {
       const result = await parseFile(file);
       setParseResult(result);
@@ -99,22 +112,12 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
         return;
       }
 
-      if (result.rows.length === 0) {
-        setParseError(result.warnings.join(' ') || 'No data rows found in the file.');
-        return;
-      }
-
-      // Auto-suggest mappings, then apply any saved supplier template.
-      const suggested = suggestMappings(result.headers);
-      setMappings(suggested);
-
-      // Auto-fill metadata from detected document
+      // Auto-fill metadata from detected document (both flows use this)
       if (result.metadata) {
         if (result.metadata.invoiceNumber) {
           setInvoiceNumber(result.metadata.invoiceNumber);
         }
         if (result.metadata.supplierName) {
-          // Try to match supplier by name
           const matchedSupplier = suppliers.find(s =>
             s.firmName.toLowerCase().includes(result.metadata!.supplierName!.toLowerCase()) ||
             result.metadata!.supplierName!.toLowerCase().includes(s.firmName.toLowerCase())
@@ -124,12 +127,38 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
           }
         }
       }
+
+      // ─── PDF workflow: detect metadata, then user opens Interactive PDF Mapping ──
+      // We don't auto-open the mapper here — the user may want to select a
+      // supplier first (which enables saved-layout auto-apply). They click
+      // "Open Visual Mapper" on the upload step to proceed.
+      if (result.format === 'pdf') {
+        // Try to find a saved layout for this supplier (by supplierId or GSTIN)
+        let savedLayout: SupplierPdfLayout | null = null;
+        if (selectedSupplierId) {
+          savedLayout = storage.getSupplierPdfLayoutBySupplierId(selectedSupplierId) || null;
+        }
+        if (!savedLayout && result.metadata?.supplierGstin) {
+          savedLayout = storage.getSupplierPdfLayoutByGstin(result.metadata.supplierGstin) || null;
+        }
+        setSavedPdfLayout(savedLayout);
+        return;
+      }
+
+      // ─── Excel/CSV workflow: automatic parsing + dropdown mapping ─────────
+      if (result.rows.length === 0) {
+        setParseError(result.warnings.join(' ') || 'No data rows found in the file.');
+        return;
+      }
+
+      const suggested = suggestMappings(result.headers);
+      setMappings(suggested);
     } catch (err) {
       setParseError(err instanceof Error ? err.message : 'Failed to read file.');
     } finally {
       setParsing(false);
     }
-  }, [suppliers]);
+  }, [suppliers, selectedSupplierId]);
 
   const applySupplierTemplate = useCallback(
     (supplierId: string) => {
@@ -161,6 +190,11 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
   const handleSupplierChange = (supplierId: string) => {
     setSelectedSupplierId(supplierId);
     if (supplierId) applySupplierTemplate(supplierId);
+    // For PDFs, load any saved visual layout for this supplier
+    if (supplierId && parseResult?.format === 'pdf') {
+      const layout = storage.getSupplierPdfLayoutBySupplierId(supplierId);
+      setSavedPdfLayout(layout || null);
+    }
   };
 
   // ─── Step 2: Field mapping → build preview rows ──────────────────────────
@@ -353,6 +387,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
     }
     setDuplicateWarning(checkDuplicate());
     setForceImport(false);
+    console.log('[SmartPurchaseImport] Products Passed to Preview:', previewRows);
     setStep('preview');
   };
 
@@ -368,6 +403,7 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
       alert('No rows to import. All rows are skipped or invalid.');
       return;
     }
+    console.log('[SmartPurchaseImport] Products Passed to Confirm Import:', committedRows);
 
     const now = new Date().toISOString();
     const supplierName = selectedSupplier?.firmName;
@@ -657,6 +693,126 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
     setDuplicateWarning(false);
     setForceImport(false);
     setSaveTemplateAfterImport(false);
+    setUploadedFile(null);
+    setShowInteractiveMapping(false);
+    setSavedPdfLayout(null);
+  };
+
+  // ─── Apply interactive PDF mapping result ─────────────────────────────────
+  // Takes the visually-extracted product rows + metadata from the Interactive
+  // PDF Mapping modal, saves the supplier layout (if requested), builds
+  // ImportPreviewRow[] for the matching step, and advances the flow.
+  const applyInteractivePdfResult = (result: InteractivePdfMappingResult) => {
+    console.log('[SmartPurchaseImport] Visual Mapping Completed', result);
+    if (!parseResult) {
+      setShowInteractiveMapping(false);
+      return;
+    }
+
+    // Update metadata from the interactive mapper
+    if (result.metadataValues.invoiceNumber) {
+      setInvoiceNumber(result.metadataValues.invoiceNumber);
+    }
+    if (result.metadataValues.invoiceDate) {
+      setImportDate(result.metadataValues.invoiceDate || new Date().toISOString().split('T')[0]);
+    }
+    if (result.metadataValues.supplierName) {
+      const matchedSupplier = suppliers.find(s =>
+        s.firmName.toLowerCase().includes(result.metadataValues.supplierName!.toLowerCase()) ||
+        result.metadataValues.supplierName!.toLowerCase().includes(s.firmName.toLowerCase())
+      );
+      if (matchedSupplier) {
+        setSelectedSupplierId(matchedSupplier.id);
+      }
+    }
+    if (parseResult.metadata) {
+      const updatedMeta = { ...parseResult.metadata };
+      if (result.metadataValues.invoiceNumber) updatedMeta.invoiceNumber = result.metadataValues.invoiceNumber;
+      if (result.metadataValues.invoiceDate) updatedMeta.invoiceDate = result.metadataValues.invoiceDate;
+      if (result.metadataValues.supplierName) updatedMeta.supplierName = result.metadataValues.supplierName;
+      if (result.metadataValues.supplierGstin) updatedMeta.supplierGstin = result.metadataValues.supplierGstin;
+      if (result.metadataValues.invoiceTotal) updatedMeta.invoiceTotal = result.metadataValues.invoiceTotal;
+      setParseResult((prev) => (prev ? { ...prev, metadata: updatedMeta } : prev));
+    }
+
+    // Note: supplier PDF layout saving (with column coordinates) is handled
+    // inside InteractivePdfMapping before calling onApply, since the detected
+    // column coordinates are only available there.
+
+    // Filter out rows with no product name — these are footer/junk rows that
+    // slipped through column detection. They must not become fake products.
+    const validProductRows = result.productRows.filter(
+      (pr) => pr.productName && pr.productName.trim() !== ''
+    );
+    console.log('[SmartPurchaseImport] Products Extracted from Visual Mapping:', validProductRows);
+
+    const stockSnapshot = new Map<string, number>();
+    catalog.forEach(p => stockSnapshot.set(p.id, p.stockQuantity));
+
+    const rows: ImportPreviewRow[] = validProductRows.map((pr, idx) => {
+      const productName = pr.productName || '';
+      const quantity = parseFloat(pr.quantity) || 0;
+      const purchasePrice = parseFloat(pr.purchasePrice) || 0;
+      const gstPercent = parseFloat(pr.gstPercent) || 0;
+
+      const warnings: string[] = [];
+      if (!productName) warnings.push('Missing product name.');
+      if (quantity <= 0) warnings.push('Quantity is zero or missing.');
+      if (purchasePrice <= 0) warnings.push('Purchase price is zero or missing.');
+
+      const candidates = findMatchCandidates(productName, catalog);
+      const top = bestCandidate(productName, catalog);
+      const decision: MatchDecision = top && top.level !== 'none' ? 'match_existing' : 'create_new';
+
+      let resolvedProduct: ProductCatalogItem | null = null;
+      let stockBefore = 0;
+
+      if (decision === 'match_existing' && top) {
+        resolvedProduct = { ...top.product };
+        stockBefore = stockSnapshot.get(top.product.id) || 0;
+      } else {
+        const now = new Date().toISOString();
+        resolvedProduct = {
+          id: generateId(),
+          name: productName || `Imported Product ${idx + 1}`,
+          category: 'Imported',
+          unit: (pr.unit || 'piece') as UnitType,
+          purchasePrice,
+          sellingPrice: purchasePrice,
+          gstPercent,
+          hsnSacCode: pr.hsnSac || '',
+          stockQuantity: 0,
+          createdAt: now,
+          updatedAt: now,
+        };
+        stockBefore = 0;
+      }
+
+      return {
+        id: `${Date.now()}-${idx}`,
+        rowIndex: idx + 1,
+        importedProductName: productName,
+        quantity,
+        purchasePrice,
+        gstPercent,
+        hsnSac: pr.hsnSac || undefined,
+        unit: pr.unit || undefined,
+        amount: parseFloat(pr.amount) || undefined,
+        candidates,
+        selectedCandidateId: top && top.level !== 'none' ? top.product.id : null,
+        decision,
+        resolvedProduct,
+        warnings,
+        stockBefore,
+        stockAfter: stockBefore + quantity,
+      };
+    });
+
+    setPreviewRows(rows);
+    console.log('[SmartPurchaseImport] Products Stored in workflow state:', rows);
+    console.log('[SmartPurchaseImport] Products Passed to Match Products:', rows);
+    setShowInteractiveMapping(false);
+    setStep('matching');
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -760,12 +916,20 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
           setImportDate={setImportDate}
           importedBy={importedBy}
           setImportedBy={setImportedBy}
-          onNext={() => setStep('mapping')}
-          canProceed={!!parseResult && parseResult.rows.length > 0 && !parseResult.metadata?.isScanned}
+          onNext={() => {
+            // PDFs open the Interactive PDF Mapper; Excel/CSV go to dropdown mapping
+            if (parseResult?.format === 'pdf') {
+              setShowInteractiveMapping(true);
+            } else {
+              setStep('mapping');
+            }
+          }}
+          canProceed={!!parseResult && !parseResult.metadata?.isScanned && (parseResult.format === 'pdf' || parseResult.rows.length > 0)}
         />
       )}
 
-      {step === 'mapping' && parseResult && (
+      {/* Dropdown mapping step — Excel/CSV only. PDFs use Interactive PDF Mapping. */}
+      {step === 'mapping' && parseResult && parseResult.format !== 'pdf' && (
         <div className="space-y-4">
           {/* Confidence Score Display */}
           <ConfidenceScoreDisplay
@@ -846,6 +1010,19 @@ export function SmartPurchaseImport({ catalog, suppliers, onCatalogChange, onSup
       )}
 
       {showLogView && <ImportLogView onClose={() => setShowLogView(false)} />}
+
+      {showInteractiveMapping && uploadedFile && parseResult && (
+        <InteractivePdfMapping
+          file={uploadedFile}
+          initialMetadata={parseResult.metadata}
+          suppliers={suppliers}
+          selectedSupplierId={selectedSupplierId}
+          onSelectSupplier={handleSupplierChange}
+          savedLayout={savedPdfLayout}
+          onApply={applyInteractivePdfResult}
+          onCancel={() => setShowInteractiveMapping(false)}
+        />
+      )}
     </div>
   );
 }
@@ -944,7 +1121,8 @@ function UploadStep({
           </div>
         )}
 
-        {parseResult && parseResult.rows.length > 0 && !parseResult.metadata?.isScanned && (
+        {/* Excel/CSV success: rows extracted */}
+        {parseResult && parseResult.format !== 'pdf' && parseResult.rows.length > 0 && !parseResult.metadata?.isScanned && (
           <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <Check className="w-4 h-4 text-emerald-600" />
@@ -953,9 +1131,7 @@ function UploadStep({
               </p>
             </div>
             <div className="flex items-center gap-2 text-xs text-emerald-700">
-              {parseResult.format === 'pdf' ? (
-                <FileIcon className="w-3.5 h-3.5" />
-              ) : parseResult.format === 'xlsx' ? (
+              {parseResult.format === 'xlsx' ? (
                 <FileSpreadsheet className="w-3.5 h-3.5" />
               ) : (
                 <FileText className="w-3.5 h-3.5" />
@@ -972,6 +1148,28 @@ function UploadStep({
                 ))}
               </ul>
             )}
+          </div>
+        )}
+
+        {/* PDF success: metadata detected, visual mapping next */}
+        {parseResult && parseResult.format === 'pdf' && !parseResult.metadata?.isScanned && (
+          <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <p className="text-sm font-medium text-emerald-800">
+                PDF ready for visual mapping
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-emerald-700">
+              <FileIcon className="w-3.5 h-3.5" />
+              <span>{parseResult.fileName}</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">
+                {parseResult.metadata?.pageCount || 1} page{(parseResult.metadata?.pageCount || 1) > 1 ? 's' : ''}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-slate-600">
+              Click <strong>Continue to Mapping</strong> to open the visual PDF mapper and teach the product columns.
+            </p>
           </div>
         )}
 
@@ -1047,7 +1245,7 @@ function UploadStep({
           disabled={!canProceed}
           className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Continue to Mapping
+          {parseResult?.format === 'pdf' ? 'Open Visual Mapper' : 'Continue to Mapping'}
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

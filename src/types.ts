@@ -1287,6 +1287,7 @@ export interface DocumentMetadata {
   invoiceDate?: string;
   supplierName?: string;
   supplierGstin?: string;
+  invoiceTotal?: string;
   currency: string;
   pageCount: number;
   isScanned: boolean;
@@ -1344,6 +1345,47 @@ export interface SupplierImportTemplate {
   createdAt: string;
   updatedAt: string;
   // Usage statistics
+  useCount?: number;
+  lastUsedAt?: string;
+}
+
+// ─── PDF Visual Mapping Layout Memory ─────────────────────────────────────────
+// Remembers the visual column positions a user taught the parser for a specific
+// supplier's PDF invoices, so the next import auto-applies the same layout.
+
+// Coordinates of a single taught column in PDF coordinate space (pdfjs
+// bottom-left origin, scale 1). Used to re-detect the same column in a future
+// PDF from this supplier without requiring the user to re-teach it.
+export interface PdfColumnCoordinate {
+  fieldKey: ImportFieldKey;
+  // Header text the user clicked (e.g. "Description of Goods")
+  headerText: string;
+  // X position of the header text item in PDF coords
+  x: number;
+  // Y position of the header text item in PDF coords
+  y: number;
+  // Width of the detected column (for hit-testing rows beneath)
+  width: number;
+  // Page number where the header was found (1-indexed)
+  page: number;
+}
+
+export interface SupplierPdfLayout {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  supplierGstin?: string;
+  // Taught column coordinates, one per mapped field
+  columns: PdfColumnCoordinate[];
+  // Metadata values the user confirmed (invoice number, date, etc.)
+  metadata?: {
+    invoiceNumber?: string;
+    invoiceDate?: string;
+    supplierName?: string;
+    supplierGstin?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
   useCount?: number;
   lastUsedAt?: string;
 }

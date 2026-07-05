@@ -5,6 +5,7 @@ import {
   SupplierData, SupplierTransaction,
   SupplierImportTemplate, ImportLogEntry,
   PurchaseHistoryEntry, StockMovementRecord,
+  SupplierPdfLayout,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -22,6 +23,7 @@ const STORAGE_KEYS = {
   PURCHASE_IMPORT_LOGS: 'laxmeejee_purchase_import_logs',
   PURCHASE_HISTORY: 'laxmeejee_purchase_history',
   STOCK_MOVEMENTS: 'laxmeejee_stock_movements',
+  SUPPLIER_PDF_LAYOUTS: 'laxmeejee_supplier_pdf_layouts',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -426,6 +428,39 @@ export const storage = {
   deleteSupplierImportTemplate: (id: string): void => {
     const templates = storage.getSupplierImportTemplates().filter(t => t.id !== id);
     localStorage.setItem(STORAGE_KEYS.SUPPLIER_IMPORT_TEMPLATES, JSON.stringify(templates));
+  },
+
+  // ─── Supplier PDF Layout Memory ─────────────────────────────────────────────
+  // Stores visual column coordinates taught by the user for a supplier's PDF
+  // invoices, so the next import auto-applies the same layout.
+
+  getSupplierPdfLayouts: (): SupplierPdfLayout[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.SUPPLIER_PDF_LAYOUTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  getSupplierPdfLayoutBySupplierId: (supplierId: string): SupplierPdfLayout | undefined => {
+    return storage.getSupplierPdfLayouts().find(l => l.supplierId === supplierId);
+  },
+
+  getSupplierPdfLayoutByGstin: (gstin: string): SupplierPdfLayout | undefined => {
+    return storage.getSupplierPdfLayouts().find(l => l.supplierGstin?.toUpperCase() === gstin.toUpperCase());
+  },
+
+  saveSupplierPdfLayout: (layout: SupplierPdfLayout): void => {
+    const layouts = storage.getSupplierPdfLayouts();
+    const existingIndex = layouts.findIndex(l => l.id === layout.id);
+    if (existingIndex >= 0) {
+      layouts[existingIndex] = { ...layout, updatedAt: new Date().toISOString() };
+    } else {
+      layouts.push(layout);
+    }
+    localStorage.setItem(STORAGE_KEYS.SUPPLIER_PDF_LAYOUTS, JSON.stringify(layouts));
+  },
+
+  deleteSupplierPdfLayout: (id: string): void => {
+    const layouts = storage.getSupplierPdfLayouts().filter(l => l.id !== id);
+    localStorage.setItem(STORAGE_KEYS.SUPPLIER_PDF_LAYOUTS, JSON.stringify(layouts));
   },
 
   getImportLogs: (): ImportLogEntry[] => {

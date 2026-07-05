@@ -709,6 +709,11 @@ const CURRENCY_PATTERNS = [
   { pattern: /€|eur|euros?/i, currency: 'EUR' },
 ];
 
+const TOTAL_PATTERNS = [
+  /(?:grand\s+total|total\s+amount|total\s+payable|net\s+payable|amount\s+payable|invoice\s+total|bill\s+total|total)[\s:]*₹?\s*([0-9][0-9,]*\.?[0-9]*)/i,
+  /(?:grand\s+total|total\s+amount|total\s+payable|net\s+payable|amount\s+payable|invoice\s+total|bill\s+total|total)[\s:]*rs\.?\s*([0-9][0-9,]*\.?[0-9]*)/i,
+];
+
 const detectMetadata = (textLines: string[], pageCount: number): DocumentMetadata => {
   const fullText = textLines.join('\n');
   const metadata: DocumentMetadata = {
@@ -751,6 +756,15 @@ const detectMetadata = (textLines: string[], pageCount: number): DocumentMetadat
     const match = fullText.match(pattern);
     if (match && match[1].length > 3) {
       metadata.supplierName = match[1].trim().substring(0, 100);
+      break;
+    }
+  }
+
+  // Detect invoice total
+  for (const pattern of TOTAL_PATTERNS) {
+    const match = fullText.match(pattern);
+    if (match) {
+      metadata.invoiceTotal = match[1].replace(/,/g, '');
       break;
     }
   }
@@ -814,7 +828,7 @@ interface TextBlock {
   width: number;
 }
 
-const detectTableFromTextBlocks = (
+export const detectTableFromTextBlocks = (
   pageItems: Array<{ str: string; transform: number[]; width: number }>[]
 ): { headers: string[]; rows: ExtractedRow[]; confidence: number } => {
   const allBlocks: TextBlock[] = [];
@@ -1108,7 +1122,14 @@ const parseXlsx = async (file: File): Promise<ParseResult> => {
   };
 };
 
-// ─── PDF parsing (Enhanced) ─────────────────────────────────────────────────
+// ─── PDF parsing (Metadata-Only Strategy) ────────────────────────────────────
+// Per the redesigned PDF workflow, the parser NO LONGER attempts to extract
+// product rows from the PDF. It only detects basic invoice metadata:
+//   - Supplier Name, Supplier GSTIN, Invoice Number, Invoice Date,
+//     Invoice Total, Currency, Page Count
+// Product extraction happens via Visual Mapping in InteractivePdfMapping,
+// where the user teaches the parser which columns are which by clicking
+// column headers directly on the rendered PDF.
 
 const parsePdf = async (file: File): Promise<ParseResult> => {
   try {
@@ -1120,8 +1141,6 @@ const parsePdf = async (file: File): Promise<ParseResult> => {
 
     const buffer = await file.arrayBuffer();
     const doc = await pdfjs.getDocument({ data: buffer }).promise;
-    const warnings: string[] = [];
-    const confidenceIssues: ConfidenceIssue[] = [];
     const allLines: string[] = [];
     const pageTextItems: Array<Array<{ str: string; transform: number[]; width: number }>> = [];
 
@@ -1174,49 +1193,39 @@ const parsePdf = async (file: File): Promise<ParseResult> => {
       };
     }
 
-    // Use advanced table detection
-    const { headers, rows, confidence } = detectTableFromTextBlocks(pageTextItems);
-
-    // Detect document metadata
+    // Detect document metadata only — no product table extraction.
     const metadata = detectMetadata(allLines, doc.numPages);
 
-    if (rows.length === 0) {
-      warnings.push('Could not detect a tabular layout in the PDF. You can still map columns manually.');
-      confidenceIssues.push({
-        field: 'general',
-        reason: 'No table structure detected - manual mapping required',
-        severity: 'warning'
-      });
-    }
+    // Confidence for PDF is based on metadata detection completeness, since
+    // product extraction is now a user-driven visual step (not automatic).
+    let confidence = 50;
+    if (metadata.supplierName) confidence += 10;
+    if (metadata.supplierGstin) confidence += 10;
+    if (metadata.invoiceNumber) confidence += 10;
+    if (metadata.invoiceDate) confidence += 10;
+    if (metadata.invoiceTotal) confidence += 10;
+    confidence = Math.min(100, confidence);
 
-    // Check for missing key fields
-    if (headers.length > 0) {
-      const headerText = headers.join(' ').toLowerCase();
-      if (!headerText.includes('product') && !headerText.includes('item') && !headerText.includes('description')) {
-        confidenceIssues.push({ field: 'Product Name', reason: 'Product name column not clearly identified', severity: 'warning' });
-      }
-      if (!headerText.includes('qty') && !headerText.includes('quantity')) {
-        confidenceIssues.push({ field: 'Quantity', reason: 'Quantity column not clearly identified', severity: 'warning' });
-      }
-    }
-
-    // Analyze metadata gaps
+    const confidenceIssues: ConfidenceIssue[] = [];
     if (!metadata.invoiceNumber) {
-      confidenceIssues.push({ field: 'Invoice Number', reason: 'Invoice number not detected', severity: 'info' });
+      confidenceIssues.push({ field: 'Invoice Number', reason: 'Invoice number not detected — you can set it in the visual mapper', severity: 'info' });
     }
     if (!metadata.invoiceDate) {
-      confidenceIssues.push({ field: 'Invoice Date', reason: 'Invoice date not detected', severity: 'info' });
+      confidenceIssues.push({ field: 'Invoice Date', reason: 'Invoice date not detected — you can set it in the visual mapper', severity: 'info' });
     }
     if (!metadata.supplierGstin) {
-      confidenceIssues.push({ field: 'Supplier GSTIN', reason: 'Supplier GSTIN not detected', severity: 'info' });
+      confidenceIssues.push({ field: 'Supplier GSTIN', reason: 'Supplier GSTIN not detected — you can set it in the visual mapper', severity: 'info' });
+    }
+    if (!metadata.supplierName) {
+      confidenceIssues.push({ field: 'Supplier Name', reason: 'Supplier name not detected — you can set it in the visual mapper', severity: 'info' });
     }
 
     return {
       format: 'pdf',
       fileName: file.name,
-      headers,
-      rows,
-      warnings,
+      headers: [],
+      rows: [],
+      warnings: [],
       confidence,
       confidenceIssues,
       metadata,
