@@ -1,13 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Play, AlertCircle } from 'lucide-react';
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Configure worker for pdfjs-dist v6.x
-// The worker will be bundled with Vite and this path works in both dev and build
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).href;
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 interface PDFViewerProps {
   pdfFile: File;
@@ -60,7 +56,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         console.log('PDFViewer: Calling getDocument...');
         const loadingTask = pdfjsLib.getDocument({
           data: uint8Array,
-          cMapUrl: 'https://unpkg.com/pdfjs-dist@6.1.200/cmaps/',
+          cMapUrl: new URL('pdfjs-dist/cmaps/', import.meta.url).href,
           cMapPacked: true,
         });
 

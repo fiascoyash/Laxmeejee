@@ -1,17 +1,80 @@
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { DocumentRenderer } from '../components/DocumentRenderer';
-import { QuotationTemplate, CompanyProfile, Customer, Quotation, Product, Invoice, GstMode, ThemeId, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, INVOICE_THEMES, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH } from '../types';
+import autoTable from 'jspdf-autotable';
+import {
+  QuotationTemplate, CompanyProfile, Customer, Quotation, Product,
+  Invoice, GstMode, ThemeId, TemplateSettings,
+  DEFAULT_TEMPLATE_SETTINGS, DEFAULT_TYPOGRAPHY_VALUES, TypographyElementId,
+  TemplateSchema, UNIT_OPTIONS, INVOICE_THEMES, StyleTheme, StyleThemeId,
+  DEFAULT_STYLE_THEME_ID, STYLE_THEMES, InvoiceTheme,
+  A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH,
+} from '../types';
+import {
+  calculateProductAmount, calculateTaxSummary,
+  calculateRoundOff, numberToWords, roundTo2, calculateGrandTotalAmount,
+} from './storage';
 
 export type DocumentType = 'quotation' | 'invoice';
 
-/**
- * Main PDF export function - WYSIWYG HTML-to-PDF with balanced quality
- * Uses DocumentRenderer (same as preview) for pixel-perfect consistency
- * Produces professional-quality PDFs (300-800KB) with sharp text and borders
- */
+// ─── Unit conversion constants ──────────────────────────────────────────────
+// CSS px → mm: 1px = 25.4/96 = 0.2646mm  (96dpi standard)
+const PX_TO_MM = 25.4 / 96;
+// CSS px → pt: 1px = 72/96 = 0.75pt  (1pt = 1/72 inch, 1px = 1/96 inch)
+const PX_TO_PT = 0.75;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const fmt = (n: number) =>
+  n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const fmtInt = (n: number) => n.toLocaleString('en-IN');
+
+/** Convert a hex color (#RRGGBB) to an [r, g, b] array for jsPDF. */
+const hexToRgb = (hex: string): [number, number, number] => {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16) || 0;
+  const g = parseInt(clean.substring(2, 4), 16) || 0;
+  const b = parseInt(clean.substring(4, 6), 16) || 0;
+  return [r, g, b];
+};
+
+/** Get a typography value for a given element. Font sizes converted from px to pt. */
+interface TypoVal { fontSizePt: number; fontWeight: number; color: string; }
+
+const getTypo = (
+  elementId: TypographyElementId,
+  settings: TemplateSettings,
+  fontScale: number,
+): TypoVal => {
+  const override = settings.typographyOverrides?.[elementId];
+  const defaults = DEFAULT_TYPOGRAPHY_VALUES[elementId] || { fontSize: 12, fontWeight: 400, color: '#000000' };
+
+  const rawFontSize = override?.usesGlobal === false
+    ? (override.fontSize ?? defaults.fontSize)
+    : (settings.globalDefaultFontSize ?? 12);
+  // px → pt conversion, then apply paper-size font scale
+  const fontSizePt = rawFontSize * PX_TO_PT * fontScale;
+
+  const fontWeight = override?.usesGlobal === false
+    ? (override.fontWeight ?? defaults.fontWeight)
+    : defaults.fontWeight;
+
+  const color = override?.usesGlobal === false
+    ? (override.color ?? defaults.color)
+    : defaults.color;
+
+  return { fontSizePt, fontWeight, color };
+};
+
+/** Map CSS font-weight to jsPDF fontStyle string. */
+const weightToStyle = (weight: number): 'normal' | 'bold' => {
+  return weight >= 600 ? 'bold' : 'normal';
+};
+
+/** Convert CSS px to mm. */
+const pxToMm = (px: number) => px * PX_TO_MM;
+
+// ─── Main export entry point ─────────────────────────────────────────────────
+
 export const exportTemplatePDF = async (
   template: QuotationTemplate,
   company: CompanyProfile,
@@ -20,260 +83,1102 @@ export const exportTemplatePDF = async (
   products: Product[],
   documentType: DocumentType = 'quotation',
   invoice?: Invoice,
-  gstMode: GstMode = 'inclusive'
+  gstMode: GstMode = 'inclusive',
 ) => {
   const themeId = (template as any).themeId as ThemeId | undefined;
   const settings = template.settings ?? DEFAULT_TEMPLATE_SETTINGS;
   const schema = template.schema;
 
-  // For theme-based templates, use WYSIWYG export with optimizations
-  if (themeId) {
-    await exportWysiwygPDF(themeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
-    return;
+  const resolvedThemeId: ThemeId = themeId ?? 'professional_corporate';
+  await generateVectorPDF(resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+};
+
+// ─── Column visibility (mirrors DocumentRenderer.isColumnVisible) ─────────────
+
+const isColumnVisible = (
+  columnKey: string,
+  docType: DocumentType,
+  quotation: Quotation,
+  invoice: Invoice | undefined,
+  settings: TemplateSettings,
+  schema: TemplateSchema | undefined,
+): boolean => {
+  const userColumns = docType === 'invoice' ? invoice?.productColumns : quotation.productColumns;
+  if (userColumns && userColumns.length > 0) {
+    const userCol = userColumns.find(c => c.key === columnKey);
+    if (userCol) return userCol.visible !== false;
   }
-
-  // Fallback for legacy templates (not commonly used)
-  await exportWysiwygPDF('professional_corporate', settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+  if (schema?.productColumns) {
+    const schemaCol = schema.productColumns.find(c => c.key === columnKey);
+    if (schemaCol) return schemaCol.visible !== false;
+  }
+  const settingsMap: Record<string, boolean> = {
+    hsnSacCode: settings.showTax,
+    batchNumber: settings.showBatchNumber,
+    expiryDate: settings.showExpiryDate,
+    mrp: false,
+    quantityUnit: settings.showQuantity || settings.showUnit,
+    discount: settings.showDiscount,
+    gstPercent: settings.showTax,
+    description: settings.showDescription,
+    wattage: false,
+    partNumber: false,
+    vehicleModel: false,
+    warrantyMonths: false,
+  };
+  return settingsMap[columnKey] ?? false;
 };
 
-/**
- * Compress image with balanced quality settings
- * Maintains sharpness while keeping file size reasonable
- */
-const compressImageWithQuality = (dataUrl: string, maxWidth: number = 600, quality: number = 0.85): Promise<string> => {
-  return new Promise((resolve) => {
-    if (!dataUrl || !dataUrl.startsWith('data:image')) {
-      resolve(dataUrl);
-      return;
-    }
+// ─── Vector PDF Generator ────────────────────────────────────────────────────
 
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      let width = img.width;
-      let height = img.height;
-
-      // Scale down only if significantly larger
-      if (width > maxWidth) {
-        height = (height / width) * maxWidth;
-        width = maxWidth;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      // Fill with white background
-      ctx!.fillStyle = '#FFFFFF';
-      ctx!.fillRect(0, 0, width, height);
-      ctx!.drawImage(img, 0, 0, width, height);
-
-      // Use PNG for logos/graphics to preserve sharpness
-      if (width < 300) {
-        resolve(canvas.toDataURL('image/png'));
-      } else {
-        // Use higher quality JPEG for larger images
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      }
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-};
-
-/**
- * Pre-process images in the container with balanced compression
- */
-const preprocessImages = async (container: HTMLElement): Promise<void> => {
-  const images = container.querySelectorAll('img');
-  const compressPromises = Array.from(images).map(async (img) => {
-    if (img.src && img.src.startsWith('data:image')) {
-      try {
-        const compressed = await compressImageWithQuality(img.src, 600, 0.85);
-        img.src = compressed;
-      } catch {
-        // Keep original if compression fails
-      }
-    }
-  });
-  await Promise.all(compressPromises);
-};
-
-/**
- * WYSIWYG PDF export - captures DocumentRenderer directly
- * Ensures exact visual match between preview and exported PDF
- * Supports A4, A5, and POS paper sizes.
- *
- * Page handling:
- *  - POS: single dynamic-height page sized to content (thermal receipt style).
- *  - A4/A5: fixed page size; content taller than one page is split across
- *    multiple pages so nothing gets cropped (totals, footer, etc.).
- */
-const exportWysiwygPDF = async (
+const generateVectorPDF = async (
   themeId: ThemeId,
-  settings: typeof DEFAULT_TEMPLATE_SETTINGS,
+  settings: TemplateSettings,
   company: CompanyProfile,
   customer: Customer,
   quotation: Quotation,
   products: Product[],
   documentType: DocumentType,
-  invoice?: Invoice,
-  gstMode?: GstMode,
-  schema?: TemplateSchema
+  invoice: Invoice | undefined,
+  gstMode: GstMode,
+  schema: TemplateSchema | undefined,
 ) => {
-  // Get theme and paper size
-  const theme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
+  const theme: InvoiceTheme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
+  const styleThemeId: StyleThemeId = settings.styleThemeId ?? DEFAULT_STYLE_THEME_ID;
+  const style: StyleTheme = STYLE_THEMES[styleThemeId] ?? STYLE_THEMES[DEFAULT_STYLE_THEME_ID];
+
   const paperSize = theme.paperSize ?? 'a4';
 
-  // Determine paper dimensions (mm)
+  // Paper dimensions and font scaling (mirrors DocumentRenderer)
   let paperWidth: number;
-  let pageHeight: number; // per-page height for multi-page paper sizes
-  let pdfFormat: 'a4' | 'a5';
+  let pageHeight: number;
+  let pdfFormat: 'a4' | 'a5' | [number, number];
+  let fontScale: number;
 
   switch (paperSize) {
     case 'a5':
       paperWidth = A5_WIDTH;
       pageHeight = A5_HEIGHT;
       pdfFormat = 'a5';
+      fontScale = 0.72;
       break;
     case 'pos':
       paperWidth = POS_WIDTH;
-      pageHeight = 0; // dynamic — single page sized to content
-      pdfFormat = 'a4'; // unused for POS (format set explicitly below)
+      pageHeight = 297;
+      pdfFormat = [POS_WIDTH, 297];
+      fontScale = 0.5;
       break;
     default: // a4
       paperWidth = A4_WIDTH;
       pageHeight = A4_HEIGHT;
       pdfFormat = 'a4';
+      fontScale = 1;
   }
 
-  // DocumentRenderer self-scales typography by paper size, so pass raw settings.
-  const scaledSettings = settings;
+  // Margins — mirrors DocumentRenderer section padding (16px ≈ 4.23mm)
+  const margin = pxToMm(16) * fontScale;
+  const contentWidth = paperWidth - margin * 2;
 
-  // Create temporary container for rendering. Width in mm matches the preview
-  // and builder exactly so all three views render identically.
-  const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = `${paperWidth}mm`;
-  container.style.backgroundColor = '#FFFFFF';
-  container.style.fontFamily = "'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  document.body.appendChild(container);
+  // Pre-compute colors as tuples
+  const secBorderColor: [number, number, number] = hexToRgb(style.sectionBorderColor);
+  const tableBorderColor: [number, number, number] = hexToRgb(style.tableBorderColor);
+  const primaryColor: [number, number, number] = hexToRgb(style.primaryColor);
+  const tableHeaderBg: [number, number, number] = hexToRgb(style.tableHeaderBg);
+  const headerBgRgb: [number, number, number] = hexToRgb(style.headerBg);
 
-  // Render the DocumentRenderer component (same as preview)
-  const root = createRoot(container);
-  root.render(
-    React.createElement(DocumentRenderer, {
-      themeId,
-      settings: scaledSettings,
-      company,
-      customer,
-      quotation: { ...quotation, gstMode: gstMode || quotation.gstMode || 'inclusive' },
-      products,
-      docType: documentType,
-      invoice,
-      schema,
-    })
-  );
-
-  // Wait for React to render
-  await new Promise(resolve => setTimeout(resolve, 150));
-  await waitForImages(container);
-
-  // Process images with balanced compression
-  await preprocessImages(container);
-
-  // Capture with html2canvas - scale 2 for sharp text/borders
-  const canvas = await html2canvas(container, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: '#FFFFFF',
-    allowTaint: true,
-    removeContainer: false,
-    imageTimeout: 5000,
-    onclone: (clonedDoc) => {
-      const clonedContainer = clonedDoc.body.querySelector('div');
-      if (clonedContainer) {
-        clonedContainer.style.backgroundColor = '#FFFFFF';
-        clonedContainer.style.width = `${paperWidth}mm`;
-      }
-    }
+  // Create jsPDF document
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: pdfFormat as any,
+    compress: true,
   });
 
-  // Clean up
-  root.unmount();
-  document.body.removeChild(container);
+  doc.setFont('helvetica');
+  doc.setTextColor(0, 0, 0);
 
-  // Total content height in mm, derived from the captured canvas aspect ratio.
-  const totalContentHeightMm = (canvas.height * paperWidth) / canvas.width;
+  // GST mode
+  const resolvedGstMode: GstMode = gstMode || quotation.gstMode || 'inclusive';
 
-  const imgData = canvas.toDataURL('image/png', 0.92);
+  // Document metadata
+  const docLabel = documentType === 'invoice' ? 'TAX INVOICE' : 'QUOTATION';
+  const docNumber = documentType === 'invoice' ? invoice?.invoiceNumber ?? '' : quotation.quotationNumber;
+  const docDate = documentType === 'invoice' ? invoice?.date ?? quotation.date : quotation.date;
+  const dueDate = documentType === 'invoice' ? invoice?.dueDate : undefined;
 
-  let doc: jsPDF;
+  // Calculations (mirrors DocumentRenderer exactly)
+  const taxSummary = calculateTaxSummary(products, resolvedGstMode);
+  const totalTaxable = roundTo2(
+    Array.from(taxSummary.values()).reduce((s, t) => s + t.taxableAmount, 0),
+  );
+  const totalCgst = roundTo2(
+    Array.from(taxSummary.values()).reduce((s, t) => s + t.cgstAmount, 0),
+  );
+  const totalSgst = roundTo2(
+    Array.from(taxSummary.values()).reduce((s, t) => s + t.sgstAmount, 0),
+  );
+  const grandTotalRaw = calculateGrandTotalAmount(products, resolvedGstMode);
+  const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalRaw);
 
-  if (paperSize === 'pos') {
-    // POS: single dynamic-height page sized exactly to content. Nothing crops.
-    doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: [paperWidth, totalContentHeightMm],
-      compress: true,
-    });
-    doc.addImage(imgData, 'PNG', 0, 0, paperWidth, totalContentHeightMm, undefined, 'MEDIUM');
-  } else {
-    // A4 / A5: fixed page size, split across multiple pages if content is
-    // taller than one page. Each page draws a slice of the source canvas.
-    doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: pdfFormat,
-      compress: true,
-    });
+  // Column visibility
+  const gstColumnVisible = isColumnVisible('gstPercent', documentType, quotation, invoice, settings, schema);
+  const hasAnyGst = products.some(p => (p.gstPercent || 0) > 0);
+  const showGstDetails = gstColumnVisible && hasAnyGst;
+  const showTaxSummary = settings.showTaxSummary !== false && showGstDetails;
 
-    const pxPerMm = canvas.width / paperWidth;
-    const pageHeightPx = pageHeight * pxPerMm;
-    const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
+  const hasShipTo =
+    settings.showShippingAddress &&
+    !!(quotation.shipTo?.name?.trim() || quotation.shipTo?.address?.trim());
 
-    for (let page = 0; page < totalPages; page++) {
-      if (page > 0) doc.addPage();
+  const hasDarkHeader = style.headerBg !== '#FFFFFF' && style.headerBg !== '#F8FAFC' && style.headerBg !== '#F9FAFB';
+  const headerTextColorRgb: [number, number, number] = hasDarkHeader ? [255, 255, 255] : hexToRgb(style.headerTextColor);
 
-      const srcY = page * pageHeightPx;
-      const sliceHeightPx = Math.min(pageHeightPx, canvas.height - srcY);
-      const sliceHeightMm = sliceHeightPx / pxPerMm;
+  // ── Track current Y position ────────────────────────────────────────────
+  let y = margin;
 
-      // Render this page's slice into its own canvas, then place it at the
-      // top of the PDF page so content flows continuously across pages.
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvas.width;
-      pageCanvas.height = sliceHeightPx;
-      const ctx = pageCanvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        ctx.drawImage(canvas, 0, srcY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-      }
-      const pageImgData = pageCanvas.toDataURL('image/png', 0.92);
-      doc.addImage(pageImgData, 'PNG', 0, 0, paperWidth, sliceHeightMm, undefined, 'MEDIUM');
+  // Helper: draw a horizontal section border line
+  const drawSecBorder = (yPos: number) => {
+    doc.setDrawColor(...secBorderColor);
+    doc.setLineWidth(0.2);
+    doc.line(margin, yPos, paperWidth - margin, yPos);
+  };
+
+  // Helper: add a new page if content overflows
+  const ensureSpace = (needed: number) => {
+    if (paperSize === 'pos') return;
+    if (y + needed > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  // Helper: set font with typo values
+  const setFont = (typo: TypoVal, italic = false) => {
+    const fs = weightToStyle(typo.fontWeight);
+    doc.setFont('helvetica', italic ? (fs === 'bold' ? 'bolditalic' : 'italic') : fs);
+    doc.setFontSize(typo.fontSizePt);
+    const [r, g, b] = hexToRgb(typo.color);
+    doc.setTextColor(r, g, b);
+  };
+
+  // Helper: line height in mm for a given font size (pt)
+  const lineHeightMm = (pt: number) => pt * 0.3528; // 1pt = 0.3528mm
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTION 1: Company Header
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const headerAlign = settings.headerAlignment ?? 'left';
+  const headerPadPx = 14; // top padding from DocumentRenderer pad('14px 16px 12px')
+  const headerPadTop = pxToMm(headerPadPx) * fontScale;
+  const headerPadSide = pxToMm(16) * fontScale;
+  const headerPadBottom = pxToMm(12) * fontScale;
+
+  // Pre-calculate all typography for header
+  const companyNameTypo = getTypo('company_name', settings, fontScale);
+  const companyAddrTypo = getTypo('company_address', settings, fontScale);
+  const companyGstinTypo = getTypo('company_gstin', settings, fontScale);
+  const companyPhoneTypo = getTypo('company_phone', settings, fontScale);
+  const docTitleTypo = getTypo('doc_title', settings, fontScale);
+  const origForRecTypo = getTypo('original_for_recipient', settings, fontScale);
+
+  // Calculate dynamic header height based on content
+  const headerLineGap = pxToMm(3) * fontScale; // marginTop: 3px in preview
+  let headerContentHeight = lineHeightMm(companyNameTypo.fontSizePt);
+  if (company.address) {
+    const addrLines = Math.ceil(doc.splitTextToSize(company.address, contentWidth * 0.55).length);
+    headerContentHeight += headerLineGap + addrLines * lineHeightMm(companyAddrTypo.fontSizePt);
+  }
+  if (settings.showGstin && company.gstNumber) {
+    headerContentHeight += headerLineGap + lineHeightMm(companyGstinTypo.fontSizePt);
+  }
+  if (settings.showPhone && company.phone) {
+    headerContentHeight += pxToMm(2) * fontScale + lineHeightMm(companyPhoneTypo.fontSizePt);
+  }
+  // Doc title + original for recipient on right side
+  const rightSideHeight = lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(3) * fontScale + lineHeightMm(origForRecTypo.fontSizePt) + 2;
+  const headerHeight = headerPadTop + Math.max(headerContentHeight, rightSideHeight) + headerPadBottom;
+
+  // Fill header background
+  doc.setFillColor(...headerBgRgb);
+  doc.rect(margin, y, contentWidth, headerHeight, 'F');
+
+  // Logo
+  const logoW = pxToMm(52) * fontScale;
+  const logoH = pxToMm(42) * fontScale;
+  let logoX = margin + headerPadSide;
+  const logoY = y + headerPadTop;
+
+  if (company.logo) {
+    try {
+      // Try to detect format from data URL
+      const isJpeg = company.logo.startsWith('data:image/jpeg') || company.logo.startsWith('data:image/jpg');
+      const fmt = isJpeg ? 'JPEG' : 'PNG';
+      doc.addImage(company.logo, fmt, logoX, logoY, logoW, logoH, undefined, 'FAST');
+    } catch {
+      // Skip if image can't be added
     }
   }
 
+  // Company info text start X
+  const textX = company.logo ? logoX + logoW + pxToMm(12) * fontScale : margin + headerPadSide;
+  const rightX = paperWidth - margin - headerPadSide;
+
+  // Dark header color helper
+  const docTitleColor: [number, number, number] = hasDarkHeader ? [255, 255, 255] : primaryColor;
+
+  if (headerAlign === 'center') {
+    const centerX = paperWidth / 2;
+    let cy = y + headerPadTop;
+
+    // Doc title centered at top
+    setFont(docTitleTypo);
+    doc.setTextColor(...docTitleColor);
+    doc.text(docLabel, centerX, cy + lineHeightMm(docTitleTypo.fontSizePt) * 0.8, { align: 'center' });
+    cy += lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(6) * fontScale;
+
+    // Company name
+    setFont(companyNameTypo);
+    doc.setTextColor(...headerTextColorRgb);
+    doc.text(company.companyName || 'Company Name', centerX, cy + lineHeightMm(companyNameTypo.fontSizePt) * 0.8, { align: 'center' });
+    cy += lineHeightMm(companyNameTypo.fontSizePt) + headerLineGap;
+
+    if (company.address) {
+      setFont(companyAddrTypo);
+      const addrLines = doc.splitTextToSize(company.address, contentWidth * 0.6);
+      doc.text(addrLines, centerX, cy + lineHeightMm(companyAddrTypo.fontSizePt) * 0.8, { align: 'center' });
+      cy += addrLines.length * lineHeightMm(companyAddrTypo.fontSizePt) + headerLineGap;
+    }
+    if (settings.showGstin && company.gstNumber) {
+      setFont(companyGstinTypo);
+      doc.text(`GSTIN ${company.gstNumber}`, centerX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8, { align: 'center' });
+      cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
+    }
+    if (settings.showPhone && company.phone) {
+      setFont(companyPhoneTypo);
+      const phoneLine = company.email ? `Phone: ${company.phone}  Email: ${company.email}` : `Phone: ${company.phone}`;
+      doc.text(phoneLine, centerX, cy + lineHeightMm(companyPhoneTypo.fontSizePt) * 0.8, { align: 'center' });
+    }
+
+    // Original for recipient — top right
+    setFont(origForRecTypo);
+    doc.setTextColor(...docTitleColor);
+    const origText = 'ORIGINAL FOR RECIPIENT';
+    const origW = doc.getTextWidth(origText) + pxToMm(14) * fontScale;
+    const origH = lineHeightMm(origForRecTypo.fontSizePt) + pxToMm(2) * fontScale;
+    doc.rect(rightX - origW, y + headerPadTop, origW, origH, 'S');
+    doc.text(origText, rightX - origW / 2, y + headerPadTop + origH * 0.7, { align: 'center' });
+
+  } else if (headerAlign === 'right') {
+    // Right alignment: doc type on left, company on right
+    let leftY = y + headerPadTop;
+    setFont(docTitleTypo);
+    doc.setTextColor(...docTitleColor);
+    doc.text(docLabel, margin + headerPadSide, leftY + lineHeightMm(docTitleTypo.fontSizePt) * 0.8);
+    leftY += lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(3) * fontScale;
+
+    setFont(origForRecTypo);
+    const origText = 'ORIGINAL FOR RECIPIENT';
+    const origW = doc.getTextWidth(origText) + pxToMm(14) * fontScale;
+    const origH = lineHeightMm(origForRecTypo.fontSizePt) + pxToMm(2) * fontScale;
+    doc.rect(margin + headerPadSide, leftY, origW, origH, 'S');
+    doc.text(origText, margin + headerPadSide + origW / 2, leftY + origH * 0.7, { align: 'center' });
+
+    // Company info on right
+    let cy = y + headerPadTop;
+    setFont(companyNameTypo);
+    doc.setTextColor(...headerTextColorRgb);
+    doc.text(company.companyName || 'Company Name', rightX, cy + lineHeightMm(companyNameTypo.fontSizePt) * 0.8, { align: 'right' });
+    cy += lineHeightMm(companyNameTypo.fontSizePt) + headerLineGap;
+
+    if (company.address) {
+      setFont(companyAddrTypo);
+      const addrLines = doc.splitTextToSize(company.address, contentWidth * 0.55);
+      doc.text(addrLines, rightX, cy + lineHeightMm(companyAddrTypo.fontSizePt) * 0.8, { align: 'right' });
+      cy += addrLines.length * lineHeightMm(companyAddrTypo.fontSizePt) + headerLineGap;
+    }
+    if (settings.showGstin && company.gstNumber) {
+      setFont(companyGstinTypo);
+      doc.text(`GSTIN ${company.gstNumber}`, rightX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8, { align: 'right' });
+      cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
+    }
+    if (settings.showPhone && company.phone) {
+      setFont(companyPhoneTypo);
+      const phoneLine = company.email ? `Phone: ${company.phone}  Email: ${company.email}` : `Phone: ${company.phone}`;
+      doc.text(phoneLine, rightX, cy + lineHeightMm(companyPhoneTypo.fontSizePt) * 0.8, { align: 'right' });
+    }
+
+  } else {
+    // Left alignment (default): company on left, doc type on right
+    let cy = y + headerPadTop;
+    setFont(companyNameTypo);
+    doc.setTextColor(...headerTextColorRgb);
+    doc.text(company.companyName || 'Company Name', textX, cy + lineHeightMm(companyNameTypo.fontSizePt) * 0.8);
+    cy += lineHeightMm(companyNameTypo.fontSizePt) + headerLineGap;
+
+    if (company.address) {
+      setFont(companyAddrTypo);
+      const addrLines = doc.splitTextToSize(company.address, contentWidth * 0.55);
+      doc.text(addrLines, textX, cy + lineHeightMm(companyAddrTypo.fontSizePt) * 0.8);
+      cy += addrLines.length * lineHeightMm(companyAddrTypo.fontSizePt) + headerLineGap;
+    }
+    if (settings.showGstin && company.gstNumber) {
+      setFont(companyGstinTypo);
+      doc.text(`GSTIN ${company.gstNumber}`, textX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8);
+      cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
+    }
+    if (settings.showPhone && company.phone) {
+      setFont(companyPhoneTypo);
+      const phoneLine = company.email ? `Phone: ${company.phone}  Email: ${company.email}` : `Phone: ${company.phone}`;
+      doc.text(phoneLine, textX, cy + lineHeightMm(companyPhoneTypo.fontSizePt) * 0.8);
+    }
+
+    // Doc type on right
+    setFont(docTitleTypo);
+    doc.setTextColor(...docTitleColor);
+    doc.text(docLabel, rightX, y + headerPadTop + lineHeightMm(docTitleTypo.fontSizePt) * 0.8, { align: 'right' });
+
+    setFont(origForRecTypo);
+    const origText = 'ORIGINAL FOR RECIPIENT';
+    const origW = doc.getTextWidth(origText) + pxToMm(14) * fontScale;
+    const origH = lineHeightMm(origForRecTypo.fontSizePt) + pxToMm(2) * fontScale;
+    doc.rect(rightX - origW, y + headerPadTop + lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(3) * fontScale, origW, origH, 'S');
+    doc.text(origText, rightX - origW / 2, y + headerPadTop + lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(3) * fontScale + origH * 0.7, { align: 'center' });
+  }
+
+  y += headerHeight;
+
+  // Accent bar (for themes that have it)
+  if (theme.accentBar) {
+    doc.setFillColor(...primaryColor);
+    doc.rect(margin, y - pxToMm(3) * fontScale, contentWidth, pxToMm(3) * fontScale, 'F');
+  }
+
+  drawSecBorder(y);
+  y += pxToMm(1);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTION 2: Invoice Meta
+  // ═══════════════════════════════════════════════════════════════════════
+
+  ensureSpace(12);
+  const metaPadTop = pxToMm(8) * fontScale;
+  const metaPadSide = pxToMm(16) * fontScale;
+  y += metaPadTop;
+
+  const metaCells: { label: string; value: string; labelId: TypographyElementId; valueId: TypographyElementId; highlight?: boolean }[] = [];
+
+  if (documentType === 'invoice') {
+    metaCells.push({ label: 'Invoice No.', value: docNumber, labelId: 'invoice_number_label', valueId: 'invoice_number_value' });
+    metaCells.push({ label: 'Invoice Date', value: docDate, labelId: 'invoice_date_label', valueId: 'invoice_date_value' });
+  } else {
+    metaCells.push({ label: 'Quotation No.', value: docNumber, labelId: 'quotation_number_label', valueId: 'quotation_number_value' });
+    metaCells.push({ label: 'Quotation Date', value: docDate, labelId: 'quotation_date_label', valueId: 'quotation_date_value' });
+  }
+
+  if (settings.showDueDate) {
+    metaCells.push({ label: 'Due Date', value: dueDate || '—', labelId: 'due_date_label', valueId: 'due_date_value', highlight: !!dueDate });
+  }
+  if (settings.showPoNumber) {
+    metaCells.push({ label: 'PO Number', value: '—', labelId: 'po_number_label', valueId: 'po_number_value' });
+  }
+  if (settings.showEwayBill) {
+    metaCells.push({ label: 'E-Way Bill', value: '—', labelId: 'eway_bill_label', valueId: 'eway_bill_value' });
+  }
+  if (settings.showVehicleNumber) {
+    metaCells.push({ label: 'Vehicle No.', value: '—', labelId: 'vehicle_number_label', valueId: 'vehicle_number_value' });
+  }
+
+  // Render meta cells in a flex-wrap-like layout
+  const metaGap = pxToMm(28) * fontScale; // gap from DocumentRenderer
+  let metaCellX = margin + metaPadSide;
+  const metaLineHeight = lineHeightMm(getTypo(metaCells[0].valueId, settings, fontScale).fontSizePt);
+  const metaCellHeight = lineHeightMm(getTypo(metaCells[0].labelId, settings, fontScale).fontSizePt) + pxToMm(2) * fontScale + metaLineHeight;
+  let metaRowStartY = y;
+
+  for (const cell of metaCells) {
+    const labelTypo = getTypo(cell.labelId, settings, fontScale);
+    const valueTypo = getTypo(cell.valueId, settings, fontScale);
+
+    setFont(labelTypo);
+    const labelW = doc.getTextWidth(cell.label);
+    setFont(valueTypo);
+    const valueW = doc.getTextWidth(cell.value);
+    const cellW = Math.max(labelW, valueW);
+
+    if (metaCellX + cellW > paperWidth - margin - metaPadSide) {
+      // Wrap to next line
+      metaCellX = margin + metaPadSide;
+      metaRowStartY += metaCellHeight + pxToMm(2) * fontScale;
+    }
+
+    setFont(labelTypo);
+    doc.text(cell.label, metaCellX, metaRowStartY + lineHeightMm(labelTypo.fontSizePt) * 0.8);
+
+    setFont(valueTypo);
+    if (cell.highlight) {
+      doc.setTextColor(...primaryColor);
+    }
+    doc.text(cell.value, metaCellX, metaRowStartY + lineHeightMm(labelTypo.fontSizePt) + pxToMm(2) * fontScale + metaLineHeight * 0.8);
+
+    metaCellX += cellW + metaGap;
+  }
+
+  y = metaRowStartY + metaCellHeight + metaPadTop;
+  drawSecBorder(y);
+  y += pxToMm(1);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTION 3: Bill To / Ship To
+  // ═══════════════════════════════════════════════════════════════════════
+
+  ensureSpace(20);
+  const partyPadTop = pxToMm(10) * fontScale;
+  const partyPadSide = pxToMm(16) * fontScale;
+  y += partyPadTop;
+
+  const partyWidth = hasShipTo ? contentWidth / 2 : contentWidth;
+  const billToX = margin + partyPadSide;
+  const shipToX = margin + partyWidth + partyPadSide;
+  const partyContentWidth = partyWidth - partyPadSide * 2;
+
+  // Bill To label
+  const billToLabelTypo = getTypo('bill_to_label', settings, fontScale);
+  setFont(billToLabelTypo);
+  doc.setTextColor(...primaryColor);
+  doc.text('Bill To', billToX, y + lineHeightMm(billToLabelTypo.fontSizePt) * 0.8);
+
+  // Bill To name
+  const billToNameTypo = getTypo('bill_to_name', settings, fontScale);
+  setFont(billToNameTypo);
+  doc.setTextColor(0, 0, 0);
+  let billToY = y + lineHeightMm(billToLabelTypo.fontSizePt) + pxToMm(4) * fontScale;
+  doc.text(customer.name, billToX, billToY + lineHeightMm(billToNameTypo.fontSizePt) * 0.8);
+  billToY += lineHeightMm(billToNameTypo.fontSizePt) + pxToMm(2) * fontScale;
+
+  if (settings.showBillingAddress && customer.billingAddress) {
+    const billToAddrTypo = getTypo('bill_to_address', settings, fontScale);
+    setFont(billToAddrTypo);
+    const addrLines = doc.splitTextToSize(customer.billingAddress, partyContentWidth);
+    doc.text(addrLines, billToX, billToY + lineHeightMm(billToAddrTypo.fontSizePt) * 0.8);
+    billToY += addrLines.length * lineHeightMm(billToAddrTypo.fontSizePt) + pxToMm(2) * fontScale;
+  }
+
+  if (customer.village || customer.district) {
+    const billToAddrTypo = getTypo('bill_to_address', settings, fontScale);
+    setFont(billToAddrTypo);
+    const locLine = [customer.village, customer.district].filter(Boolean).join(', ');
+    doc.text(locLine, billToX, billToY + lineHeightMm(billToAddrTypo.fontSizePt) * 0.8);
+    billToY += lineHeightMm(billToAddrTypo.fontSizePt) + pxToMm(2) * fontScale;
+  }
+
+  if (settings.showPhone && customer.mobile) {
+    const billToPhoneTypo = getTypo('bill_to_phone', settings, fontScale);
+    setFont(billToPhoneTypo);
+    doc.text(`Mobile ${customer.mobile}`, billToX, billToY + lineHeightMm(billToPhoneTypo.fontSizePt) * 0.8);
+    billToY += lineHeightMm(billToPhoneTypo.fontSizePt) + pxToMm(2) * fontScale;
+  }
+
+  if (settings.showGstin && customer.gstNumber) {
+    const billToGstinTypo = getTypo('bill_to_gstin', settings, fontScale);
+    setFont(billToGstinTypo);
+    doc.text(`GSTIN ${customer.gstNumber}`, billToX, billToY + lineHeightMm(billToGstinTypo.fontSizePt) * 0.8);
+    billToY += lineHeightMm(billToGstinTypo.fontSizePt) + pxToMm(2) * fontScale;
+  }
+
+  // Ship To
+  let shipToY = y;
+  if (hasShipTo) {
+    // Divider
+    doc.setDrawColor(...secBorderColor);
+    doc.setLineWidth(0.2);
+    doc.line(margin + partyWidth, y - partyPadTop, margin + partyWidth, Math.max(billToY, y + pxToMm(60) * fontScale));
+
+    const shipToLabelTypo = getTypo('ship_to_label', settings, fontScale);
+    setFont(shipToLabelTypo);
+    doc.setTextColor(...primaryColor);
+    doc.text('Ship To', shipToX, y + lineHeightMm(shipToLabelTypo.fontSizePt) * 0.8);
+
+    shipToY = y + lineHeightMm(shipToLabelTypo.fontSizePt) + pxToMm(4) * fontScale;
+
+    if (quotation.shipTo?.name) {
+      const shipToNameTypo = getTypo('ship_to_name', settings, fontScale);
+      setFont(shipToNameTypo);
+      doc.setTextColor(0, 0, 0);
+      doc.text(quotation.shipTo.name, shipToX, shipToY + lineHeightMm(shipToNameTypo.fontSizePt) * 0.8);
+      shipToY += lineHeightMm(shipToNameTypo.fontSizePt) + pxToMm(2) * fontScale;
+    }
+
+    if (quotation.shipTo?.address) {
+      const shipToAddrTypo = getTypo('ship_to_address', settings, fontScale);
+      setFont(shipToAddrTypo);
+      const addrLines = doc.splitTextToSize(quotation.shipTo.address, partyContentWidth);
+      doc.text(addrLines, shipToX, shipToY + lineHeightMm(shipToAddrTypo.fontSizePt) * 0.8);
+      shipToY += addrLines.length * lineHeightMm(shipToAddrTypo.fontSizePt) + pxToMm(2) * fontScale;
+    }
+
+    if (settings.showPhone && quotation.shipTo?.mobile) {
+      const shipToPhoneTypo = getTypo('ship_to_phone', settings, fontScale);
+      setFont(shipToPhoneTypo);
+      doc.text(`Mobile ${quotation.shipTo.mobile}`, shipToX, shipToY + lineHeightMm(shipToPhoneTypo.fontSizePt) * 0.8);
+      shipToY += lineHeightMm(shipToPhoneTypo.fontSizePt) + pxToMm(2) * fontScale;
+    }
+
+    if (settings.showGstin && quotation.shipTo?.gstNumber) {
+      const shipToGstinTypo = getTypo('ship_to_gstin', settings, fontScale);
+      setFont(shipToGstinTypo);
+      doc.text(`GSTIN ${quotation.shipTo.gstNumber}`, shipToX, shipToY + lineHeightMm(shipToGstinTypo.fontSizePt) * 0.8);
+      shipToY += lineHeightMm(shipToGstinTypo.fontSizePt) + pxToMm(2) * fontScale;
+    }
+  }
+
+  y = Math.max(billToY, shipToY, y + pxToMm(60) * fontScale);
+  y += partyPadTop;
+  drawSecBorder(y);
+  y += pxToMm(1);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTION 4: Product Table (using autoTable)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const tableHeaderTypo = getTypo('table_header', settings, fontScale);
+  const productRowTypo = getTypo('product_row', settings, fontScale);
+
+  // Cell padding from DocumentRenderer: cellPad = '6px 8px' * fontScale
+  const cellPadY = pxToMm(6) * fontScale;
+  const cellPadX = pxToMm(8) * fontScale;
+
+  // Column definitions — widths converted from px to mm (matching DocumentRenderer colW)
+  const colWmm = (px: number) => pxToMm(px) * fontScale;
+
+  const columns: { header: string; key: string; width: number; align: 'left' | 'center' | 'right' }[] = [
+    { header: 'No', key: 'srNo', width: colWmm(32), align: 'center' },
+    { header: 'Items', key: 'name', width: 0, align: 'left' },
+  ];
+
+  const addOptionalCol = (key: string, header: string, widthPx: number) => {
+    if (isColumnVisible(key, documentType, quotation, invoice, settings, schema)) {
+      columns.push({ header, key, width: colWmm(widthPx), align: 'right' });
+    }
+  };
+
+  addOptionalCol('hsnSacCode', 'HSN/SAC', 72);
+  addOptionalCol('wattage', 'Wattage', 72);
+  addOptionalCol('partNumber', 'Part No.', 72);
+  addOptionalCol('vehicleModel', 'Vehicle', 80);
+  addOptionalCol('mrp', 'MRP', 72);
+  addOptionalCol('batchNumber', 'Batch No.', 72);
+  addOptionalCol('expiryDate', 'Expiry', 80);
+  addOptionalCol('warrantyMonths', 'Warranty', 72);
+  addOptionalCol('quantityUnit', 'Qty/Unit', 80);
+
+  columns.push({ header: 'Rate', key: 'rate', width: colWmm(76), align: 'right' });
+
+  if (isColumnVisible('discount', documentType, quotation, invoice, settings, schema)) {
+    columns.push({ header: 'Disc.', key: 'discount', width: colWmm(70), align: 'right' });
+  }
+  if (gstColumnVisible) {
+    columns.push({ header: 'Tax', key: 'tax', width: colWmm(76), align: 'right' });
+  }
+  columns.push({ header: 'Total', key: 'amount', width: colWmm(84), align: 'right' });
+
+  // Build table data
+  const head = [columns.map(c => c.header)];
+  const body: (string | number)[][] = products.map((product, i) => {
+    const amount = calculateProductAmount(product);
+    const productTaxSummary = calculateTaxSummary([product], resolvedGstMode);
+    const productTaxEntry = Array.from(productTaxSummary.values())[0];
+    const taxAmount = productTaxEntry
+      ? roundTo2(productTaxEntry.cgstAmount + productTaxEntry.sgstAmount)
+      : 0;
+
+    const row: (string | number)[] = [];
+    for (const col of columns) {
+      switch (col.key) {
+        case 'srNo': row.push(i + 1); break;
+        case 'name': {
+          let nameStr = product.name;
+          if (isColumnVisible('description', documentType, quotation, invoice, settings, schema) && product.description?.trim()) {
+            nameStr += '\n' + product.description;
+          }
+          row.push(nameStr);
+          break;
+        }
+        case 'hsnSacCode': row.push(product.hsnSacCode || '—'); break;
+        case 'wattage': row.push(product.wattage ? `${product.wattage}W` : '—'); break;
+        case 'partNumber': row.push(product.partNumber || '—'); break;
+        case 'vehicleModel': row.push(product.vehicleModel || '—'); break;
+        case 'mrp': row.push(product.mrp ? `Rs. ${product.mrp.toLocaleString('en-IN')}` : '—'); break;
+        case 'batchNumber': row.push(product.batchNumber || '—'); break;
+        case 'expiryDate': row.push(product.expiryDate || '—'); break;
+        case 'warrantyMonths': row.push(product.warrantyMonths ? `${product.warrantyMonths} mo` : '—'); break;
+        case 'quantityUnit': {
+          const unitLabel = UNIT_OPTIONS.find(u => u.value === product.unit)?.label || 'Piece';
+          row.push(`${product.quantity} ${unitLabel}`);
+          break;
+        }
+        case 'rate': row.push(fmtInt(product.unitPrice)); break;
+        case 'discount': row.push(`${product.discount ?? 0}%`); break;
+        case 'tax': row.push(`${fmtInt(taxAmount)}\n(${product.gstPercent}%)`); break;
+        case 'amount': row.push(fmtInt(amount)); break;
+        default: row.push(''); break;
+      }
+    }
+    return row;
+  });
+
+  if (products.length === 0) {
+    const emptyRow: (string | number)[] = new Array(columns.length).fill('');
+    emptyRow[0] = 'No items added';
+    body.push(emptyRow);
+  }
+
+  // Column styles
+  const columnStyles: Record<number, { cellWidth: number | 'auto'; halign: 'left' | 'center' | 'right' }> = {};
+  columns.forEach((col, idx) => {
+    columnStyles[idx] = {
+      cellWidth: col.width > 0 ? col.width : 'auto',
+      halign: col.align,
+    };
+  });
+
+  // Draw product table with autoTable
+  autoTable(doc, {
+    startY: y,
+    head: head,
+    body: body,
+    theme: 'grid',
+    headStyles: {
+      fillColor: tableHeaderBg,
+      textColor: hexToRgb(settings.tableHeaderTextColor ?? style.tableHeaderTextColor),
+      fontStyle: 'bold',
+      fontSize: tableHeaderTypo.fontSizePt,
+      halign: 'center',
+      cellPadding: [cellPadY, cellPadX] as any,
+      lineColor: tableBorderColor,
+      lineWidth: 0.1,
+    },
+    bodyStyles: {
+      fontSize: productRowTypo.fontSizePt,
+      textColor: [0, 0, 0],
+      lineColor: tableBorderColor,
+      lineWidth: 0.1,
+      cellPadding: [cellPadY, cellPadX] as any,
+    },
+    alternateRowStyles: {
+      fillColor: hexToRgb(style.tableRowAltBg),
+    },
+    columnStyles: columnStyles as any,
+    margin: { left: margin, right: margin, top: 0, bottom: 0 },
+    tableWidth: contentWidth,
+    tableLineColor: tableBorderColor,
+    tableLineWidth: 0.1,
+  });
+
+  // Safely get finalY (avoid undefined finalY error)
+  const finalY = (doc as any).lastAutoTable?.finalY ?? y + 20;
+  y = finalY;
+
+  drawSecBorder(y);
+  y += pxToMm(1);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTION 5: Tax Summary + Grand Total
+  // ═══════════════════════════════════════════════════════════════════════
+
+  ensureSpace(30);
+  const totalsPadTop = pxToMm(10) * fontScale;
+  const totalsPadSide = pxToMm(16) * fontScale;
+  const totalsStartY = y + totalsPadTop;
+
+  // Typography
+  const taxSummaryLabelTypo = getTypo('tax_summary_label', settings, fontScale);
+  const taxSummaryRowTypo = getTypo('tax_summary_row', settings, fontScale);
+  const subtotalLabelTypo = getTypo('subtotal_label', settings, fontScale);
+  const subtotalValueTypo = getTypo('subtotal_value', settings, fontScale);
+  const cgstLabelTypo = getTypo('cgst_label', settings, fontScale);
+  const cgstValueTypo = getTypo('cgst_value', settings, fontScale);
+  const sgstLabelTypo = getTypo('sgst_label', settings, fontScale);
+  const sgstValueTypo = getTypo('sgst_value', settings, fontScale);
+  const roundOffLabelTypo = getTypo('round_off_label', settings, fontScale);
+  const roundOffValueTypo = getTypo('round_off_value', settings, fontScale);
+  const grandTotalLabelTypo = getTypo('grand_total_label', settings, fontScale);
+  const grandTotalValueTypo = getTypo('grand_total_value', settings, fontScale);
+  const amountInWordsTypo = getTypo('amount_in_words', settings, fontScale);
+
+  // Grand total column width: 220px in preview when tax summary is shown.
+  // totalsX = left edge of the grand-total div (mirrors flex layout: tax summary
+  // gets flex:1, grand total gets fixed width 220px). Text inside has 16px padding.
+  const totalsColWidth = showTaxSummary ? pxToMm(220) * fontScale : contentWidth - totalsPadSide * 2;
+  const totalsX = paperWidth - margin - totalsColWidth;
+  const totalsLabelX = totalsX + totalsPadSide;
+  const totalsValueX = paperWidth - margin - totalsPadSide;
+
+  // Tax summary on left AND grand total on right — both start at totalsStartY
+  let taxSummaryFinalY = totalsStartY;
+  let grandTotalFinalY = totalsStartY;
+
+  // ── Tax Summary (left side) ──────────────────────────────────────────
+  if (showTaxSummary) {
+    // Tax summary content area: from (margin + padSide) to (totalsX - border - padSide)
+    const taxTableLeft = margin + totalsPadSide;
+    const taxTableRight = totalsX - pxToMm(1) * fontScale - totalsPadSide;
+    const taxSummaryWidth = taxTableRight - taxTableLeft;
+
+    setFont(taxSummaryLabelTypo);
+    doc.setTextColor(...primaryColor);
+    doc.text('Tax Summary', taxTableLeft, totalsStartY + lineHeightMm(taxSummaryLabelTypo.fontSizePt) * 0.8);
+
+    const taxHead = [['HSN/SAC', 'Tax%', 'Taxable Amt', 'CGST', 'SGST']];
+    const taxBody = Array.from(taxSummary.entries()).map(([key, data]) => {
+      const rate = key.split('_')[1];
+      return [
+        data.hsnSacCode || '—',
+        `${rate}%`,
+        fmt(data.taxableAmount),
+        fmt(data.cgstAmount),
+        fmt(data.sgstAmount),
+      ];
+    });
+
+    const taxCellPadY = pxToMm(3) * fontScale;
+    const taxCellPadX = pxToMm(5) * fontScale;
+
+    autoTable(doc, {
+      startY: totalsStartY + lineHeightMm(taxSummaryLabelTypo.fontSizePt) + pxToMm(5) * fontScale,
+      head: taxHead,
+      body: taxBody,
+      theme: 'grid',
+      headStyles: {
+        fillColor: tableHeaderBg,
+        textColor: hexToRgb(settings.tableHeaderTextColor ?? style.tableHeaderTextColor),
+        fontStyle: 'bold',
+        fontSize: taxSummaryRowTypo.fontSizePt * 0.8,
+        cellPadding: [taxCellPadY, taxCellPadX] as any,
+        lineColor: tableBorderColor,
+        lineWidth: 0.1,
+      },
+      bodyStyles: {
+        fontSize: taxSummaryRowTypo.fontSizePt * 0.8,
+        textColor: [0, 0, 0],
+        cellPadding: [taxCellPadY, taxCellPadX] as any,
+        lineColor: tableBorderColor,
+        lineWidth: 0.1,
+      },
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+      } as any,
+      margin: { left: taxTableLeft, right: paperWidth - taxTableRight, top: 0, bottom: 0 },
+      tableWidth: taxSummaryWidth,
+    });
+
+    taxSummaryFinalY = (doc as any).lastAutoTable?.finalY ?? totalsStartY + 20;
+  }
+
+  // ── Grand Total (right side) — starts at SAME Y as tax summary ───────
+  let gtY = totalsStartY;
+
+  const drawTotalLine = (label: string, value: string, labelTypo: TypoVal, valueTypo: TypoVal) => {
+    ensureSpace(lineHeightMm(labelTypo.fontSizePt) + 2);
+    setFont(labelTypo);
+    doc.setTextColor(0, 0, 0);
+    doc.text(label, totalsLabelX, gtY + lineHeightMm(labelTypo.fontSizePt) * 0.8);
+    setFont(valueTypo);
+    doc.text(value, totalsValueX, gtY + lineHeightMm(valueTypo.fontSizePt) * 0.8, { align: 'right' });
+    gtY += lineHeightMm(labelTypo.fontSizePt) + pxToMm(3) * fontScale;
+  };
+
+  drawTotalLine('Sub Total', `Rs. ${fmt(totalTaxable)}`, subtotalLabelTypo, subtotalValueTypo);
+
+  if (showGstDetails) {
+    drawTotalLine('CGST', `Rs. ${fmt(totalCgst)}`, cgstLabelTypo, cgstValueTypo);
+    drawTotalLine('SGST', `Rs. ${fmt(totalSgst)}`, sgstLabelTypo, sgstValueTypo);
+  }
+
+  if (roundOff !== 0) {
+    drawTotalLine('Round Off', `Rs. ${fmt(roundOff)}`, roundOffLabelTypo, roundOffValueTypo);
+  }
+
+  // Grand total line with top border
+  ensureSpace(10);
+  doc.setDrawColor(...secBorderColor);
+  doc.setLineWidth(0.4);
+  gtY += pxToMm(5) * fontScale;
+  doc.line(totalsLabelX, gtY, totalsValueX, gtY);
+  gtY += pxToMm(5) * fontScale;
+
+  const totalSectionColorRgb = hexToRgb(settings.totalSectionColor ?? '#000000');
+  setFont(grandTotalLabelTypo);
+  doc.setTextColor(...totalSectionColorRgb);
+  doc.text('Total', totalsLabelX, gtY + lineHeightMm(grandTotalLabelTypo.fontSizePt) * 0.8);
+  setFont(grandTotalValueTypo);
+  doc.text(`Rs. ${fmt(roundedGrandTotal)}`, totalsValueX, gtY + lineHeightMm(grandTotalValueTypo.fontSizePt) * 0.8, { align: 'right' });
+  gtY += lineHeightMm(grandTotalLabelTypo.fontSizePt) + pxToMm(4) * fontScale;
+
+  // Amount in words
+  setFont(amountInWordsTypo, true);
+  doc.setTextColor(0, 0, 0);
+  const wordsText = numberToWords(roundedGrandTotal);
+  const wordsLines = doc.splitTextToSize(wordsText, totalsColWidth - totalsPadSide * 2);
+  doc.text(wordsLines, totalsLabelX, gtY + lineHeightMm(amountInWordsTypo.fontSizePt) * 0.8);
+  gtY += wordsLines.length * lineHeightMm(amountInWordsTypo.fontSizePt) + pxToMm(2) * fontScale;
+
+  grandTotalFinalY = gtY;
+
+  // Vertical divider between Tax Summary and Grand Total (matches preview borderRight)
+  if (showTaxSummary) {
+    const dividerTop = totalsStartY - totalsPadTop;
+    const dividerBottom = Math.max(taxSummaryFinalY, grandTotalFinalY) + totalsPadTop;
+    doc.setDrawColor(...secBorderColor);
+    doc.setLineWidth(0.2);
+    doc.line(totalsX, dividerTop, totalsX, dividerBottom);
+  }
+
+  // Y advances to the bottom of whichever section is taller
+  y = Math.max(taxSummaryFinalY, grandTotalFinalY) + totalsPadTop;
+  drawSecBorder(y);
+  y += pxToMm(1);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTION 6: Notes
+  // ═══════════════════════════════════════════════════════════════════════
+
+  if (settings.showNotes) {
+    ensureSpace(8);
+    y += pxToMm(8) * fontScale;
+    const notesLabelTypo = getTypo('notes_label', settings, fontScale);
+    const notesValueTypo = getTypo('notes_value', settings, fontScale);
+
+    setFont(notesLabelTypo);
+    doc.setTextColor(...primaryColor);
+    doc.text('Notes: ', margin + pxToMm(16) * fontScale, y + lineHeightMm(notesLabelTypo.fontSizePt) * 0.8);
+
+    setFont(notesValueTypo);
+    doc.setTextColor(0, 0, 0);
+    const notesText = quotation.notes || 'Thank you for your business!';
+
+    setFont(notesLabelTypo);
+    const labelWidth = doc.getTextWidth('Notes: ');
+    setFont(notesValueTypo);
+    const notesLines = doc.splitTextToSize(notesText, contentWidth - pxToMm(16) * fontScale * 2 - labelWidth);
+    doc.text(notesLines, margin + pxToMm(16) * fontScale + labelWidth, y + lineHeightMm(notesValueTypo.fontSizePt) * 0.8);
+    y += Math.max(notesLines.length * lineHeightMm(notesValueTypo.fontSizePt), lineHeightMm(notesLabelTypo.fontSizePt)) + pxToMm(8) * fontScale;
+
+    drawSecBorder(y);
+    y += pxToMm(1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTION 7: Bank Details + QR + Signature
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const hasFooter = settings.showBankDetails || settings.showPaymentQr || settings.showSignature;
+  if (hasFooter) {
+    ensureSpace(30);
+    const footerPadTop = pxToMm(10) * fontScale;
+    const footerPadSide = pxToMm(16) * fontScale;
+    y += footerPadTop;
+    const footerStartY = y;
+
+    const showBank = settings.showBankDetails;
+    const showQr = settings.showPaymentQr;
+    const showSig = settings.showSignature;
+
+    // Calculate section widths (flex: 1 each in preview)
+    const sections = [showBank, showQr, showSig].filter(Boolean).length;
+    const footerSectionWidth = contentWidth / sections;
+
+    // ── Bank Details ──────────────────────────────────────────────────────
+    if (showBank) {
+      const bankX = margin + footerPadSide;
+      const bankLabelTypo = getTypo('bank_details_label', settings, fontScale);
+      const bankContentTypo = getTypo('bank_details_content', settings, fontScale);
+
+      setFont(bankLabelTypo);
+      doc.setTextColor(...primaryColor);
+      doc.text('Bank Details', bankX, footerStartY + lineHeightMm(bankLabelTypo.fontSizePt) * 0.8);
+
+      let bankY = footerStartY + lineHeightMm(bankLabelTypo.fontSizePt) + pxToMm(4) * fontScale;
+      if (company.bankName) {
+        setFont(bankContentTypo);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Bank: ${company.bankName}`, bankX, bankY + lineHeightMm(bankContentTypo.fontSizePt) * 0.8);
+        bankY += lineHeightMm(bankContentTypo.fontSizePt) + pxToMm(2) * fontScale;
+      }
+      if (company.bankAccount) {
+        setFont(bankContentTypo);
+        doc.text(`A/c: ${company.bankAccount}`, bankX, bankY + lineHeightMm(bankContentTypo.fontSizePt) * 0.8);
+        bankY += lineHeightMm(bankContentTypo.fontSizePt) + pxToMm(2) * fontScale;
+      }
+      if (company.bankIfsc) {
+        setFont(bankContentTypo);
+        doc.text(`IFSC: ${company.bankIfsc}`, bankX, bankY + lineHeightMm(bankContentTypo.fontSizePt) * 0.8);
+        bankY += lineHeightMm(bankContentTypo.fontSizePt) + pxToMm(2) * fontScale;
+      }
+      if (company.bankBranch) {
+        setFont(bankContentTypo);
+        doc.text(`Branch: ${company.bankBranch}`, bankX, bankY + lineHeightMm(bankContentTypo.fontSizePt) * 0.8);
+        bankY += lineHeightMm(bankContentTypo.fontSizePt) + pxToMm(2) * fontScale;
+      }
+
+      y = Math.max(y, bankY);
+    }
+
+    // ── QR Code ───────────────────────────────────────────────────────────
+    if (showQr) {
+      const qrX = margin + footerSectionWidth + footerPadSide;
+      const qrSize = pxToMm(64) * fontScale;
+
+      if (quotation.paymentQr) {
+        try {
+          const isJpeg = quotation.paymentQr.startsWith('data:image/jpeg') || quotation.paymentQr.startsWith('data:image/jpg');
+          doc.addImage(quotation.paymentQr, isJpeg ? 'JPEG' : 'PNG', qrX, footerStartY, qrSize, qrSize, undefined, 'FAST');
+        } catch {
+          doc.setDrawColor(...primaryColor);
+          doc.setLineWidth(0.3);
+          doc.rect(qrX, footerStartY, qrSize, qrSize, 'S');
+          const qrLabelTypo = getTypo('custom_block', settings, fontScale);
+          setFont(qrLabelTypo);
+          doc.text('QR Code', qrX + qrSize / 2, footerStartY + qrSize / 2, { align: 'center' });
+        }
+      } else {
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.3);
+        doc.rect(qrX, footerStartY, qrSize, qrSize, 'S');
+        const qrLabelTypo = getTypo('custom_block', settings, fontScale);
+        setFont(qrLabelTypo);
+        doc.text('QR Code', qrX + qrSize / 2, footerStartY + qrSize / 2, { align: 'center' });
+      }
+
+      const qrCaptionTypo = getTypo('custom_block', settings, fontScale);
+      setFont(qrCaptionTypo);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Scan to Pay', qrX + qrSize / 2, footerStartY + qrSize + pxToMm(3) * fontScale + lineHeightMm(qrCaptionTypo.fontSizePt) * 0.8, { align: 'center' });
+
+      y = Math.max(y, footerStartY + qrSize + pxToMm(3) * fontScale + lineHeightMm(qrCaptionTypo.fontSizePt));
+    }
+
+    // ── Signature ─────────────────────────────────────────────────────────
+    if (showSig) {
+      const sigSectionIndex = (showBank ? 1 : 0) + (showQr ? 1 : 0);
+      const sigX = margin + footerSectionWidth * sigSectionIndex + footerPadSide;
+      const sigWidth = footerSectionWidth - footerPadSide * 2;
+      const sigImgHeight = pxToMm(45) * fontScale;
+
+      const signatureImg = quotation.signature || company.signature;
+
+      if (signatureImg) {
+        try {
+          const isJpeg = signatureImg.startsWith('data:image/jpeg') || signatureImg.startsWith('data:image/jpg');
+          doc.addImage(signatureImg, isJpeg ? 'JPEG' : 'PNG', sigX, footerStartY, sigWidth * 0.6, sigImgHeight, undefined, 'FAST');
+        } catch {
+          // Skip
+        }
+      }
+
+      // Signature line
+      const sigLineY = footerStartY + sigImgHeight + pxToMm(4) * fontScale;
+      doc.setDrawColor(...secBorderColor);
+      doc.setLineWidth(0.2);
+      doc.line(sigX, sigLineY, sigX + sigWidth, sigLineY);
+
+      const sigLabelTypo = getTypo('signature_label', settings, fontScale);
+      setFont(sigLabelTypo);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Authorised Signatory', sigX + sigWidth / 2, sigLineY + pxToMm(4) * fontScale + lineHeightMm(sigLabelTypo.fontSizePt) * 0.8, { align: 'center' });
+
+      y = Math.max(y, sigLineY + pxToMm(4) * fontScale + lineHeightMm(sigLabelTypo.fontSizePt));
+    }
+
+    // Draw vertical dividers between footer sections
+    if (sections > 1) {
+      doc.setDrawColor(...secBorderColor);
+      doc.setLineWidth(0.2);
+      const sectionEndY = y;
+      if (showBank && (showQr || showSig)) {
+        doc.line(margin + footerSectionWidth, footerStartY - footerPadTop, margin + footerSectionWidth, sectionEndY);
+      }
+      if (showQr && showSig) {
+        doc.line(margin + footerSectionWidth * 2, footerStartY - footerPadTop, margin + footerSectionWidth * 2, sectionEndY);
+      }
+    }
+
+    y += footerPadTop;
+    drawSecBorder(y);
+    y += pxToMm(1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTION 8: Terms & Conditions
+  // ═══════════════════════════════════════════════════════════════════════
+
+  if (settings.showTermsConditions) {
+    const termsLabelTypo = getTypo('terms_label', settings, fontScale);
+    const termsContentTypo = getTypo('terms_content', settings, fontScale);
+
+    const termsText = quotation.terms ||
+      '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.';
+
+    const termsLines = termsText.split('\n');
+    const termsHeight = termsLines.length * lineHeightMm(termsContentTypo.fontSizePt) + lineHeightMm(termsLabelTypo.fontSizePt) + pxToMm(16) * fontScale;
+    ensureSpace(termsHeight);
+
+    y += pxToMm(8) * fontScale;
+    setFont(termsLabelTypo);
+    doc.setTextColor(...primaryColor);
+    doc.text('Terms & Conditions', margin + pxToMm(16) * fontScale, y + lineHeightMm(termsLabelTypo.fontSizePt) * 0.8);
+    y += lineHeightMm(termsLabelTypo.fontSizePt) + pxToMm(3) * fontScale;
+
+    setFont(termsContentTypo);
+    doc.setTextColor(0, 0, 0);
+    for (const line of termsLines) {
+      const wrappedLines = doc.splitTextToSize(line, contentWidth - pxToMm(16) * fontScale * 2);
+      doc.text(wrappedLines, margin + pxToMm(16) * fontScale, y + lineHeightMm(termsContentTypo.fontSizePt) * 0.8);
+      y += wrappedLines.length * lineHeightMm(termsContentTypo.fontSizePt);
+    }
+
+    y += pxToMm(8) * fontScale;
+    drawSecBorder(y);
+    y += pxToMm(1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Footer Strip
+  // ═══════════════════════════════════════════════════════════════════════
+
+  ensureSpace(6);
+  const footerStripTypo = getTypo('footer_strip', settings, fontScale);
+  const footerStripPadTop = pxToMm(5) * fontScale;
+
+  // Top border for footer strip
+  doc.setDrawColor(...secBorderColor);
+  doc.setLineWidth(0.2);
+  doc.line(margin, y, paperWidth - margin, y);
+
+  y += footerStripPadTop;
+  setFont(footerStripTypo);
+  doc.setTextColor(170, 170, 170);
+  doc.text('Computer-generated document. No signature required.', paperWidth / 2, y + lineHeightMm(footerStripTypo.fontSizePt) * 0.8, { align: 'center' });
+  y += lineHeightMm(footerStripTypo.fontSizePt) + footerStripPadTop;
+
+  // ── Draw outer border (if theme has it) on all pages ────────────────────
+  if (theme.outerBorder) {
+    const totalPages = doc.getNumberOfPages();
+    const borderWidth = theme.outerBorderWidth * 0.3;
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setDrawColor(...primaryColor);
+      doc.setLineWidth(borderWidth);
+      const pageH = paperSize === 'pos' ? y + margin : pageHeight;
+      doc.rect(margin - 1, margin - 1, contentWidth + 2, pageH - margin * 2 + 2);
+    }
+  }
+
+  // ── Save ────────────────────────────────────────────────────────────────
   const fileName = documentType === 'invoice' && invoice ? invoice.invoiceNumber : quotation.quotationNumber;
   doc.save(`${fileName}.pdf`);
 };
-
-/**
- * Wait for all images in a container to load.
- */
-function waitForImages(container: HTMLElement): Promise<void[]> {
-  const images = container.querySelectorAll('img');
-  return Promise.all(Array.from(images).map(img => {
-    if (img.complete) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      img.onload = () => resolve();
-      img.onerror = () => resolve(); // Continue even if image fails
-    });
-  }));
-}

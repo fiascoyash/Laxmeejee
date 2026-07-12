@@ -18,11 +18,9 @@ import {
   BILL_FIELD_DEFINITIONS,
 } from '../../types';
 
-// Set worker path - use local worker bundled with Vite
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).href;
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 interface TextItem {
   str: string;

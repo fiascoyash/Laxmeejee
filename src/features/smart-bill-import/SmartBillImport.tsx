@@ -32,11 +32,9 @@ type Viewport = ReturnType<PDFDocumentProxy['getPage']> extends Promise<infer P>
     : never
   : never;
 
-// Configure the worker once
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 type FieldKey =
   | 'productName'
