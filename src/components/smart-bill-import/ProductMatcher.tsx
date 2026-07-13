@@ -430,7 +430,7 @@ export const ProductMatcher: React.FC<ProductMatcherProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={newProductForm.purchasePrice}
+                      value={newProductForm.purchasePrice || ''}
                       onChange={(e) =>
                         setNewProductForm({
                           ...newProductForm,
@@ -446,7 +446,7 @@ export const ProductMatcher: React.FC<ProductMatcherProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={newProductForm.sellingPrice}
+                      value={newProductForm.sellingPrice || ''}
                       onChange={(e) =>
                         setNewProductForm({
                           ...newProductForm,

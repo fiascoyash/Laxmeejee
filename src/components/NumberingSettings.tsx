@@ -69,7 +69,7 @@ export function NumberingSettingsPanel({ settings, onSave }: Props) {
               <input
                 type="number"
                 min={1}
-                value={local.quotationStartNumber}
+                value={local.quotationStartNumber || ''}
                 onChange={(e) => update({ quotationStartNumber: parseInt(e.target.value) || 1, quotationNextNumber: parseInt(e.target.value) || 1 })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-blue-500"
               />
@@ -125,7 +125,7 @@ export function NumberingSettingsPanel({ settings, onSave }: Props) {
               <input
                 type="number"
                 min={1}
-                value={local.invoiceStartNumber}
+                value={local.invoiceStartNumber || ''}
                 onChange={(e) => update({ invoiceStartNumber: parseInt(e.target.value) || 1, invoiceNextNumber: parseInt(e.target.value) || 1 })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-blue-500"
               />

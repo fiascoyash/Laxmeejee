@@ -256,7 +256,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
       return (
         <input
           type="number"
-          value={value as number}
+          value={value === '' ? '' : (value as number) || ''}
           onChange={(e) => updateCustomField(field.key, Number(e.target.value))}
           className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           placeholder={field.placeholder}

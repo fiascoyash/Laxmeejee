@@ -348,6 +348,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             <option value={5}>5%</option>
             <option value={18}>18%</option>
             <option value={28}>28%</option>
+            <option value={40}>40%</option>
           </select>
         );
       case 'quantityUnit':
@@ -356,7 +357,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             <input
               type="number"
               min="1"
-              value={product.quantity}
+              value={product.quantity || ''}
               onChange={(e) => {
                 const newQuantity = Number(e.target.value) || 1;
                 // If manual amount is set, recalculate rate from amount/quantity
@@ -396,7 +397,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             type="number"
             min="0"
             step="0.01"
-            value={product.unitPrice}
+            value={product.unitPrice || ''}
             onChange={(e) => {
               // Reset manual amount when rate changes
               onChange(products.map(p =>
@@ -408,8 +409,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
         );
       case 'amount':
         const displayAmount = product.isManualAmount && product.manualAmount !== undefined
-          ? product.manualAmount
-          : calculateProductAmount(product);
+          ? (product.manualAmount || '')
+          : (calculateProductAmount(product) || '');
         return (
           <input
             type="number"
@@ -477,7 +478,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             min="0"
             max="100"
             step="0.1"
-            value={product.discount || 0}
+            value={product.discount || ''}
             onChange={(e) => updateProduct(product.id, 'discount', Number(e.target.value))}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
           />
@@ -488,7 +489,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             type="number"
             min="0"
             step="0.01"
-            value={product.mrp || 0}
+            value={product.mrp || ''}
             onChange={(e) => updateProduct(product.id, 'mrp', Number(e.target.value))}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-right"
           />
@@ -518,7 +519,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
           <input
             type="number"
             min="0"
-            value={product.warrantyMonths || 0}
+            value={product.warrantyMonths || ''}
             onChange={(e) => updateProduct(product.id, 'warrantyMonths', Number(e.target.value))}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
           />
@@ -528,7 +529,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
           <input
             type="number"
             min="0"
-            value={product.wattage || 0}
+            value={product.wattage || ''}
             onChange={(e) => updateProduct(product.id, 'wattage', Number(e.target.value))}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
             placeholder="W"
@@ -563,7 +564,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             return (
               <input
                 type="number"
-                value={value as number}
+                value={value === '' ? '' : (value as number) || ''}
                 onChange={(e) => updateCustomField(product.id, colKey, Number(e.target.value))}
                 className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
                 placeholder={customField.placeholder}
@@ -790,7 +791,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                   <input
                     type="number"
                     min="1"
-                    value={product.quantity}
+                    value={product.quantity || ''}
                     onChange={(e) => {
                       const newQuantity = Number(e.target.value) || 1;
                       if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
@@ -830,7 +831,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                   type="number"
                   min="0"
                   step="0.01"
-                  value={product.unitPrice}
+                  value={product.unitPrice || ''}
                   onChange={(e) => {
                     onChange(products.map(p =>
                       p.id === product.id ? { ...p, unitPrice: Number(e.target.value), isManualAmount: false } : p
@@ -853,6 +854,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     <option value={5}>5%</option>
                     <option value={18}>18%</option>
                     <option value={28}>28%</option>
+                    <option value={40}>40%</option>
                   </select>
                 </div>
               )}
@@ -865,8 +867,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                   min="0"
                   step="0.01"
                   value={product.isManualAmount && product.manualAmount !== undefined
-                    ? product.manualAmount
-                    : calculateProductAmount(product)}
+                    ? (product.manualAmount || '')
+                    : (calculateProductAmount(product) || '')}
                   onChange={(e) => {
                     const manualValue = Number(e.target.value);
                     if (product.quantity > 0 && manualValue > 0) {
@@ -942,7 +944,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     min="0"
                     max="100"
                     step="0.1"
-                    value={product.discount || 0}
+                    value={product.discount || ''}
                     onChange={(e) => updateProduct(product.id, 'discount', Number(e.target.value))}
                     className="w-full px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
                   />

@@ -170,7 +170,7 @@ export function SupplierForm({ supplier, onSave, onCancel }: Props) {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={form.openingBalance}
+                  value={form.openingBalance || ''}
                   onChange={e => update('openingBalance', Number(e.target.value))}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="0"

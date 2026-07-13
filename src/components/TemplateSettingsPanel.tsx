@@ -381,7 +381,7 @@ export function TemplateSettingsPanel({
                   type="number"
                   min={6}
                   max={72}
-                  value={settings.globalDefaultFontSize ?? 12}
+                  value={settings.globalDefaultFontSize ?? ''}
                   onChange={(e) => updateSetting('globalDefaultFontSize', Number(e.target.value))}
                   className="w-16 px-2 py-1 border border-slate-300 rounded-md text-sm text-center"
                 />
@@ -437,7 +437,7 @@ export function TemplateSettingsPanel({
                           type="range"
                           min={6}
                           max={72}
-                          value={selectedElementValues.fontSize}
+                          value={selectedElementValues.fontSize || ''}
                           onChange={(e) => updateElementTypography(selectedTypographyElement, 'fontSize', Number(e.target.value))}
                           className="flex-1 accent-purple-600"
                         />
@@ -445,7 +445,7 @@ export function TemplateSettingsPanel({
                           type="number"
                           min={6}
                           max={72}
-                          value={selectedElementValues.fontSize}
+                          value={selectedElementValues.fontSize || ''}
                           onChange={(e) => updateElementTypography(selectedTypographyElement, 'fontSize', Number(e.target.value))}
                           className="w-14 px-1 py-0.5 border border-slate-300 rounded-md text-xs text-center"
                         />

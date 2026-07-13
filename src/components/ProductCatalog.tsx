@@ -512,7 +512,7 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
                 type="number"
                 min="0"
                 step="any"
-                value={value as number}
+                value={value === '' ? '' : (value as number) || ''}
                 onChange={(e) => {
                   setEditing({
                     ...editing,
@@ -661,6 +661,7 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
                   <option value="12">12%</option>
                   <option value="18">18%</option>
                   <option value="28">28%</option>
+                  <option value="40">40%</option>
                 </select>
               </div>
               <div>
@@ -964,7 +965,7 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
                       type="number"
                       min="0"
                       step="0.01"
-                      value={editing.purchasePrice}
+                      value={editing.purchasePrice || ''}
                       onChange={(e) => updateField('purchasePrice', Number(e.target.value))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     />
@@ -975,7 +976,7 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
                       type="number"
                       min="0"
                       step="0.01"
-                      value={editing.sellingPrice}
+                      value={editing.sellingPrice || ''}
                       onChange={(e) => updateField('sellingPrice', Number(e.target.value))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     />
@@ -992,6 +993,7 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
                       <option value={12}>12%</option>
                       <option value={18}>18%</option>
                       <option value={28}>28%</option>
+                      <option value={40}>40%</option>
                     </select>
                   </div>
                 </div>
@@ -1020,7 +1022,7 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
                     <input
                       type="number"
                       min="0"
-                      value={editing.stockQuantity}
+                      value={editing.stockQuantity || ''}
                       onChange={(e) => updateField('stockQuantity', Number(e.target.value))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     />
