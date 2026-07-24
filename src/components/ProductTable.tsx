@@ -1,7 +1,8 @@
 import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UNIT_OPTIONS } from '../types';
 import { generateId, calculateProductAmount, calculateTaxSummary, calculateRoundOff, calculateGrandTotalAmount, roundTo2, getExpiryStatus, isLowStock, getDaysUntilExpiry } from '../utils/storage';
-import { Plus, Trash2, Package, ChevronDown, Settings2, AlertTriangle, AlertCircle, Clock } from 'lucide-react';
+import { Plus, Trash2, Package, ChevronDown, Settings2, AlertTriangle, AlertCircle, Clock, PackagePlus } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { SaveProductDialog } from './SaveProductDialog';
 
 interface Props {
   products: Product[];
@@ -17,6 +18,8 @@ interface Props {
   templateSettings?: TemplateSettings;
   // Template schema - defines industry-specific columns (SINGLE SOURCE OF TRUTH)
   schema?: TemplateSchema;
+  // Callback to save a new product directly to the global catalog
+  onSaveNewProduct?: (item: ProductCatalogItem) => void;
 }
 
 // Built-in columns for standard fields
@@ -43,8 +46,9 @@ const getBuiltinColumns = (): Record<string, TableColumn> => ({
   notes: { id: 'col_notes', key: 'notes', label: 'Notes', width: 15, visible: false, order: 13 },
 });
 
-export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema }: Props) {
+export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema, onSaveNewProduct }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
+  const [saveDialogProduct, setSaveDialogProduct] = useState<Product | null>(null);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const columnSettingsRef = useRef<HTMLDivElement>(null);
   const catalogRef = useRef<HTMLDivElement>(null);
@@ -307,16 +311,32 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
   const renderCell = (product: Product, colKey: string) => {
     switch (colKey) {
       case 'sno': return null;
-      case 'name':
+      case 'name': {
+        const isNew = onSaveNewProduct &&
+          product.name.trim().length > 0 &&
+          !catalog.some(c => c.name.trim().toLowerCase() === product.name.trim().toLowerCase());
         return (
-          <input
-            type="text"
-            value={product.name}
-            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
-            placeholder="Product/Service name"
-          />
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={product.name}
+              onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+              className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
+              placeholder="Product/Service name"
+            />
+            {isNew && (
+              <button
+                type="button"
+                onClick={() => setSaveDialogProduct(product)}
+                className="flex-shrink-0 p-1.5 rounded text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                title="Save to Product Catalog"
+              >
+                <PackagePlus className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         );
+      }
       case 'description':
         return (
           <textarea
@@ -767,13 +787,27 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             <div className="flex justify-between items-start mb-3">
               <div className="flex-1">
                 <div className="text-xs text-slate-500 mb-1">#{index + 1}</div>
-                <input
-                  type="text"
-                  value={product.name}
-                  onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 text-sm min-h-[44px]"
-                  placeholder="Product/Service name"
-                />
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={product.name}
+                    onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 text-sm min-h-[44px]"
+                    placeholder="Product/Service name"
+                  />
+                  {onSaveNewProduct &&
+                    product.name.trim().length > 0 &&
+                    !catalog.some(c => c.name.trim().toLowerCase() === product.name.trim().toLowerCase()) && (
+                    <button
+                      type="button"
+                      onClick={() => setSaveDialogProduct(product)}
+                      className="flex-shrink-0 p-2 rounded text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      title="Save to Product Catalog"
+                    >
+                      <PackagePlus className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
               </div>
               <button
                 onClick={() => removeProduct(product.id)}
@@ -1141,6 +1175,18 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
           </div>
         </div>
       )}
+    {/* Save Product to Catalog Dialog */}
+    {saveDialogProduct && (
+      <SaveProductDialog
+        product={saveDialogProduct}
+        catalog={catalog}
+        onSave={(item) => {
+          if (onSaveNewProduct) onSaveNewProduct(item);
+          setSaveDialogProduct(null);
+        }}
+        onClose={() => setSaveDialogProduct(null)}
+      />
+    )}
     </div>
   );
 }

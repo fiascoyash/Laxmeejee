@@ -1,8 +1,9 @@
 import {
   CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn,
-  Invoice, NumberingSettings, GstMode, CustomerData,
+  Invoice, InvoiceStatus, NumberingSettings, GstMode, CustomerData,
   DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UnitType, IndustryType, ExpiryStatus, UNIT_OPTIONS,
   SupplierData, SupplierTransaction, ProductPurchase, ProductStockMovement, StockMovementType,
+  InvoicePayment,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -18,6 +19,7 @@ const STORAGE_KEYS = {
   LAST_USED_COLUMNS: 'laxmeejee_last_used_columns',
   PRODUCT_PURCHASES: 'laxmeejee_product_purchases',
   PRODUCT_STOCK_MOVEMENTS: 'laxmeejee_product_stock_movements',
+  INVOICE_PAYMENTS: 'laxmeejee_invoice_payments',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -445,7 +447,55 @@ export const storage = {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
-  // Create a stock movement and return the balance after
+  // --- Invoice Payments ---
+
+  getPayments: (): InvoicePayment[] => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.INVOICE_PAYMENTS);
+      return data ? JSON.parse(data) : [];
+    } catch { return []; }
+  },
+
+  addPayment: (payment: InvoicePayment): void => {
+    const payments = storage.getPayments();
+    payments.unshift(payment);
+    localStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
+  },
+
+  deletePayment: (id: string): void => {
+    const payments = storage.getPayments().filter(p => p.id !== id);
+    localStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
+  },
+
+  getPaymentsByInvoice: (invoiceId: string): InvoicePayment[] => {
+    return storage.getPayments()
+      .filter(p => p.invoiceId === invoiceId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  },
+
+  getInvoiceAmountPaid: (invoiceId: string): number => {
+    return storage.getPaymentsByInvoice(invoiceId)
+      .reduce((sum, p) => sum + p.amount, 0);
+  },
+
+  computeInvoiceStatus: (amountPaid: number, grandTotal: number, isDraft: boolean): InvoiceStatus => {
+    if (isDraft) return 'Draft';
+    if (amountPaid <= 0) return 'Unpaid';
+    if (amountPaid >= grandTotal) return 'Paid';
+    return 'Partial Payment';
+  },
+
+  updateInvoiceAmountPaid: (invoiceId: string): void => {
+    const invoices = storage.getInvoices();
+    const idx = invoices.findIndex(i => i.id === invoiceId);
+    if (idx === -1) return;
+    const inv = invoices[idx];
+    const amountPaid = storage.getInvoiceAmountPaid(invoiceId);
+    const status = storage.computeInvoiceStatus(amountPaid, inv.grandTotal, inv.status === 'Draft');
+    invoices[idx] = { ...inv, amountPaid, status, updatedAt: new Date().toISOString() };
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  },
+
   createStockMovement: (
     productId: string,
     movementType: StockMovementType,

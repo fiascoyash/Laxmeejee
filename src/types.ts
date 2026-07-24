@@ -409,6 +409,28 @@ export interface NumberingSettings {
 
 export type InvoiceStatus = 'Draft' | 'Unpaid' | 'Partial Payment' | 'Paid';
 
+export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'card' | 'other';
+
+export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  bank_transfer: 'Bank Transfer',
+  cheque: 'Cheque',
+  card: 'Card / Swipe',
+  other: 'Other',
+};
+
+export interface InvoicePayment {
+  id: string;
+  invoiceId: string;
+  date: string;        // YYYY-MM-DD
+  amount: number;
+  mode: PaymentMode;
+  reference?: string;  // cheque no, UTR, etc.
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -423,6 +445,7 @@ export interface Invoice {
   roundOff: number;
   grandTotal: number;
   status: InvoiceStatus;
+  amountPaid?: number;   // sum of all recorded payments (cached)
   notes?: string;
   signature?: string;       // Signature image URL
   paymentQr?: string;       // QR Code image URL

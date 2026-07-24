@@ -1,5 +1,5 @@
 import { Invoice, InvoiceStatus } from '../types';
-import { FileText, Trash2, Copy, CreditCard as Edit, Eye, X, Calendar, User, Search, XCircle } from 'lucide-react';
+import { FileText, Trash2, Copy, CreditCard as Edit, Eye, X, Calendar, User, Search, XCircle, IndianRupee } from 'lucide-react';
 import { useState, useMemo } from 'react';
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
   onEdit: (invoice: Invoice) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  onRecordPayment: (invoice: Invoice) => void;
 }
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -41,7 +42,7 @@ function matchesInvoice(inv: Invoice, query: string): boolean {
   return haystack.some(field => field.toLowerCase().includes(q));
 }
 
-export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate }: Props) {
+export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate, onRecordPayment }: Props) {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -123,8 +124,32 @@ export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate }: Props) 
                     Rs. {invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
                 </div>
+                {/* Payment breakdown */}
+                {invoice.status !== 'Draft' && (
+                  <div className="mt-2 flex items-center gap-4 text-xs">
+                    {(invoice.amountPaid || 0) > 0 && (
+                      <span className="text-emerald-600 font-medium">
+                        Received: ₹{(invoice.amountPaid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                    {Math.max(0, invoice.grandTotal - (invoice.amountPaid || 0)) > 0 && (
+                      <span className="text-red-600 font-medium">
+                        Outstanding: ₹{Math.max(0, invoice.grandTotal - (invoice.amountPaid || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
+                {(invoice.status === 'Unpaid' || invoice.status === 'Partial Payment') && (
+                  <button
+                    onClick={() => onRecordPayment(invoice)}
+                    className="p-2 text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors"
+                    title="Record Payment"
+                  >
+                    <IndianRupee className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => setPreviewInvoice(invoice)}
                   className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

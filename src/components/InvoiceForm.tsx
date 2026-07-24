@@ -13,6 +13,7 @@ interface Props {
   onExportPDF: () => void;
   onPreview: () => void;
   onCancel: () => void;
+  onSaveNewProduct?: (item: ProductCatalogItem) => void;
 }
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['Draft', 'Unpaid', 'Partial Payment', 'Paid'];
@@ -33,6 +34,7 @@ export function InvoiceForm({
   onExportPDF,
   onPreview,
   onCancel,
+  onSaveNewProduct,
 }: Props) {
   const update = (patch: Partial<Invoice>) => onChange({ ...invoice, ...patch });
   const updateCustomer = (customer: Customer) => update({ customer });
@@ -126,6 +128,7 @@ export function InvoiceForm({
         templateSettings={selectedTemplate?.settings}
         schema={selectedTemplate?.schema}
         customFields={selectedTemplate?.schema?.productFields || []}
+        onSaveNewProduct={onSaveNewProduct}
       />
 
       {/* Dynamic Fields based on Template Settings */}

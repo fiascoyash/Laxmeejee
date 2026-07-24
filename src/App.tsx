@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData } from './types';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment } from './types';
 import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
@@ -21,6 +21,8 @@ import { SupplierForm } from './components/SupplierForm';
 import { SupplierLedger } from './components/SupplierLedger';
 import { SmartBillImport } from './features/smart-bill-import';
 import { GstReports } from './components/GstReports';
+import { Dashboard } from './components/Dashboard';
+import { PaymentModal } from './components/PaymentModal';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { isValidMobile, isValidGstin } from './utils/validation';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3 } from 'lucide-react';
@@ -96,6 +98,7 @@ function App() {
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [viewingCustomer, setViewingCustomer] = useState<CustomerData | null>(null);
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
 
   // Supplier / Vendor Management State
   const [suppliers, setSuppliers] = useState<SupplierData[]>(storage.getSuppliers);
@@ -363,6 +366,64 @@ function App() {
     storage.saveProductCatalog(catalogItems);
     setCatalog(catalogItems);
   };
+
+  const handleSaveNewProduct = (item: ProductCatalogItem) => {
+    storage.addCatalogProduct(item);
+    setCatalog(prev => [...prev, item]);
+  };
+
+  // Payment handlers
+  const handleAddPayment = (payment: InvoicePayment) => {
+    storage.addPayment(payment);
+    storage.updateInvoiceAmountPaid(payment.invoiceId);
+    const updatedInvoices = storage.getInvoices();
+    setInvoices(updatedInvoices);
+    // Keep paymentInvoice in sync with updated data
+    const updatedInv = updatedInvoices.find(i => i.id === payment.invoiceId);
+    if (updatedInv) setPaymentInvoice(updatedInv);
+    // Background sync to Supabase
+    (async () => {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const url = import.meta.env.VITE_SUPABASE_URL;
+        const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (!url || !key) return;
+        const sb = createClient(url, key);
+        await sb.from('invoice_payments').insert({
+          id: payment.id,
+          invoice_id: payment.invoiceId,
+          date: payment.date,
+          amount: payment.amount,
+          mode: payment.mode,
+          reference: payment.reference || null,
+          notes: payment.notes || null,
+          created_at: payment.createdAt,
+        });
+      } catch (_) { /* fire-and-forget */ }
+    })();
+  };
+
+  const handleDeletePayment = (paymentId: string, invoiceId: string) => {
+    storage.deletePayment(paymentId);
+    storage.updateInvoiceAmountPaid(invoiceId);
+    const updatedInvoices = storage.getInvoices();
+    setInvoices(updatedInvoices);
+    const updatedInv = updatedInvoices.find(i => i.id === invoiceId);
+    if (updatedInv) setPaymentInvoice(updatedInv);
+    // Background sync to Supabase
+    (async () => {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const url = import.meta.env.VITE_SUPABASE_URL;
+        const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (!url || !key) return;
+        const sb = createClient(url, key);
+        await sb.from('invoice_payments').delete().eq('id', paymentId);
+      } catch (_) { /* fire-and-forget */ }
+    })();
+  };
+
+  const handleRecordPayment = (invoice: Invoice) => setPaymentInvoice(invoice);
 
   // Reset quotation form - keeps last used column configuration
   const resetForm = () => {
@@ -1196,106 +1257,18 @@ function App() {
         <div className="p-4 lg:p-6">
           {/* Home Dashboard */}
           {view === 'home' && (
-            <div className="max-w-6xl mx-auto space-y-6">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl lg:text-3xl font-bold text-slate-800 mb-2">Dashboard</h2>
-                <p className="text-slate-500">Welcome to Laxmeejee GST Invoice System</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <button
-                  onClick={startNewQuotation}
-                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-blue-400 transition-all group"
-                >
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500 transition-colors">
-                    <FileText className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-semibold text-slate-800 mb-1">New Quotation</h3>
-                  <p className="text-sm text-slate-500">Create a new quotation</p>
-                </button>
-
-                <button
-                  onClick={() => navigateTo('list')}
-                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-emerald-400 transition-all group"
-                >
-                  <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-emerald-500 transition-colors">
-                    <List className="w-6 h-6 text-emerald-600 group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-semibold text-slate-800 mb-1">Quotation History</h3>
-                  <p className="text-sm text-slate-500">{quotations.length} quotations saved</p>
-                </button>
-
-                <button
-                  onClick={() => navigateTo('invoiceList')}
-                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-amber-400 transition-all group"
-                >
-                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-500 transition-colors">
-                    <Receipt className="w-6 h-6 text-amber-600 group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-semibold text-slate-800 mb-1">Invoice History</h3>
-                  <p className="text-sm text-slate-500">{invoices.length} invoices</p>
-                </button>
-
-                <button
-                  onClick={() => navigateTo('templates')}
-                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-purple-400 transition-all group"
-                >
-                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-500 transition-colors">
-                    <Layout className="w-6 h-6 text-purple-600 group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-semibold text-slate-800 mb-1">Templates</h3>
-                  <p className="text-sm text-slate-500">{templates.length} templates</p>
-                </button>
-
-                <button
-                  onClick={() => navigateTo('gstReports')}
-                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-indigo-400 transition-all group"
-                >
-                  <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-500 transition-colors">
-                    <BarChart3 className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-semibold text-slate-800 mb-1">GST Reports</h3>
-                  <p className="text-sm text-slate-500">Tax analysis & reports</p>
-                </button>
-              </div>
-
-              {/* Recent Quotations */}
-              {quotations.length > 0 && (
-                <div className="mt-8">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-4">Recent Quotations</h3>
-                  <div className="space-y-3">
-                    {quotations.slice(0, 3).map(q => (
-                      <div
-                        key={q.id}
-                        className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => editQuotation(q)}
-                      >
-                        <div>
-                          <span className="font-medium text-emerald-600">{q.quotationNumber}</span>
-                          <span className="text-slate-400 mx-2">|</span>
-                          <span className="text-slate-600">{q.customer.name}</span>
-                        </div>
-                        <span className="font-medium text-slate-800">Rs. {q.grandTotal.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Quick Setup */}
-              {!companyProfile.companyName && (
-                <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-emerald-800 mb-2">Get Started</h3>
-                  <p className="text-emerald-600 mb-4">Complete your company profile to create professional quotations.</p>
-                  <button
-                    onClick={() => setShowCompanyProfile(true)}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                  >
-                    Setup Company Profile
-                  </button>
-                </div>
-              )}
-            </div>
+            <Dashboard
+              invoices={invoices}
+              quotations={quotations}
+              customers={customers}
+              suppliers={suppliers}
+              catalog={catalog}
+              companyProfile={companyProfile}
+              onNewInvoice={startNewInvoice}
+              onNewQuotation={startNewQuotation}
+              onNavigate={(v) => navigateTo(v)}
+              onShowCompanyProfile={() => setShowCompanyProfile(true)}
+            />
           )}
 
           {/* Template Selection */}
@@ -1369,6 +1342,7 @@ function App() {
                 customFields={selectedTemplate?.schema?.productFields || []}
                 templateSettings={selectedTemplate?.settings}
                 schema={selectedTemplate?.schema}
+                onSaveNewProduct={handleSaveNewProduct}
               />
 
               {/* Dynamic Fields based on Template Settings */}
@@ -1591,6 +1565,7 @@ function App() {
               onExportPDF={exportInvoicePDF}
               onPreview={previewInvoice}
               onCancel={() => { setEditingInvoice(null); setView('invoiceList'); }}
+              onSaveNewProduct={handleSaveNewProduct}
             />
           )}
 
@@ -1612,6 +1587,7 @@ function App() {
                 onEdit={editInvoice}
                 onDelete={deleteInvoice}
                 onDuplicate={duplicateInvoice}
+                onRecordPayment={handleRecordPayment}
               />
             </div>
           )}
@@ -1975,12 +1951,15 @@ function App() {
         />
       )}
 
-      {/* Customer History Modal */}
+      {/* Customer History / Khata Book Modal */}
       {viewingCustomer && (
         <CustomerHistory
           customer={viewingCustomer}
           quotations={getCustomerHistory(viewingCustomer.mobile).customerQuotations}
           invoices={getCustomerHistory(viewingCustomer.mobile).customerInvoices}
+          payments={storage.getPayments().filter(p =>
+            getCustomerHistory(viewingCustomer.mobile).customerInvoices.some(i => i.id === p.invoiceId)
+          )}
           onClose={() => setViewingCustomer(null)}
           onEditQuotation={(q) => {
             setViewingCustomer(null);
@@ -1990,6 +1969,20 @@ function App() {
             setViewingCustomer(null);
             editInvoice(i);
           }}
+          onRecordPayment={(inv) => {
+            setPaymentInvoice(inv);
+          }}
+        />
+      )}
+
+      {/* Payment Modal */}
+      {paymentInvoice && (
+        <PaymentModal
+          invoice={paymentInvoice}
+          payments={storage.getPaymentsByInvoice(paymentInvoice.id)}
+          onAddPayment={handleAddPayment}
+          onDeletePayment={handleDeletePayment}
+          onClose={() => setPaymentInvoice(null)}
         />
       )}
     </div>
