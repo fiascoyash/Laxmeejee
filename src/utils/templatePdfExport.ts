@@ -90,7 +90,33 @@ export const exportTemplatePDF = async (
   const schema = template.schema;
 
   const resolvedThemeId: ThemeId = themeId ?? 'professional_corporate';
-  await generateVectorPDF(resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+  const theme = INVOICE_THEMES[resolvedThemeId] ?? INVOICE_THEMES['professional_corporate'];
+  const paperSize = theme.paperSize ?? 'a4';
+
+  const fileName = documentType === 'invoice' && invoice ? invoice.invoiceNumber : quotation.quotationNumber;
+
+  if (paperSize === 'pos') {
+    // POS: measure content height first, then create doc with exact height
+    const posFontScale = 0.5;
+    const posMargin = pxToMm(16) * posFontScale;
+
+    // Measurement pass — never saved, just calculates finalY
+    const measureDoc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [POS_WIDTH, 297], compress: true });
+    const finalY = await generateVectorPDF(measureDoc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+
+    const calculatedHeight = Math.max(finalY + posMargin, posMargin * 2);
+
+    // Real render — single pass into correctly-sized doc
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [POS_WIDTH, calculatedHeight], compress: true });
+    await generateVectorPDF(doc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+    doc.save(`${fileName}.pdf`);
+  } else {
+    // A4/A5: single pass with fixed page size
+    const pdfFormat = paperSize === 'a5' ? 'a5' as const : 'a4' as const;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: pdfFormat, compress: true });
+    await generateVectorPDF(doc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+    doc.save(`${fileName}.pdf`);
+  }
 };
 
 // ─── Column visibility (mirrors DocumentRenderer.isColumnVisible) ─────────────
@@ -129,9 +155,456 @@ const isColumnVisible = (
   return settingsMap[columnKey] ?? false;
 };
 
+// ─── POS Compact Bill Renderer (80mm thermal receipt layout) ──────────────────
+
+const generatePosReceipt = (
+  doc: jsPDF,
+  settings: TemplateSettings,
+  company: CompanyProfile,
+  customer: Customer,
+  quotation: Quotation,
+  products: Product[],
+  documentType: DocumentType,
+  invoice: Invoice | undefined,
+  gstMode: GstMode,
+  schema: TemplateSchema | undefined,
+): number => {
+  const margin = 3;
+  const contentWidth = POS_WIDTH - margin * 2;
+  const centerX = POS_WIDTH / 2;
+  const rightX = POS_WIDTH - margin;
+
+  const FS_COMPANY = 12;
+  const FS_BODY = 8;
+  const FS_SMALL = 7;
+  const FS_TITLE = 10;
+  const FS_TABLE = 7.5;
+  const FS_TOTALS = 8;
+  const FS_GRAND = 10;
+
+  const lh = (pt: number) => pt * 0.3528;
+
+  const styleThemeId: StyleThemeId = settings.styleThemeId ?? DEFAULT_STYLE_THEME_ID;
+  const style: StyleTheme = STYLE_THEMES[styleThemeId] ?? STYLE_THEMES[DEFAULT_STYLE_THEME_ID];
+  const primaryColor = hexToRgb(style.primaryColor);
+  const secBorderColor = hexToRgb(style.sectionBorderColor);
+  const tableBorderColor = hexToRgb(style.tableBorderColor);
+  const tableHeaderBg = hexToRgb(style.tableHeaderBg);
+
+  doc.setFont('helvetica');
+  doc.setTextColor(0, 0, 0);
+
+  const resolvedGstMode: GstMode = gstMode || quotation.gstMode || 'inclusive';
+  const docLabel = documentType === 'invoice' ? 'TAX INVOICE' : 'QUOTATION';
+  const docNumber = documentType === 'invoice' ? invoice?.invoiceNumber ?? '' : quotation.quotationNumber;
+  const docDate = documentType === 'invoice' ? invoice?.date ?? quotation.date : quotation.date;
+  const dueDate = documentType === 'invoice' ? invoice?.dueDate : undefined;
+
+  const taxSummary = calculateTaxSummary(products, resolvedGstMode);
+  const totalTaxable = roundTo2(Array.from(taxSummary.values()).reduce((s, t) => s + t.taxableAmount, 0));
+  const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((s, t) => s + t.cgstAmount, 0));
+  const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((s, t) => s + t.sgstAmount, 0));
+  const grandTotalRaw = calculateGrandTotalAmount(products, resolvedGstMode);
+  const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalRaw);
+
+  const gstColumnVisible = isColumnVisible('gstPercent', documentType, quotation, invoice, settings, schema);
+  const hasAnyGst = products.some(p => (p.gstPercent || 0) > 0);
+  const showGstDetails = gstColumnVisible && hasAnyGst;
+  const showTaxSummary = settings.showTaxSummary !== false && showGstDetails;
+
+  let y = margin;
+
+  const drawSep = () => {
+    doc.setDrawColor(...secBorderColor);
+    doc.setLineWidth(0.2);
+    doc.line(margin, y, POS_WIDTH - margin, y);
+  };
+
+  // ═══ SECTION 1: Header (centered) ═══
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(FS_COMPANY);
+  doc.setTextColor(0, 0, 0);
+  doc.text(company.companyName || 'Company Name', centerX, y + lh(FS_COMPANY) * 0.8, { align: 'center' });
+  y += lh(FS_COMPANY) + 1;
+
+  if (company.address) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(FS_BODY);
+    const addrLines = doc.splitTextToSize(company.address, contentWidth);
+    doc.text(addrLines, centerX, y + lh(FS_BODY) * 0.8, { align: 'center' });
+    y += addrLines.length * lh(FS_BODY) + 0.5;
+  }
+
+  if (settings.showGstin && company.gstNumber) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(FS_SMALL);
+    doc.text(`GSTIN: ${company.gstNumber}`, centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+    y += lh(FS_SMALL) + 0.5;
+  }
+
+  if (settings.showPhone && company.phone) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(FS_SMALL);
+    const contact = company.email ? `Mob: ${company.phone}  ${company.email}` : `Mob: ${company.phone}`;
+    doc.text(contact, centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+    y += lh(FS_SMALL) + 1;
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(FS_TITLE);
+  doc.setTextColor(...primaryColor);
+  doc.text(docLabel, centerX, y + lh(FS_TITLE) * 0.8, { align: 'center' });
+  y += lh(FS_TITLE) + 1.5;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(FS_SMALL);
+  doc.setTextColor(0, 0, 0);
+  const origText = 'ORIGINAL FOR RECIPIENT';
+  const origW = doc.getTextWidth(origText) + 4;
+  const origH = lh(FS_SMALL) + 1.5;
+  doc.setDrawColor(...secBorderColor);
+  doc.setLineWidth(0.2);
+  doc.rect(centerX - origW / 2, y, origW, origH, 'S');
+  doc.text(origText, centerX, y + origH * 0.7, { align: 'center' });
+  y += origH + 1;
+
+  drawSep();
+  y += 2;
+
+  // ═══ SECTION 2: Meta (stacked, one per line) ═══
+  const metaItems: { label: string; value: string }[] = [];
+  if (documentType === 'invoice') {
+    metaItems.push({ label: 'Invoice No.', value: docNumber });
+    metaItems.push({ label: 'Date', value: docDate });
+  } else {
+    metaItems.push({ label: 'Quotation No.', value: docNumber });
+    metaItems.push({ label: 'Date', value: docDate });
+  }
+  if (settings.showDueDate) metaItems.push({ label: 'Due Date', value: dueDate || '—' });
+  if (settings.showPoNumber) metaItems.push({ label: 'PO Number', value: '—' });
+  if (settings.showEwayBill) metaItems.push({ label: 'E-Way Bill', value: '—' });
+  if (settings.showVehicleNumber) metaItems.push({ label: 'Vehicle No.', value: '—' });
+
+  doc.setFontSize(FS_BODY);
+  for (const item of metaItems) {
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(item.label, margin, y + lh(FS_BODY) * 0.8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(item.value, rightX, y + lh(FS_BODY) * 0.8, { align: 'right' });
+    y += lh(FS_BODY) + 1;
+  }
+
+  drawSep();
+  y += 2;
+
+  // ═══ SECTION 3: Bill To (stacked, full width) ═══
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(FS_BODY);
+  doc.setTextColor(...primaryColor);
+  doc.text('Bill To', margin, y + lh(FS_BODY) * 0.8);
+  y += lh(FS_BODY) + 1;
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.text(customer.name, margin, y + lh(FS_BODY) * 0.8);
+  y += lh(FS_BODY) + 0.5;
+
+  if (settings.showBillingAddress && customer.billingAddress) {
+    doc.setFont('helvetica', 'normal');
+    const addrLines = doc.splitTextToSize(customer.billingAddress, contentWidth);
+    doc.text(addrLines, margin, y + lh(FS_BODY) * 0.8);
+    y += addrLines.length * lh(FS_BODY) + 0.5;
+  }
+
+  if (customer.village || customer.district) {
+    doc.setFont('helvetica', 'normal');
+    const locLine = [customer.village, customer.district].filter(Boolean).join(', ');
+    doc.text(locLine, margin, y + lh(FS_BODY) * 0.8);
+    y += lh(FS_BODY) + 0.5;
+  }
+
+  if (settings.showPhone && customer.mobile) {
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Mob: ${customer.mobile}`, margin, y + lh(FS_BODY) * 0.8);
+    y += lh(FS_BODY) + 0.5;
+  }
+
+  if (settings.showGstin && customer.gstNumber) {
+    doc.setFont('helvetica', 'bold');
+    doc.text(`GSTIN: ${customer.gstNumber}`, margin, y + lh(FS_BODY) * 0.8);
+    y += lh(FS_BODY) + 0.5;
+  }
+
+  drawSep();
+  y += 2;
+
+  // ═══ SECTION 4: Product Table (POS-optimized columns) ═══
+  const showHsn = isColumnVisible('hsnSacCode', documentType, quotation, invoice, settings, schema);
+  const showDisc = isColumnVisible('discount', documentType, quotation, invoice, settings, schema);
+  const showQtyUnit = isColumnVisible('quantityUnit', documentType, quotation, invoice, settings, schema);
+  const showDesc = isColumnVisible('description', documentType, quotation, invoice, settings, schema);
+
+  const tableHead = [['Item', 'Qty', 'Rate', 'Amt']];
+  const tableBody: string[][] = products.map((product) => {
+    const amount = calculateProductAmount(product);
+    const unitLabel = UNIT_OPTIONS.find(u => u.value === product.unit)?.label || 'Pc';
+
+    let nameStr = product.name;
+    const secondary: string[] = [];
+    if (showHsn && product.hsnSacCode) secondary.push(`HSN: ${product.hsnSacCode}`);
+    if (showDesc && product.description?.trim()) secondary.push(product.description.trim());
+    if (showDisc && (product.discount ?? 0) > 0) secondary.push(`Disc: ${product.discount}%`);
+    if (showGstDetails) secondary.push(`GST: ${product.gstPercent}%`);
+    if (secondary.length > 0) nameStr += '\n' + secondary.join(' | ');
+
+    const qtyStr = showQtyUnit ? `${product.quantity} ${unitLabel}` : String(product.quantity);
+    return [nameStr, qtyStr, fmtInt(product.unitPrice), fmtInt(amount)];
+  });
+
+  if (products.length === 0) {
+    tableBody.push(['No items added', '', '', '']);
+  }
+
+  autoTable(doc, {
+    startY: y,
+    head: tableHead,
+    body: tableBody,
+    theme: 'plain',
+    headStyles: {
+      fillColor: tableHeaderBg,
+      textColor: [0, 0, 0],
+      fontStyle: 'bold',
+      fontSize: FS_TABLE,
+      halign: 'center',
+      cellPadding: [1, 1] as any,
+      lineColor: tableBorderColor,
+      lineWidth: 0.1,
+    },
+    bodyStyles: {
+      fontSize: FS_TABLE,
+      textColor: [0, 0, 0],
+      cellPadding: [1, 1] as any,
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto', halign: 'left' },
+      1: { cellWidth: 12, halign: 'center' },
+      2: { cellWidth: 16, halign: 'right' },
+      3: { cellWidth: 18, halign: 'right' },
+    } as any,
+    margin: { left: margin, right: margin, top: 0, bottom: 0 },
+    tableWidth: contentWidth,
+    tableLineColor: tableBorderColor,
+    tableLineWidth: 0.1,
+  });
+
+  y = (doc as any).lastAutoTable?.finalY ?? y + 20;
+  y += 1;
+
+  // Line under table
+  doc.setDrawColor(...tableBorderColor);
+  doc.setLineWidth(0.2);
+  doc.line(margin, y, POS_WIDTH - margin, y);
+  y += 2;
+
+  // ═══ SECTION 5: Tax Summary (compact, one line per slab) ═══
+  if (showTaxSummary) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(FS_SMALL);
+    doc.setTextColor(...primaryColor);
+    doc.text('Tax Summary', margin, y + lh(FS_SMALL) * 0.8);
+    y += lh(FS_SMALL) + 1;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    for (const [key, data] of taxSummary) {
+      const rate = key.split('_')[1];
+      const line = `${data.hsnSacCode || '—'} | ${rate}% | Tax: Rs.${fmt(data.taxableAmount)} | CGST: Rs.${fmt(data.cgstAmount)} | SGST: Rs.${fmt(data.sgstAmount)}`;
+      const wrapped = doc.splitTextToSize(line, contentWidth);
+      doc.text(wrapped, margin, y + lh(FS_SMALL) * 0.8);
+      y += wrapped.length * lh(FS_SMALL) + 0.5;
+    }
+    y += 1;
+  }
+
+  // ═══ SECTION 6: Totals (right-aligned, full width) ═══
+  const drawTotalLine = (label: string, value: string, bold = false) => {
+    const fs = bold ? FS_GRAND : FS_TOTALS;
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(fs);
+    doc.setTextColor(0, 0, 0);
+    doc.text(label, margin, y + lh(fs) * 0.8);
+    doc.text(value, rightX, y + lh(fs) * 0.8, { align: 'right' });
+    y += lh(fs) + 1;
+  };
+
+  drawTotalLine('Sub Total', `Rs. ${fmt(totalTaxable)}`);
+  if (showGstDetails) {
+    drawTotalLine('CGST', `Rs. ${fmt(totalCgst)}`);
+    drawTotalLine('SGST', `Rs. ${fmt(totalSgst)}`);
+  }
+  if (roundOff !== 0) {
+    drawTotalLine('Round Off', `Rs. ${fmt(roundOff)}`);
+  }
+
+  doc.setDrawColor(...secBorderColor);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, rightX, y);
+  y += 2;
+
+  drawTotalLine('GRAND TOTAL', `Rs. ${fmt(roundedGrandTotal)}`, true);
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(FS_SMALL);
+  doc.setTextColor(80, 80, 80);
+  const wordsText = `(${numberToWords(roundedGrandTotal)})`;
+  const wordsLines = doc.splitTextToSize(wordsText, contentWidth);
+  doc.text(wordsLines, centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+  y += wordsLines.length * lh(FS_SMALL) + 2;
+
+  drawSep();
+  y += 2;
+
+  // ═══ SECTION 7: Notes ═══
+  if (settings.showNotes) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(FS_BODY);
+    doc.setTextColor(...primaryColor);
+    doc.text('Notes', margin, y + lh(FS_BODY) * 0.8);
+    y += lh(FS_BODY) + 1;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    const notesText = quotation.notes || 'Thank you for your business!';
+    const notesLines = doc.splitTextToSize(notesText, contentWidth);
+    doc.text(notesLines, margin, y + lh(FS_BODY) * 0.8);
+    y += notesLines.length * lh(FS_BODY) + 2;
+
+    drawSep();
+    y += 2;
+  }
+
+  // ═══ SECTION 8: Bank Details (stacked) ═══
+  if (settings.showBankDetails) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(FS_BODY);
+    doc.setTextColor(...primaryColor);
+    doc.text('Bank Details', margin, y + lh(FS_BODY) * 0.8);
+    y += lh(FS_BODY) + 1;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    if (company.bankName) {
+      doc.text(`Bank: ${company.bankName}`, margin, y + lh(FS_BODY) * 0.8);
+      y += lh(FS_BODY) + 0.5;
+    }
+    if (company.bankAccount) {
+      doc.text(`A/c: ${company.bankAccount}`, margin, y + lh(FS_BODY) * 0.8);
+      y += lh(FS_BODY) + 0.5;
+    }
+    if (company.bankIfsc) {
+      doc.text(`IFSC: ${company.bankIfsc}`, margin, y + lh(FS_BODY) * 0.8);
+      y += lh(FS_BODY) + 0.5;
+    }
+    if (company.bankBranch) {
+      doc.text(`Branch: ${company.bankBranch}`, margin, y + lh(FS_BODY) * 0.8);
+      y += lh(FS_BODY) + 0.5;
+    }
+
+    drawSep();
+    y += 2;
+  }
+
+  // ═══ SECTION 9: QR Code (centered) ═══
+  if (settings.showPaymentQr) {
+    if (quotation.paymentQr) {
+      try {
+        const qrSize = 20;
+        const qrX = centerX - qrSize / 2;
+        const isJpeg = quotation.paymentQr.startsWith('data:image/jpeg') || quotation.paymentQr.startsWith('data:image/jpg');
+        doc.addImage(quotation.paymentQr, isJpeg ? 'JPEG' : 'PNG', qrX, y, qrSize, qrSize, undefined, 'FAST');
+        y += qrSize + 1;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(FS_SMALL);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Scan to Pay', centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+        y += lh(FS_SMALL) + 2;
+      } catch { /* skip */ }
+    }
+    drawSep();
+    y += 2;
+  }
+
+  // ═══ SECTION 10: Signature (centered) ═══
+  if (settings.showSignature) {
+    const signatureImg = quotation.signature || company.signature;
+    const sigWidth = contentWidth * 0.5;
+    const sigX = centerX - sigWidth / 2;
+    const sigImgHeight = 15;
+
+    if (signatureImg) {
+      try {
+        const isJpeg = signatureImg.startsWith('data:image/jpeg') || signatureImg.startsWith('data:image/jpg');
+        doc.addImage(signatureImg, isJpeg ? 'JPEG' : 'PNG', sigX, y, sigWidth * 0.6, sigImgHeight, undefined, 'FAST');
+      } catch { /* skip */ }
+    }
+
+    y += sigImgHeight + 1;
+    doc.setDrawColor(...secBorderColor);
+    doc.setLineWidth(0.2);
+    doc.line(sigX, y, sigX + sigWidth, y);
+    y += 1;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(FS_SMALL);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Authorised Signatory', centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+    y += lh(FS_SMALL) + 2;
+
+    drawSep();
+    y += 2;
+  }
+
+  // ═══ SECTION 11: Terms & Conditions ═══
+  if (settings.showTermsConditions) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(FS_BODY);
+    doc.setTextColor(...primaryColor);
+    doc.text('Terms & Conditions', margin, y + lh(FS_BODY) * 0.8);
+    y += lh(FS_BODY) + 1;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(FS_SMALL);
+    const termsText = quotation.terms ||
+      '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.';
+    const termsLines = termsText.split('\n');
+    for (const line of termsLines) {
+      const wrapped = doc.splitTextToSize(line, contentWidth);
+      doc.text(wrapped, margin, y + lh(FS_SMALL) * 0.8);
+      y += wrapped.length * lh(FS_SMALL) + 0.5;
+    }
+
+    y += 1;
+    drawSep();
+    y += 2;
+  }
+
+  // ═══ SECTION 12: Footer Strip (centered) ═══
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(FS_SMALL);
+  doc.setTextColor(120, 120, 120);
+  doc.text('Computer-generated document. No signature required.', centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+  y += lh(FS_SMALL) + 2;
+
+  return y;
+};
+
 // ─── Vector PDF Generator ────────────────────────────────────────────────────
 
 const generateVectorPDF = async (
+  doc: jsPDF,
   themeId: ThemeId,
   settings: TemplateSettings,
   company: CompanyProfile,
@@ -144,6 +617,11 @@ const generateVectorPDF = async (
   schema: TemplateSchema | undefined,
 ) => {
   const theme: InvoiceTheme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
+
+  // POS uses a dedicated thermal receipt layout — not a scaled-down A4
+  if (theme.paperSize === 'pos') {
+    return generatePosReceipt(doc, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+  }
   const styleThemeId: StyleThemeId = settings.styleThemeId ?? DEFAULT_STYLE_THEME_ID;
   const style: StyleTheme = STYLE_THEMES[styleThemeId] ?? STYLE_THEMES[DEFAULT_STYLE_THEME_ID];
 
@@ -152,26 +630,17 @@ const generateVectorPDF = async (
   // Paper dimensions and font scaling (mirrors DocumentRenderer)
   let paperWidth: number;
   let pageHeight: number;
-  let pdfFormat: 'a4' | 'a5' | [number, number];
   let fontScale: number;
 
   switch (paperSize) {
     case 'a5':
       paperWidth = A5_WIDTH;
       pageHeight = A5_HEIGHT;
-      pdfFormat = 'a5';
       fontScale = 0.72;
-      break;
-    case 'pos':
-      paperWidth = POS_WIDTH;
-      pageHeight = 297;
-      pdfFormat = [POS_WIDTH, 297];
-      fontScale = 0.5;
       break;
     default: // a4
       paperWidth = A4_WIDTH;
       pageHeight = A4_HEIGHT;
-      pdfFormat = 'a4';
       fontScale = 1;
   }
 
@@ -185,14 +654,6 @@ const generateVectorPDF = async (
   const primaryColor: [number, number, number] = hexToRgb(style.primaryColor);
   const tableHeaderBg: [number, number, number] = hexToRgb(style.tableHeaderBg);
   const headerBgRgb: [number, number, number] = hexToRgb(style.headerBg);
-
-  // Create jsPDF document
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: pdfFormat as any,
-    compress: true,
-  });
 
   doc.setFont('helvetica');
   doc.setTextColor(0, 0, 0);
@@ -245,7 +706,6 @@ const generateVectorPDF = async (
 
   // Helper: add a new page if content overflows
   const ensureSpace = (needed: number) => {
-    if (paperSize === 'pos') return;
     if (y + needed > pageHeight - margin) {
       doc.addPage();
       y = margin;
@@ -769,7 +1229,7 @@ const generateVectorPDF = async (
       fillColor: hexToRgb(style.tableRowAltBg),
     },
     columnStyles: columnStyles as any,
-    margin: { left: margin, right: margin, top: 0, bottom: 0 },
+    margin: { left: margin, right: margin, top: margin, bottom: margin },
     tableWidth: contentWidth,
     tableLineColor: tableBorderColor,
     tableLineWidth: 0.1,
@@ -872,7 +1332,7 @@ const generateVectorPDF = async (
         3: { halign: 'right' },
         4: { halign: 'right' },
       } as any,
-      margin: { left: taxTableLeft, right: paperWidth - taxTableRight, top: 0, bottom: 0 },
+      margin: { left: taxTableLeft, right: paperWidth - taxTableRight, top: margin, bottom: margin },
       tableWidth: taxSummaryWidth,
     });
 
@@ -1173,12 +1633,9 @@ const generateVectorPDF = async (
       doc.setPage(p);
       doc.setDrawColor(...primaryColor);
       doc.setLineWidth(borderWidth);
-      const pageH = paperSize === 'pos' ? y + margin : pageHeight;
-      doc.rect(margin - 1, margin - 1, contentWidth + 2, pageH - margin * 2 + 2);
+      doc.rect(margin - 1, margin - 1, contentWidth + 2, pageHeight - margin * 2 + 2);
     }
   }
 
-  // ── Save ────────────────────────────────────────────────────────────────
-  const fileName = documentType === 'invoice' && invoice ? invoice.invoiceNumber : quotation.quotationNumber;
-  doc.save(`${fileName}.pdf`);
+  return y;
 };

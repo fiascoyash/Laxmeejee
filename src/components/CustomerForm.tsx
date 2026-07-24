@@ -1,6 +1,7 @@
 import { CustomerData } from '../types';
 import { X, Save } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { sanitizeMobile, sanitizeGstin, isValidMobile, isValidGstin } from '../utils/validation';
 
 interface Props {
   customer: CustomerData | null;
@@ -66,6 +67,14 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
       alert('Name and Mobile are required');
       return;
     }
+    if (!isValidMobile(formData.mobile)) {
+      alert('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (formData.gstNumber && !isValidGstin(formData.gstNumber)) {
+      alert('Please enter a valid 15-character GSTIN or leave it blank');
+      return;
+    }
     const now = new Date().toISOString();
     const customerData: CustomerData = {
       id: customer?.id || '',
@@ -119,12 +128,16 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
               <input
                 type="tel"
                 value={formData.mobile}
-                onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, mobile: sanitizeMobile(e.target.value) })}
                 onKeyDown={(e) => handleFieldKeyDown(e, 'mobile')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="10-digit mobile number"
+                maxLength={10}
                 required
               />
+              {formData.mobile && !isValidMobile(formData.mobile) && (
+                <p className="text-xs text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -133,11 +146,15 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
               <input
                 type="text"
                 value={formData.gstNumber || ''}
-                onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, gstNumber: sanitizeGstin(e.target.value) })}
                 onKeyDown={(e) => handleFieldKeyDown(e, 'gstNumber')}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono uppercase"
                 placeholder="GSTIN number"
+                maxLength={15}
               />
+              {formData.gstNumber && !isValidGstin(formData.gstNumber) && (
+                <p className="text-xs text-red-500 mt-1">Invalid GSTIN format (15 chars, state code + PAN + Z + checksum)</p>
+              )}
             </div>
             <div data-field-id="email">
               <label className="block text-sm font-medium text-slate-700 mb-1">Email (Optional)</label>

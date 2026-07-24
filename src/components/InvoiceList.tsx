@@ -1,6 +1,6 @@
 import { Invoice, InvoiceStatus } from '../types';
-import { FileText, Trash2, Copy, CreditCard as Edit, Eye, X, Calendar, User } from 'lucide-react';
-import { useState } from 'react';
+import { FileText, Trash2, Copy, CreditCard as Edit, Eye, X, Calendar, User, Search, XCircle } from 'lucide-react';
+import { useState, useMemo } from 'react';
 
 interface Props {
   invoices: Invoice[];
@@ -16,8 +16,39 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
   'Paid': 'bg-green-100 text-green-700',
 };
 
+function matchesInvoice(inv: Invoice, query: string): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase().trim();
+  if (!q) return true;
+  const haystack: string[] = [
+    inv.invoiceNumber,
+    inv.date,
+    inv.dueDate,
+    String(inv.grandTotal),
+    String(inv.totalAmount),
+    inv.customer.name,
+    inv.customer.mobile,
+    inv.customer.gstNumber || '',
+    inv.customer.village,
+    inv.customer.district,
+    inv.customer.billingAddress,
+    inv.shipTo?.name || '',
+    inv.shipTo?.mobile || '',
+    inv.shipTo?.gstNumber || '',
+    inv.shipTo?.address || '',
+    ...inv.products.map(p => p.name),
+  ];
+  return haystack.some(field => field.toLowerCase().includes(q));
+}
+
 export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate }: Props) {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredInvoices = useMemo(
+    () => invoices.filter(inv => matchesInvoice(inv, searchQuery)),
+    [invoices, searchQuery]
+  );
 
   if (invoices.length === 0) {
     return (
@@ -31,8 +62,36 @@ export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate }: Props) 
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4">
-        {invoices.map(invoice => (
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search invoices..."
+          className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            title="Clear search"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {filteredInvoices.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-lg shadow-sm border border-slate-200">
+          <Search className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <h3 className="text-lg font-medium text-slate-800 mb-1">No invoices found</h3>
+          <p className="text-slate-500">No invoices match "{searchQuery}". Try a different search term.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {filteredInvoices.map(invoice => (
           <div
             key={invoice.id}
             className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
@@ -98,7 +157,8 @@ export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate }: Props) 
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {previewInvoice && (
         <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} />

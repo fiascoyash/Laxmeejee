@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CompanyProfile as CompanyProfileType, BusinessType, BUSINESS_TYPE_OPTIONS } from '../types';
 import { Building2, Mail, Phone, MapPin, Save, Upload, X, Briefcase } from 'lucide-react';
+import { sanitizeMobile, sanitizeGstin, isValidMobile, isValidGstin } from '../utils/validation';
 
 interface Props {
   profile: CompanyProfileType;
@@ -30,6 +31,14 @@ export function CompanyProfile({ profile, onSave, onClose }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.phone && !isValidMobile(formData.phone)) {
+      alert('Please enter a valid 10-digit phone number or leave it blank');
+      return;
+    }
+    if (formData.gstNumber && !isValidGstin(formData.gstNumber)) {
+      alert('Please enter a valid 15-character GSTIN or leave it blank');
+      return;
+    }
     onSave(formData);
     onClose();
   };
@@ -86,10 +95,14 @@ export function CompanyProfile({ profile, onSave, onClose }: Props) {
                 <input
                   type="text"
                   value={formData.gstNumber}
-                  onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value.toUpperCase() })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-blue-500 font-mono"
+                  onChange={(e) => setFormData({ ...formData, gstNumber: sanitizeGstin(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-blue-500 font-mono uppercase"
                   placeholder="29ABCDE1234F1Z5"
+                  maxLength={15}
                 />
+                {formData.gstNumber && !isValidGstin(formData.gstNumber) && (
+                  <p className="text-xs text-red-500 mt-1">Invalid GSTIN format</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
@@ -119,9 +132,13 @@ export function CompanyProfile({ profile, onSave, onClose }: Props) {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, phone: sanitizeMobile(e.target.value) })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-blue-500"
+                    maxLength={10}
                   />
+                  {formData.phone && !isValidMobile(formData.phone) && (
+                    <p className="text-xs text-red-500 mt-1">Phone number must be exactly 10 digits</p>
+                  )}
                 </div>
               </div>
               <div>

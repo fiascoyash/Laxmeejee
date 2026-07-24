@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SupplierData, SupplierBalanceType, PAYMENT_TERMS_OPTIONS } from '../types';
 import { generateId } from '../utils/storage';
+import { sanitizeMobile, sanitizeGstin, isValidMobile, isValidGstin } from '../utils/validation';
 import { X, Save, Truck } from 'lucide-react';
 
 interface Props {
@@ -50,6 +51,14 @@ export function SupplierForm({ supplier, onSave, onCancel }: Props) {
   const handleSubmit = () => {
     if (!form.firmName.trim()) {
       alert('Please enter firm / company name');
+      return;
+    }
+    if (form.mobile && !isValidMobile(form.mobile)) {
+      alert('Please enter a valid 10-digit mobile number or leave it blank');
+      return;
+    }
+    if (form.gstNumber && !isValidGstin(form.gstNumber)) {
+      alert('Please enter a valid 15-character GSTIN or leave it blank');
       return;
     }
     const now = new Date().toISOString();
@@ -116,10 +125,14 @@ export function SupplierForm({ supplier, onSave, onCancel }: Props) {
               <input
                 type="tel"
                 value={form.mobile || ''}
-                onChange={e => update('mobile', e.target.value)}
+                onChange={e => update('mobile', sanitizeMobile(e.target.value))}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 placeholder="10-digit mobile"
+                maxLength={10}
               />
+              {form.mobile && !isValidMobile(form.mobile) && (
+                <p className="text-xs text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
+              )}
             </div>
           </div>
 
@@ -140,11 +153,14 @@ export function SupplierForm({ supplier, onSave, onCancel }: Props) {
               <input
                 type="text"
                 value={form.gstNumber || ''}
-                onChange={e => update('gstNumber', e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
+                onChange={e => update('gstNumber', sanitizeGstin(e.target.value))}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono uppercase"
                 placeholder="GSTIN"
                 maxLength={15}
               />
+              {form.gstNumber && !isValidGstin(form.gstNumber) && (
+                <p className="text-xs text-red-500 mt-1">Invalid GSTIN format</p>
+              )}
             </div>
           </div>
 

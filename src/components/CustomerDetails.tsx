@@ -2,6 +2,7 @@ import { Customer, ShipTo, TemplateField, CustomerData } from '../types';
 import { User, MapPin, Phone, MapPinned, Truck, Copy, Save, Clock } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { storage, generateId } from '../utils/storage';
+import { sanitizeMobile, sanitizeGstin, isValidMobile, isValidGstin } from '../utils/validation';
 
 interface Props {
   customer: Customer;
@@ -180,6 +181,14 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
       alert('Please enter customer name and mobile number');
       return;
     }
+    if (!isValidMobile(customer.mobile)) {
+      alert('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (customer.gstNumber && !isValidGstin(customer.gstNumber)) {
+      alert('Please enter a valid 15-character GSTIN or leave it blank');
+      return;
+    }
     if (storage.isCustomerExists(customer.mobile)) {
       alert('Customer with this mobile number already exists');
       return;
@@ -336,7 +345,7 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
               <input
                 type="tel"
                 value={customer.mobile}
-                onChange={(e) => onChange({ ...customer, mobile: e.target.value })}
+                onChange={(e) => onChange({ ...customer, mobile: sanitizeMobile(e.target.value) })}
                 onFocus={() => {
                   if (customer.mobile.length >= 4 && suggestions.length > 0) {
                     setShowSuggestions(true);
@@ -347,7 +356,11 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                 }}
                 className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
                 placeholder="10-digit mobile number"
+                maxLength={10}
               />
+              {customer.mobile && !isValidMobile(customer.mobile) && (
+                <p className="text-xs text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
+              )}
               {/* Customer Suggestions Dropdown */}
               {showSuggestions && suggestions.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
@@ -373,11 +386,15 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
               <input
                 type="text"
                 value={customer.gstNumber || ''}
-                onChange={(e) => onChange({ ...customer, gstNumber: e.target.value })}
+                onChange={(e) => onChange({ ...customer, gstNumber: sanitizeGstin(e.target.value) })}
                 onKeyDown={(e) => handleFieldKeyDown(e, 'customerGst')}
-                className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
+                className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px] font-mono uppercase"
                 placeholder="GSTIN number"
+                maxLength={15}
               />
+              {customer.gstNumber && !isValidGstin(customer.gstNumber) && (
+                <p className="text-xs text-red-500 mt-1">Invalid GSTIN format</p>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div data-field-id="customerVillage">
@@ -471,22 +488,30 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
                 <input
                   type="tel"
                   value={actualShipTo.mobile}
-                  onChange={(e) => handleShipToChange('mobile', e.target.value)}
+                  onChange={(e) => handleShipToChange('mobile', sanitizeMobile(e.target.value))}
                   className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed min-h-[44px]"
                   placeholder="10-digit mobile number"
+                  maxLength={10}
                   disabled={sameAsBillTo}
                 />
+                {actualShipTo.mobile && !isValidMobile(actualShipTo.mobile) && (
+                  <p className="text-xs text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">GST Number (Optional)</label>
                 <input
                   type="text"
                   value={actualShipTo.gstNumber || ''}
-                  onChange={(e) => handleShipToChange('gstNumber', e.target.value)}
-                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed min-h-[44px]"
+                  onChange={(e) => handleShipToChange('gstNumber', sanitizeGstin(e.target.value))}
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:cursor-not-allowed min-h-[44px] font-mono uppercase"
                   placeholder="GSTIN number"
+                  maxLength={15}
                   disabled={sameAsBillTo}
                 />
+                {actualShipTo.gstNumber && !isValidGstin(actualShipTo.gstNumber) && (
+                  <p className="text-xs text-red-500 mt-1">Invalid GSTIN format</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Delivery Address</label>

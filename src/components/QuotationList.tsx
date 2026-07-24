@@ -1,6 +1,6 @@
 import { Quotation } from '../types';
-import { FileText, Trash2, Copy, CreditCard as Edit, Calendar, User, Eye, X, FileInput } from 'lucide-react';
-import { useState } from 'react';
+import { FileText, Trash2, Copy, CreditCard as Edit, Calendar, User, Eye, X, FileInput, Search, XCircle } from 'lucide-react';
+import { useState, useMemo } from 'react';
 
 interface Props {
   quotations: Quotation[];
@@ -10,8 +10,38 @@ interface Props {
   onConvertToInvoice: (quotation: Quotation) => void;
 }
 
+function matchesQuotation(q: Quotation, query: string): boolean {
+  if (!query) return true;
+  const q2 = query.toLowerCase().trim();
+  if (!q2) return true;
+  const haystack: string[] = [
+    q.quotationNumber,
+    q.date,
+    String(q.grandTotal),
+    String(q.totalAmount),
+    q.customer.name,
+    q.customer.mobile,
+    q.customer.gstNumber || '',
+    q.customer.village,
+    q.customer.district,
+    q.customer.billingAddress,
+    q.shipTo?.name || '',
+    q.shipTo?.mobile || '',
+    q.shipTo?.gstNumber || '',
+    q.shipTo?.address || '',
+    ...q.products.map(p => p.name),
+  ];
+  return haystack.some(field => field.toLowerCase().includes(q2));
+}
+
 export function QuotationList({ quotations, onEdit, onDelete, onDuplicate, onConvertToInvoice }: Props) {
   const [previewQuotation, setPreviewQuotation] = useState<Quotation | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredQuotations = useMemo(
+    () => quotations.filter(q => matchesQuotation(q, searchQuery)),
+    [quotations, searchQuery]
+  );
 
   if (quotations.length === 0) {
     return (
@@ -25,8 +55,36 @@ export function QuotationList({ quotations, onEdit, onDelete, onDuplicate, onCon
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:gap-4">
-        {quotations.map(quotation => (
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search quotations..."
+          className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            title="Clear search"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {filteredQuotations.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-lg shadow-sm border border-slate-200">
+          <Search className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <h3 className="text-lg font-medium text-slate-800 mb-1">No quotations found</h3>
+          <p className="text-slate-500">No quotations match "{searchQuery}". Try a different search term.</p>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:gap-4">
+          {filteredQuotations.map(quotation => (
           <div
             key={quotation.id}
             className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 hover:shadow-md transition-shadow"
@@ -143,7 +201,8 @@ export function QuotationList({ quotations, onEdit, onDelete, onDuplicate, onCon
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Preview Modal */}
       {previewQuotation && (

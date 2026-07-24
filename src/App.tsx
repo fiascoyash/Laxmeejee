@@ -22,6 +22,7 @@ import { SupplierLedger } from './components/SupplierLedger';
 import { SmartBillImport } from './features/smart-bill-import';
 import { GstReports } from './components/GstReports';
 import { exportTemplatePDF } from './utils/templatePdfExport';
+import { isValidMobile, isValidGstin } from './utils/validation';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -427,6 +428,22 @@ function App() {
       alert('Please enter customer name');
       return;
     }
+    if (customer.mobile && !isValidMobile(customer.mobile)) {
+      alert('Please enter a valid 10-digit mobile number or leave it blank');
+      return;
+    }
+    if (customer.gstNumber && !isValidGstin(customer.gstNumber)) {
+      alert('Please enter a valid 15-character GSTIN or leave it blank');
+      return;
+    }
+    if (shipTo?.mobile && !isValidMobile(shipTo.mobile)) {
+      alert('Please enter a valid 10-digit ship-to mobile number or leave it blank');
+      return;
+    }
+    if (shipTo?.gstNumber && !isValidGstin(shipTo.gstNumber)) {
+      alert('Please enter a valid 15-character ship-to GSTIN or leave it blank');
+      return;
+    }
     if (products.length === 0) {
       alert('Please add at least one product');
       return;
@@ -502,6 +519,22 @@ function App() {
     if (!editingInvoice) return;
     if (!editingInvoice.customer.name) {
       alert('Please enter customer name');
+      return;
+    }
+    if (editingInvoice.customer.mobile && !isValidMobile(editingInvoice.customer.mobile)) {
+      alert('Please enter a valid 10-digit mobile number or leave it blank');
+      return;
+    }
+    if (editingInvoice.customer.gstNumber && !isValidGstin(editingInvoice.customer.gstNumber)) {
+      alert('Please enter a valid 15-character GSTIN or leave it blank');
+      return;
+    }
+    if (editingInvoice.shipTo?.mobile && !isValidMobile(editingInvoice.shipTo.mobile)) {
+      alert('Please enter a valid 10-digit ship-to mobile number or leave it blank');
+      return;
+    }
+    if (editingInvoice.shipTo?.gstNumber && !isValidGstin(editingInvoice.shipTo.gstNumber)) {
+      alert('Please enter a valid 15-character ship-to GSTIN or leave it blank');
       return;
     }
     if (editingInvoice.products.length === 0) {

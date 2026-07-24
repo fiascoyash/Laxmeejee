@@ -29,20 +29,19 @@ export function ProductLedgerModal({ isOpen, onClose, product, suppliers, onUpda
   const [activeTab, setActiveTab] = useState<'summary' | 'purchases' | 'movements'>('summary');
 
   useEffect(() => {
-    if (isOpen && product.id && supabase) {
+    if (isOpen && product.id) {
       fetchHistory();
     }
   }, [isOpen, product.id]);
 
   const fetchHistory = async () => {
-    if (!supabase) {
-      // Fallback to localStorage if no Supabase
-      calculateSummaryFromLocalStorage();
-      return;
-    }
-
     setLoading(true);
     try {
+      if (!supabase) {
+        // Fallback to localStorage if no Supabase
+        calculateSummaryFromLocalStorage();
+        return;
+      }
       // Fetch purchases
       const { data: purchaseData, error: purchaseError } = await supabase
         .from('product_purchases')
