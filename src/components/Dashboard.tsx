@@ -61,8 +61,8 @@ export function Dashboard({
     const todayInvoices = invoices.filter(i => i.date === todayStr);
     const todaySales = todayInvoices.reduce((s, i) => s + (i.grandTotal || 0), 0);
 
-    const pendingInvoices = invoices.filter(i => i.status === 'Unpaid' || i.status === 'Partial Payment');
-    const pendingPayments = pendingInvoices.reduce((s, i) => s + (i.grandTotal || 0), 0);
+    const pendingInvoices = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Draft' && (i.grandTotal || 0) - (i.amountPaid || 0) > 0);
+    const pendingPayments = pendingInvoices.reduce((s, i) => s + ((i.grandTotal || 0) - (i.amountPaid || 0)), 0);
 
     const highestInvoice = invoices.reduce((max, i) => (i.grandTotal > (max?.grandTotal || 0) ? i : max), invoices[0] || null);
 
@@ -137,7 +137,7 @@ export function Dashboard({
 
     return {
       totalSales, avgInvoice, monthlyRevenue, monthlyInvoices, todaySales,
-      pendingPayments, highestInvoice, topCustomers, activities,
+      pendingPayments, pendingInvoices, highestInvoice, topCustomers, activities,
       latestCustomer, recentInvoices, recentQuotations, monthlyQuotations, monthlyCustomers,
     };
   }, [invoices, quotations, customers, suppliers, todayStr, currentMonth, currentYear]);
@@ -206,7 +206,7 @@ export function Dashboard({
     {
       title: 'Pending Payments',
       value: fmt(stats.pendingPayments),
-      sub: `${invoices.filter(i => i.status === 'Unpaid' || i.status === 'Partial Payment').length} unpaid invoices`,
+      sub: `${stats.pendingInvoices.length} outstanding invoices`,
       icon: AlertCircle,
       gradient: 'from-red-500 to-red-600',
       bg: 'bg-red-50',
@@ -239,7 +239,11 @@ export function Dashboard({
   };
 
   const greetingHour = today.getHours();
-  const greeting = greetingHour < 12 ? 'Good Morning' : greetingHour < 17 ? 'Good Afternoon' : 'Good Evening';
+  const greeting =
+    greetingHour >= 5 && greetingHour < 12 ? 'Good Morning' :
+    greetingHour >= 12 && greetingHour < 17 ? 'Good Afternoon' :
+    greetingHour >= 17 && greetingHour < 21 ? 'Good Evening' :
+    'Good Night';
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-10">

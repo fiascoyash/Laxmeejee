@@ -378,9 +378,12 @@ function App() {
     storage.updateInvoiceAmountPaid(payment.invoiceId);
     const updatedInvoices = storage.getInvoices();
     setInvoices(updatedInvoices);
-    // Keep paymentInvoice in sync with updated data
+    // Keep paymentInvoice and editingInvoice in sync with updated data
     const updatedInv = updatedInvoices.find(i => i.id === payment.invoiceId);
-    if (updatedInv) setPaymentInvoice(updatedInv);
+    if (updatedInv) {
+      setPaymentInvoice(updatedInv);
+      setEditingInvoice(prev => prev && prev.id === payment.invoiceId ? updatedInv : prev);
+    }
     // Background sync to Supabase
     (async () => {
       try {
@@ -409,7 +412,10 @@ function App() {
     const updatedInvoices = storage.getInvoices();
     setInvoices(updatedInvoices);
     const updatedInv = updatedInvoices.find(i => i.id === invoiceId);
-    if (updatedInv) setPaymentInvoice(updatedInv);
+    if (updatedInv) {
+      setPaymentInvoice(updatedInv);
+      setEditingInvoice(prev => prev && prev.id === invoiceId ? updatedInv : prev);
+    }
     // Background sync to Supabase
     (async () => {
       try {
@@ -1566,6 +1572,7 @@ function App() {
               onPreview={previewInvoice}
               onCancel={() => { setEditingInvoice(null); setView('invoiceList'); }}
               onSaveNewProduct={handleSaveNewProduct}
+              onRecordPayment={handleRecordPayment}
             />
           )}
 

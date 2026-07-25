@@ -1,7 +1,7 @@
 import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn, GstMode, ShipTo, TemplateSchema } from '../types';
 import { CustomerDetails } from './CustomerDetails';
 import { ProductTable } from './ProductTable';
-import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, FileText } from 'lucide-react';
+import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, FileText, IndianRupee } from 'lucide-react';
 
 interface Props {
   invoice: Invoice;
@@ -14,9 +14,8 @@ interface Props {
   onPreview: () => void;
   onCancel: () => void;
   onSaveNewProduct?: (item: ProductCatalogItem) => void;
+  onRecordPayment?: (invoice: Invoice) => void;
 }
-
-const STATUS_OPTIONS: InvoiceStatus[] = ['Draft', 'Unpaid', 'Partial Payment', 'Paid'];
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
   'Draft': 'bg-slate-100 text-slate-700',
@@ -35,7 +34,10 @@ export function InvoiceForm({
   onPreview,
   onCancel,
   onSaveNewProduct,
+  onRecordPayment,
 }: Props) {
+  const amountPaid = invoice.amountPaid || 0;
+  const outstanding = Math.max(0, invoice.grandTotal - amountPaid);
   const update = (patch: Partial<Invoice>) => onChange({ ...invoice, ...patch });
   const updateCustomer = (customer: Customer) => update({ customer });
   const updateShipTo = (shipTo: ShipTo) => update({ shipTo });
@@ -65,17 +67,44 @@ export function InvoiceForm({
               <span className="text-purple-700 font-medium">{selectedTemplate.name}</span>
             </div>
           )}
-          <select
-            value={invoice.status}
-            onChange={(e) => update({ status: e.target.value as InvoiceStatus })}
-            className={`px-3 py-2 border border-slate-300 rounded-md text-sm font-medium ${STATUS_COLORS[invoice.status]}`}
+          <span
+            className={`px-3 py-2 rounded-md text-sm font-semibold ${STATUS_COLORS[invoice.status]}`}
+            title="Status is calculated automatically from recorded payments"
           >
-            {STATUS_OPTIONS.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+            {invoice.status}
+          </span>
+          {invoice.status !== 'Draft' && outstanding > 0 && onRecordPayment && (
+            <button
+              onClick={() => onRecordPayment(invoice)}
+              className="px-3 py-2 bg-emerald-600 text-white rounded-md text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center gap-1.5"
+              title="Receive Payment"
+            >
+              <IndianRupee className="w-4 h-4" />
+              Receive Payment
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Payment summary (auto-calculated) */}
+      {invoice.status !== 'Draft' && (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-slate-50 rounded-lg p-3 text-center">
+              <p className="text-xs text-slate-500 mb-1">Invoice Total</p>
+              <p className="text-sm font-bold text-slate-800">₹{invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3 text-center">
+              <p className="text-xs text-emerald-600 mb-1">Received</p>
+              <p className="text-sm font-bold text-emerald-700">₹{amountPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className={`rounded-lg p-3 text-center ${outstanding > 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
+              <p className={`text-xs mb-1 ${outstanding > 0 ? 'text-red-600' : 'text-emerald-600'}`}>Outstanding</p>
+              <p className={`text-sm font-bold ${outstanding > 0 ? 'text-red-700' : 'text-emerald-700'}`}>₹{outstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Invoice meta */}
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
