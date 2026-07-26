@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment } from './types';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment } from './types';
 import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
@@ -23,6 +23,7 @@ import { SmartBillImport } from './features/smart-bill-import';
 import { GstReports } from './components/GstReports';
 import { Dashboard } from './components/Dashboard';
 import { PaymentModal } from './components/PaymentModal';
+import { PaymentDecisionModal, PaymentDecision } from './components/PaymentDecisionModal';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { isValidMobile, isValidGstin } from './utils/validation';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3 } from 'lucide-react';
@@ -99,6 +100,10 @@ function App() {
   const [viewingCustomer, setViewingCustomer] = useState<CustomerData | null>(null);
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  // Invoice that passed validation and is awaiting a save decision (Draft /
+  // Unpaid / Receive payment / Mark fully paid). The decision modal reads from
+  // this; applyPaymentDecision performs the actual save once chosen.
+  const [pendingSaveInvoice, setPendingSaveInvoice] = useState<Invoice | null>(null);
 
   // Supplier / Vendor Management State
   const [suppliers, setSuppliers] = useState<SupplierData[]>(storage.getSuppliers);
@@ -581,8 +586,10 @@ function App() {
     setView('editInvoice');
   };
 
-  // Save invoice
-  const saveInvoice = async () => {
+  // Validate the invoice form and compute final totals, then open the
+  // Payment Decision dialog so the user chooses how to save (Draft / Unpaid /
+  // Receive payment / Mark fully paid). The invoice is NOT persisted here.
+  const saveInvoice = () => {
     if (!editingInvoice) return;
     if (!editingInvoice.customer.name) {
       alert('Please enter customer name');
@@ -627,17 +634,99 @@ function App() {
       updatedAt: new Date().toISOString(),
     };
 
-    storage.saveInvoice(toSave);
-    if (!invoices.find(i => i.id === toSave.id)) incrementInvoiceNumber();
-    setInvoices(storage.getInvoices());
+    setPendingSaveInvoice(toSave);
+  };
 
-    // Record stock movements for sales (only for new invoices or when status changes to non-Draft)
+  // Apply the save decision chosen in the Payment Decision dialog. Persists
+  // the invoice, optionally creates a payment entry, and updates status /
+  // amount paid / outstanding automatically.
+  const applyPaymentDecision = async (decision: PaymentDecision) => {
+    const toSave = pendingSaveInvoice;
+    if (!toSave) return;
+    setPendingSaveInvoice(null);
+
     const isNewInvoice = !invoices.find(i => i.id === toSave.id);
-    if (isNewInvoice && toSave.status !== 'Draft') {
-      await recordStockMovementsForSale(toSave);
+    const existingPayments = storage.getPaymentsByInvoice(toSave.id);
+    const previouslyPaid = existingPayments.reduce((s, p) => s + p.amount, 0);
+
+    let status: InvoiceStatus;
+    let paymentToRecord: InvoicePayment | null = null;
+
+    switch (decision.kind) {
+      case 'draft':
+        status = 'Draft';
+        break;
+      case 'unpaid':
+        status = 'Unpaid';
+        break;
+      case 'receive':
+        paymentToRecord = decision.payment;
+        status = storage.computeInvoiceStatus(
+          previouslyPaid + decision.payment.amount,
+          toSave.grandTotal,
+          false,
+        );
+        break;
+      case 'paid':
+        paymentToRecord = decision.payment;
+        status = 'Paid';
+        break;
     }
 
-    alert('Invoice saved successfully!');
+    const invoiceToPersist: Invoice = {
+      ...toSave,
+      status,
+      amountPaid: paymentToRecord
+        ? roundTo2(previouslyPaid + paymentToRecord.amount)
+        : status === 'Draft' ? (toSave.amountPaid || 0) : 0,
+      updatedAt: new Date().toISOString(),
+    };
+
+    storage.saveInvoice(invoiceToPersist);
+    if (isNewInvoice) incrementInvoiceNumber();
+
+    if (paymentToRecord) {
+      storage.addPayment(paymentToRecord);
+      storage.updateInvoiceAmountPaid(toSave.id);
+    }
+
+    setInvoices(storage.getInvoices());
+
+    // Record stock movements for new, non-Draft sales
+    if (isNewInvoice && status !== 'Draft') {
+      await recordStockMovementsForSale(invoiceToPersist);
+    }
+
+    // Background-sync the payment entry to Supabase (mirrors handleAddPayment)
+    if (paymentToRecord) {
+      (async () => {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const url = import.meta.env.VITE_SUPABASE_URL;
+          const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+          if (!url || !key) return;
+          const sb = createClient(url, key);
+          await sb.from('invoice_payments').insert({
+            id: paymentToRecord.id,
+            invoice_id: paymentToRecord.invoiceId,
+            date: paymentToRecord.date,
+            amount: paymentToRecord.amount,
+            mode: paymentToRecord.mode,
+            reference: paymentToRecord.reference || null,
+            notes: paymentToRecord.notes || null,
+            created_at: paymentToRecord.createdAt,
+          });
+        } catch (_) { /* fire-and-forget */ }
+      })();
+    }
+
+    const successMsg =
+      status === 'Draft' ? 'Invoice saved as Draft.' :
+      status === 'Unpaid' ? 'Invoice saved as Unpaid.' :
+      status === 'Paid' ? 'Invoice saved and marked as Paid.' :
+      'Invoice saved with partial payment.';
+    alert(successMsg);
+
     setEditingInvoice(null);
     setView('invoiceList');
   };
@@ -1084,11 +1173,29 @@ function App() {
     return { quotationCounts, invoiceCounts, lastActivityDates };
   };
 
-  // Get customer history for viewing
-  const getCustomerHistory = (mobile: string) => {
-    const customerQuotations = quotations.filter(q => q.customer.mobile === mobile);
-    const customerInvoices = invoices.filter(i => i.customer.mobile === mobile);
-    return { customerQuotations, customerInvoices };
+  // Match a document's embedded customer to a CustomerData record.
+  // Mobile is the primary key (the fallback used elsewhere via
+  // getCustomerByMobile / searchCustomers). When the customer has no mobile,
+  // fall back to a case-insensitive name match. A blank field never matches a
+  // blank field — that was the bug that let one customer's invoices/payments
+  // leak into another customer's Khata Book.
+  const docBelongsToCustomer = (docCustomer: Customer, customer: CustomerData): boolean => {
+    const cMobile = customer.mobile?.trim() || '';
+    const dMobile = docCustomer.mobile?.trim() || '';
+    if (cMobile) return dMobile === cMobile;
+    const cName = customer.name?.trim().toLowerCase() || '';
+    const dName = docCustomer.name?.trim().toLowerCase() || '';
+    return !!cName && cName === dName;
+  };
+
+  // Get customer history for viewing — returns only this customer's
+  // quotations, invoices, and the payments linked to those invoices.
+  const getCustomerHistory = (customer: CustomerData) => {
+    const customerQuotations = quotations.filter(q => docBelongsToCustomer(q.customer, customer));
+    const customerInvoices = invoices.filter(i => docBelongsToCustomer(i.customer, customer));
+    const invoiceIds = new Set(customerInvoices.map(i => i.id));
+    const customerPayments = storage.getPayments().filter(p => invoiceIds.has(p.invoiceId));
+    return { customerQuotations, customerInvoices, customerPayments };
   };
 
   // Supplier / Vendor Handlers
@@ -1959,14 +2066,14 @@ function App() {
       )}
 
       {/* Customer History / Khata Book Modal */}
-      {viewingCustomer && (
+      {viewingCustomer && (() => {
+        const history = getCustomerHistory(viewingCustomer);
+        return (
         <CustomerHistory
           customer={viewingCustomer}
-          quotations={getCustomerHistory(viewingCustomer.mobile).customerQuotations}
-          invoices={getCustomerHistory(viewingCustomer.mobile).customerInvoices}
-          payments={storage.getPayments().filter(p =>
-            getCustomerHistory(viewingCustomer.mobile).customerInvoices.some(i => i.id === p.invoiceId)
-          )}
+          quotations={history.customerQuotations}
+          invoices={history.customerInvoices}
+          payments={history.customerPayments}
           onClose={() => setViewingCustomer(null)}
           onEditQuotation={(q) => {
             setViewingCustomer(null);
@@ -1980,7 +2087,8 @@ function App() {
             setPaymentInvoice(inv);
           }}
         />
-      )}
+        );
+      })()}
 
       {/* Payment Modal */}
       {paymentInvoice && (
@@ -1990,6 +2098,16 @@ function App() {
           onAddPayment={handleAddPayment}
           onDeletePayment={handleDeletePayment}
           onClose={() => setPaymentInvoice(null)}
+        />
+      )}
+
+      {/* Payment Decision Modal — shown after Save Invoice is validated */}
+      {pendingSaveInvoice && (
+        <PaymentDecisionModal
+          invoice={pendingSaveInvoice}
+          existingPayments={storage.getPaymentsByInvoice(pendingSaveInvoice.id)}
+          onConfirm={applyPaymentDecision}
+          onClose={() => setPendingSaveInvoice(null)}
         />
       )}
     </div>
