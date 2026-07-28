@@ -5,6 +5,7 @@ import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, F
 
 interface Props {
   invoice: Invoice;
+  allInvoices: Invoice[];
   catalog: ProductCatalogItem[];
   companyProfile: CompanyProfile;
   selectedTemplate: QuotationTemplate | undefined;
@@ -26,6 +27,7 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
 
 export function InvoiceForm({
   invoice,
+  allInvoices,
   catalog,
   selectedTemplate,
   onChange,
@@ -44,6 +46,9 @@ export function InvoiceForm({
   const updateProducts = (products: Product[]) => update({ products });
   const updateProductColumns = (productColumns: TableColumn[]) => update({ productColumns });
   const updateGstMode = (gstMode: GstMode) => update({ gstMode });
+
+  const isDuplicateInvoiceNumber = !!invoice.invoiceNumber &&
+    allInvoices.some(i => i.id !== invoice.id && i.invoiceNumber === invoice.invoiceNumber);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -137,8 +142,18 @@ export function InvoiceForm({
               type="text"
               value={invoice.invoiceNumber}
               onChange={(e) => update({ invoiceNumber: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-blue-500 font-mono"
+              className={`w-full px-3 py-2 border rounded-md focus:ring-2 font-mono ${
+                isDuplicateInvoiceNumber
+                  ? 'border-red-400 focus:ring-red-500 focus:border-red-500 bg-red-50 text-red-800'
+                  : 'border-slate-300 focus:ring-emerald-500 focus:border-blue-500'
+              }`}
             />
+            {isDuplicateInvoiceNumber && (
+              <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Invoice Number already exists. Choose another number.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -325,8 +340,13 @@ export function InvoiceForm({
         </button>
         <button
           onClick={onSave}
-          className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 order-4"
-          title="Save (Ctrl+S)"
+          disabled={isDuplicateInvoiceNumber}
+          className={`px-4 py-2 rounded-md flex items-center justify-center gap-2 order-4 transition-colors ${
+            isDuplicateInvoiceNumber
+              ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700'
+          }`}
+          title={isDuplicateInvoiceNumber ? 'Fix duplicate invoice number to save' : 'Save (Ctrl+S)'}
         >
           <Save className="w-4 h-4" />
           Save Invoice

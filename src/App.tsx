@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment } from './types';
-import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount } from './utils/storage';
+import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount, bulkMarkInvoicesPaid } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
 import { ProductTable } from './components/ProductTable';
@@ -26,7 +26,9 @@ import { PaymentModal } from './components/PaymentModal';
 import { PaymentDecisionModal, PaymentDecision } from './components/PaymentDecisionModal';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { isValidMobile, isValidGstin } from './utils/validation';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3 } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle } from 'lucide-react';
+import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog';
+import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
 import { createClient } from '@supabase/supabase-js';
 
 type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports';
@@ -104,6 +106,13 @@ function App() {
   // Unpaid / Receive payment / Mark fully paid). The decision modal reads from
   // this; applyPaymentDecision performs the actual save once chosen.
   const [pendingSaveInvoice, setPendingSaveInvoice] = useState<Invoice | null>(null);
+
+  // Duplicate document number blocking dialogs
+  const [duplicateQtWarning, setDuplicateQtWarning] = useState<{ number: string; customerName: string; date: string } | null>(null);
+  const [duplicateInvWarning, setDuplicateInvWarning] = useState<{ number: string; customerName: string; date: string } | null>(null);
+  // Similar document soft-warning dialogs
+  const [similarQtPending, setSimilarQtPending] = useState<{ quotation: Quotation; isNew: boolean } | null>(null);
+  const [similarInvPending, setSimilarInvPending] = useState<Invoice | null>(null);
 
   // Supplier / Vendor Management State
   const [suppliers, setSuppliers] = useState<SupplierData[]>(storage.getSuppliers);
@@ -528,9 +537,12 @@ function App() {
     const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
     const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
 
+    const isNew = !editingQuotationId;
+    const qNumber = isNew ? generateQuotationNumber() : quotationNumber;
+
     const newQuotation: Quotation = {
       id: editingQuotationId || generateId(),
-      quotationNumber: editingQuotationId ? quotationNumber : generateQuotationNumber(),
+      quotationNumber: qNumber,
       date: quotationDate,
       customer,
       shipTo,
@@ -544,17 +556,39 @@ function App() {
       selectedTemplateId: selectedTemplateId || undefined,
       productColumns,
       gstMode,
-      // Dynamic fields from template settings
       notes: quotation.notes,
       signature: quotation.signature,
       paymentQr: quotation.paymentQr,
       terms: quotation.terms,
     };
 
+    // Block save if quotation number already exists (for a different quotation)
+    const dupQt = quotations.find(q => q.quotationNumber === qNumber && q.id !== editingQuotationId);
+    if (dupQt) {
+      setDuplicateQtWarning({ number: qNumber, customerName: dupQt.customer.name, date: dupQt.date });
+      return;
+    }
+
+    // Soft warning: same customer + date + total
+    const similarQt = quotations.find(q =>
+      q.id !== editingQuotationId &&
+      q.customer.name.toLowerCase() === newQuotation.customer.name.toLowerCase() &&
+      q.date === newQuotation.date &&
+      Math.abs(q.grandTotal - newQuotation.grandTotal) < 0.01
+    );
+    if (similarQt && isNew) {
+      setSimilarQtPending({ quotation: newQuotation, isNew });
+      return;
+    }
+
+    commitQuotationSave(newQuotation, isNew);
+  };
+
+  const commitQuotationSave = (newQuotation: Quotation, isNew: boolean) => {
     storage.saveQuotation(newQuotation);
-    if (!editingQuotationId) incrementQuotationNumber();
+    if (isNew) incrementQuotationNumber();
     setQuotations(storage.getQuotations());
-    alert(editingQuotationId ? 'Quotation updated successfully!' : 'Quotation saved successfully!');
+    alert(isNew ? 'Quotation saved successfully!' : 'Quotation updated successfully!');
     resetForm();
     setView('list');
   };
@@ -563,6 +597,13 @@ function App() {
   const deleteQuotation = (id: string) => {
     if (confirm('Are you sure you want to delete this quotation?')) {
       storage.deleteQuotation(id);
+      setQuotations(storage.getQuotations());
+    }
+  };
+
+  const handleBulkDeleteQuotations = (ids: string[]) => {
+    if (confirm(`Delete ${ids.length} quotation${ids.length !== 1 ? 's' : ''}? This cannot be undone.`)) {
+      ids.forEach(id => storage.deleteQuotation(id));
       setQuotations(storage.getQuotations());
     }
   };
@@ -634,6 +675,28 @@ function App() {
       updatedAt: new Date().toISOString(),
     };
 
+    // Block save if invoice number already exists for a different invoice
+    const dupInv = invoices.find(i => i.invoiceNumber === toSave.invoiceNumber && i.id !== toSave.id);
+    if (dupInv) {
+      setDuplicateInvWarning({ number: toSave.invoiceNumber, customerName: dupInv.customer.name, date: dupInv.date });
+      return;
+    }
+
+    // Soft warning: same customer + date + total on a new invoice
+    const isNewInvoice = !invoices.find(i => i.id === toSave.id);
+    if (isNewInvoice) {
+      const similarInv = invoices.find(i =>
+        i.id !== toSave.id &&
+        i.customer.name.toLowerCase() === toSave.customer.name.toLowerCase() &&
+        i.date === toSave.date &&
+        Math.abs(i.grandTotal - toSave.grandTotal) < 0.01
+      );
+      if (similarInv) {
+        setSimilarInvPending(toSave);
+        return;
+      }
+    }
+
     setPendingSaveInvoice(toSave);
   };
 
@@ -651,13 +714,16 @@ function App() {
 
     let status: InvoiceStatus;
     let paymentToRecord: InvoicePayment | null = null;
+    let clearAllPayments = false;
 
     switch (decision.kind) {
       case 'draft':
         status = 'Draft';
+        clearAllPayments = true;
         break;
       case 'unpaid':
         status = 'Unpaid';
+        clearAllPayments = true;
         break;
       case 'receive':
         paymentToRecord = decision.payment;
@@ -667,18 +733,28 @@ function App() {
           false,
         );
         break;
-      case 'paid':
+      case 'paid': {
+        // Replace all existing payments with one full-payment record
+        clearAllPayments = true;
         paymentToRecord = decision.payment;
         status = 'Paid';
         break;
+      }
+    }
+
+    // Clear payment records when reverting to Draft or Unpaid, or replacing with full-paid
+    if (clearAllPayments && existingPayments.length > 0) {
+      existingPayments.forEach(p => storage.deletePayment(p.id));
     }
 
     const invoiceToPersist: Invoice = {
       ...toSave,
       status,
-      amountPaid: paymentToRecord
-        ? roundTo2(previouslyPaid + paymentToRecord.amount)
-        : status === 'Draft' ? (toSave.amountPaid || 0) : 0,
+      amountPaid: clearAllPayments && !paymentToRecord
+        ? 0
+        : paymentToRecord
+          ? roundTo2((clearAllPayments ? 0 : previouslyPaid) + paymentToRecord.amount)
+          : roundTo2(previouslyPaid),
       updatedAt: new Date().toISOString(),
     };
 
@@ -687,6 +763,9 @@ function App() {
 
     if (paymentToRecord) {
       storage.addPayment(paymentToRecord);
+      storage.updateInvoiceAmountPaid(toSave.id);
+    } else if (clearAllPayments) {
+      // Reconcile the cached amountPaid from now-empty payment records
       storage.updateInvoiceAmountPaid(toSave.id);
     }
 
@@ -697,7 +776,20 @@ function App() {
       await recordStockMovementsForSale(invoiceToPersist);
     }
 
-    // Background-sync the payment entry to Supabase (mirrors handleAddPayment)
+    // Background-sync payment changes to Supabase
+    if (clearAllPayments && existingPayments.length > 0) {
+      (async () => {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const url = import.meta.env.VITE_SUPABASE_URL;
+          const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+          if (!url || !key) return;
+          const sb = createClient(url, key);
+          await sb.from('invoice_payments').delete().eq('invoice_id', toSave.id);
+        } catch (_) { /* fire-and-forget */ }
+      })();
+    }
+
     if (paymentToRecord) {
       (async () => {
         try {
@@ -766,6 +858,20 @@ function App() {
   const deleteInvoice = (id: string) => {
     if (confirm('Are you sure you want to delete this invoice?')) {
       storage.deleteInvoice(id);
+      setInvoices(storage.getInvoices());
+    }
+  };
+
+  const handleBulkDeleteInvoices = (ids: string[]) => {
+    if (confirm(`Delete ${ids.length} invoice${ids.length !== 1 ? 's' : ''}? This cannot be undone.`)) {
+      ids.forEach(id => storage.deleteInvoice(id));
+      setInvoices(storage.getInvoices());
+    }
+  };
+
+  const handleBulkMarkPaid = (ids: string[]) => {
+    if (confirm(`Mark ${ids.length} invoice${ids.length !== 1 ? 's' : ''} as Paid?`)) {
+      bulkMarkInvoicesPaid(ids);
       setInvoices(storage.getInvoices());
     }
   };
@@ -1409,10 +1515,20 @@ function App() {
                       value={quotationNumber}
                       onChange={(e) => setQuotationNumber(e.target.value)}
                       placeholder="Auto-generated on save"
-                      className="px-2 py-1 text-sm text-gray-600 border border-gray-200 rounded font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
+                      className={`px-2 py-1 text-sm border rounded font-mono focus:ring-2 w-48 ${
+                        quotationNumber && quotations.some(q => q.quotationNumber === quotationNumber && q.id !== editingQuotationId)
+                          ? 'border-red-400 text-red-700 bg-red-50 focus:ring-red-500 focus:border-red-400'
+                          : 'text-gray-600 border-gray-200 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
                     />
                     <span className="text-xs text-gray-400">editable</span>
                   </div>
+                  {quotationNumber && quotations.some(q => q.quotationNumber === quotationNumber && q.id !== editingQuotationId) && (
+                    <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Quotation Number already exists. Choose another number.
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto items-center">
                   {/* Template indicator */}
@@ -1609,8 +1725,13 @@ function App() {
                 </button>
                 <button
                   onClick={saveQuotation}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 order-4"
-                  title="Save (Ctrl+S)"
+                  disabled={!!(quotationNumber && quotations.some(q => q.quotationNumber === quotationNumber && q.id !== editingQuotationId))}
+                  className={`px-4 py-2 rounded-md transition-colors flex items-center justify-center gap-2 order-4 ${
+                    quotationNumber && quotations.some(q => q.quotationNumber === quotationNumber && q.id !== editingQuotationId)
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                  title={quotationNumber && quotations.some(q => q.quotationNumber === quotationNumber && q.id !== editingQuotationId) ? 'Fix duplicate quotation number to save' : 'Save (Ctrl+S)'}
                 >
                   <Save className="w-4 h-4" />
                   {editingQuotationId ? 'Update' : 'Save'} Quotation
@@ -1638,6 +1759,7 @@ function App() {
                 onDelete={deleteQuotation}
                 onDuplicate={duplicateQuotation}
                 onConvertToInvoice={convertToInvoice}
+                onBulkDelete={handleBulkDeleteQuotations}
               />
             </div>
           )}
@@ -1670,6 +1792,7 @@ function App() {
           {view === 'editInvoice' && editingInvoice && (
             <InvoiceForm
               invoice={editingInvoice}
+              allInvoices={invoices}
               catalog={catalog}
               companyProfile={companyProfile}
               selectedTemplate={invoiceTemplate}
@@ -1702,6 +1825,8 @@ function App() {
                 onDelete={deleteInvoice}
                 onDuplicate={duplicateInvoice}
                 onRecordPayment={handleRecordPayment}
+                onBulkDelete={handleBulkDeleteInvoices}
+                onBulkMarkPaid={handleBulkMarkPaid}
               />
             </div>
           )}
@@ -2108,6 +2233,60 @@ function App() {
           existingPayments={storage.getPaymentsByInvoice(pendingSaveInvoice.id)}
           onConfirm={applyPaymentDecision}
           onClose={() => setPendingSaveInvoice(null)}
+        />
+      )}
+
+      {/* Duplicate Quotation Number — blocking dialog */}
+      {duplicateQtWarning && (
+        <DuplicateDocumentDialog
+          type="quotation"
+          duplicateNumber={duplicateQtWarning.number}
+          existingCustomerName={duplicateQtWarning.customerName}
+          existingDate={duplicateQtWarning.date}
+          onClose={() => setDuplicateQtWarning(null)}
+        />
+      )}
+
+      {/* Duplicate Invoice Number — blocking dialog */}
+      {duplicateInvWarning && (
+        <DuplicateDocumentDialog
+          type="invoice"
+          duplicateNumber={duplicateInvWarning.number}
+          existingCustomerName={duplicateInvWarning.customerName}
+          existingDate={duplicateInvWarning.date}
+          onClose={() => setDuplicateInvWarning(null)}
+        />
+      )}
+
+      {/* Similar Quotation — soft non-blocking warning */}
+      {similarQtPending && (
+        <SimilarDocumentDialog
+          type="quotation"
+          customerName={similarQtPending.quotation.customer.name}
+          amount={similarQtPending.quotation.grandTotal}
+          date={similarQtPending.quotation.date}
+          onCancel={() => setSimilarQtPending(null)}
+          onProceed={() => {
+            const { quotation, isNew } = similarQtPending;
+            setSimilarQtPending(null);
+            commitQuotationSave(quotation, isNew);
+          }}
+        />
+      )}
+
+      {/* Similar Invoice — soft non-blocking warning */}
+      {similarInvPending && (
+        <SimilarDocumentDialog
+          type="invoice"
+          customerName={similarInvPending.customer.name}
+          amount={similarInvPending.grandTotal}
+          date={similarInvPending.date}
+          onCancel={() => setSimilarInvPending(null)}
+          onProceed={() => {
+            const toSave = similarInvPending;
+            setSimilarInvPending(null);
+            setPendingSaveInvoice(toSave);
+          }}
         />
       )}
     </div>

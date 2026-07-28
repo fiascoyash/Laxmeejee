@@ -94,6 +94,7 @@ export const storage = {
     };
 
     storage.saveQuotation(newQuotation);
+    incrementQuotationNumber();
     return newQuotation;
   },
 
@@ -228,6 +229,9 @@ export const storage = {
   deleteInvoice: (id: string): void => {
     const invoices = storage.getInvoices().filter(i => i.id !== id);
     localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    // Also remove all payment records for this invoice
+    const payments = storage.getPayments().filter(p => p.invoiceId !== id);
+    localStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
   },
 
   duplicateInvoice: (id: string): Invoice | null => {
@@ -528,21 +532,39 @@ export const generateId = (): string => {
 export const generateQuotationNumber = (): string => {
   const settings = storage.getNumberingSettings();
   const year = new Date().getFullYear();
-  const num = settings.quotationNextNumber;
-  const parts = [settings.quotationPrefix];
-  if (settings.quotationIncludeYear) parts.push(String(year));
-  parts.push(num.toString().padStart(3, '0'));
-  return parts.join('-');
+  const existingNumbers = new Set(storage.getQuotations().map(q => q.quotationNumber));
+  const build = (n: number): string => {
+    const parts = [settings.quotationPrefix];
+    if (settings.quotationIncludeYear) parts.push(String(year));
+    parts.push(n.toString().padStart(3, '0'));
+    return parts.join('-');
+  };
+  let num = settings.quotationNextNumber;
+  let candidate = build(num);
+  while (existingNumbers.has(candidate)) {
+    num++;
+    candidate = build(num);
+  }
+  return candidate;
 };
 
 export const generateInvoiceNumber = (): string => {
   const settings = storage.getNumberingSettings();
   const year = new Date().getFullYear();
-  const num = settings.invoiceNextNumber;
-  const parts = [settings.invoicePrefix];
-  if (settings.invoiceIncludeYear) parts.push(String(year));
-  parts.push(num.toString().padStart(3, '0'));
-  return parts.join('-');
+  const existingNumbers = new Set(storage.getInvoices().map(i => i.invoiceNumber));
+  const build = (n: number): string => {
+    const parts = [settings.invoicePrefix];
+    if (settings.invoiceIncludeYear) parts.push(String(year));
+    parts.push(n.toString().padStart(3, '0'));
+    return parts.join('-');
+  };
+  let num = settings.invoiceNextNumber;
+  let candidate = build(num);
+  while (existingNumbers.has(candidate)) {
+    num++;
+    candidate = build(num);
+  }
+  return candidate;
 };
 
 export const incrementQuotationNumber = (): void => {
@@ -559,6 +581,32 @@ export const incrementInvoiceNumber = (): void => {
     settings.invoiceNextNumber = settings.invoiceNextNumber + 1;
     storage.saveNumberingSettings(settings);
   }
+};
+
+export const bulkMarkInvoicesPaid = (ids: string[]): void => {
+  const invoices = storage.getInvoices();
+  const now = new Date().toISOString();
+  const today = now.split('T')[0];
+
+  // Clear any existing payments for these invoices, then create one full-payment record each
+  const existingPayments = storage.getPayments().filter(p => !ids.includes(p.invoiceId));
+  const newPayments: InvoicePayment[] = [];
+
+  const updated = invoices.map(inv => {
+    if (!ids.includes(inv.id) || inv.status === 'Draft' || inv.status === 'Paid') return inv;
+    newPayments.push({
+      id: generateId(),
+      invoiceId: inv.id,
+      date: today,
+      amount: inv.grandTotal,
+      mode: 'cash',
+      createdAt: now,
+    });
+    return { ...inv, status: 'Paid' as InvoiceStatus, amountPaid: inv.grandTotal, updatedAt: now };
+  });
+
+  localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(updated));
+  localStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify([...newPayments, ...existingPayments]));
 };
 
 export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
