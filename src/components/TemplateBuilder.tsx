@@ -1,11 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   QuotationTemplate, TemplateBlock, BlockType, TableColumn,
-  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, STYLE_THEMES, StyleThemeId, BlockZone, TypographyElementId
+  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, STYLE_THEMES, StyleThemeId, BlockZone, TypographyElementId,
+  LogoSettings, LogoSizePreset, LogoAlignment, DEFAULT_LOGO_SETTINGS, LOGO_SIZE_PRESETS,
 } from '../types';
 import { generateId, getDefaultProductColumns } from '../utils/storage';
 import {
-  Trash2, Plus, Save, Settings, Type, Image,
+  Trash2, Plus, Save, Settings, Type, Image, RotateCcw,
   Building2, User, FileText, Calendar, Table, CreditCard, PenTool, FileWarning, Truck,
   ChevronDown, GripVertical, LucideIcon, Square, Minus, MoveVertical, AlignJustify,
   ArrowUp, ArrowDown, Undo2, Redo2, Copy, Keyboard, X, PanelLeftClose, PanelLeft, Shield, Package, Hammer
@@ -134,7 +135,9 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   // Register sub-layers with escape stack (priority 1 = dropdowns/panels, 2 = small popups)
   useEscapeStack(showShortcutsHelp ? () => setShowShortcutsHelp(false) : null, 2);
   useEscapeStack(showColumnSettings ? () => setShowColumnSettings(false) : null, 2);
+  const [showLogoPanel, setShowLogoPanel] = useState(false);
   useEscapeStack(showSettingsPanel ? () => setShowSettingsPanel(false) : null, 2);
+  useEscapeStack(showLogoPanel ? () => setShowLogoPanel(false) : null, 2);
   const [selectedZone, setSelectedZone] = useState<BlockZone | null>(null);
   const [selectedTypographyElement, setSelectedTypographyElement] = useState<TypographyElementId | undefined>(undefined);
 
@@ -489,6 +492,17 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                   <Settings className="w-4 h-4" />
                   Settings
                 </button>
+                <button
+                  onClick={() => setShowLogoPanel(!showLogoPanel)}
+                  className={`px-3 py-3 rounded-md text-sm flex items-center justify-center gap-2 min-h-[44px] col-span-2 ${
+                    showLogoPanel
+                      ? 'bg-blue-600 text-white'
+                      : 'border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <Image className="w-4 h-4" />
+                  Logo Customization
+                </button>
               </div>
 
               <div>
@@ -577,6 +591,18 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                 onChange={setTemplateSettings}
                 selectedTypographyElement={selectedTypographyElement}
                 onTypographyElementSelect={setSelectedTypographyElement}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Logo Customization Panel - Mobile */}
+        {showLogoPanel && (
+          <div className="bg-white border-b border-slate-200 mt-2">
+            <div className="p-4">
+              <LogoCustomizationPanel
+                settings={templateSettings}
+                onChange={setTemplateSettings}
               />
             </div>
           </div>
@@ -981,7 +1007,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           </div>
         </div>
       ) : (
-        <div className="hidden lg:block w-64 bg-white border-l border-slate-200 p-4">
+        <div className="hidden lg:block w-64 bg-white border-l border-slate-200 p-4 overflow-y-auto">
           <h3 className="font-semibold text-slate-800 mb-4">Properties</h3>
           <div className="text-sm text-slate-500">
             <p>Select a block to edit its properties.</p>
@@ -993,6 +1019,12 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
                 - Use settings to toggle fixed sections
               </p>
             </div>
+          </div>
+          <div className="mt-6">
+            <LogoCustomizationPanel
+              settings={templateSettings}
+              onChange={setTemplateSettings}
+            />
           </div>
         </div>
       )}
@@ -1088,6 +1120,129 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LogoCustomizationPanel({
+  settings,
+  onChange,
+}: {
+  settings: TemplateSettings;
+  onChange: (s: TemplateSettings) => void;
+}) {
+  const logo: LogoSettings = settings.logoSettings ?? DEFAULT_LOGO_SETTINGS;
+
+  const updateLogo = (patch: Partial<LogoSettings>) => {
+    onChange({ ...settings, logoSettings: { ...logo, ...patch } });
+  };
+
+  const presetEntries = Object.entries(LOGO_SIZE_PRESETS) as [LogoSizePreset, { label: string; height: number }][];
+  const currentHeight = logo.customSize > 0 ? logo.customSize : (LOGO_SIZE_PRESETS[logo.sizePreset]?.height ?? 50);
+
+  return (
+    <div className="space-y-4">
+      <h4 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+        <Image className="w-4 h-4 text-blue-600" />
+        Logo Customization
+      </h4>
+
+      {/* Size Presets */}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1.5">Logo Size</label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {presetEntries.map(([key, val]) => (
+            <button
+              key={key}
+              onClick={() => updateLogo({ sizePreset: key, customSize: 0 })}
+              className={`px-2 py-2 rounded text-xs font-medium border transition-colors ${
+                logo.sizePreset === key && logo.customSize === 0
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+              }`}
+            >
+              {val.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Custom Size Slider */}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1.5">
+          Custom Size: {currentHeight}px height
+        </label>
+        <input
+          type="range"
+          min={10}
+          max={200}
+          value={currentHeight}
+          onChange={(e) => updateLogo({ customSize: parseInt(e.target.value) })}
+          className="w-full accent-blue-600"
+        />
+        <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+          <span>10px</span>
+          <span>200px</span>
+        </div>
+      </div>
+
+      {/* Alignment */}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1.5">Logo Alignment</label>
+        <div className="grid grid-cols-3 gap-1.5">
+          {(['left', 'center', 'right'] as LogoAlignment[]).map(align => (
+            <button
+              key={align}
+              onClick={() => updateLogo({ alignment: align })}
+              className={`px-2 py-2 rounded text-xs font-medium border transition-colors capitalize ${
+                logo.alignment === align
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+              }`}
+            >
+              {align}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Margins */}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1.5">Margins (px)</label>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ['marginTop', 'Top'],
+            ['marginBottom', 'Bottom'],
+            ['marginLeft', 'Left'],
+            ['marginRight', 'Right'],
+          ] as [keyof Pick<LogoSettings, 'marginTop' | 'marginBottom' | 'marginLeft' | 'marginRight'>, string][]).map(([key, label]) => (
+            <div key={key}>
+              <label className="block text-[10px] text-slate-500 mb-0.5">{label}</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={logo[key]}
+                onChange={(e) => updateLogo({ [key]: parseInt(e.target.value) || 0 } as Partial<LogoSettings>)}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Reset */}
+      <button
+        onClick={() => onChange({ ...settings, logoSettings: { ...DEFAULT_LOGO_SETTINGS } })}
+        className="w-full px-3 py-2.5 border border-amber-300 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-50 transition-colors flex items-center justify-center gap-2"
+      >
+        <RotateCcw className="w-4 h-4" />
+        Reset Logo Settings
+      </button>
+
+      <p className="text-[10px] text-slate-400 leading-relaxed">
+        Logo scales proportionally without distortion. Settings are saved per template and apply to invoices, quotations, preview, PDF export, and print across all paper sizes.
+      </p>
     </div>
   );
 }

@@ -933,7 +933,40 @@ export interface TemplateSettings {
   // Style theme (Level 2) — colors/typography/borders only. Structure comes
   // from the template's themeId (Level 1).
   styleThemeId: StyleThemeId;
+  // Logo customization (per-template)
+  logoSettings?: LogoSettings;
 }
+
+// ─── Logo Customization ──────────────────────────────────────────────────────
+export type LogoSizePreset = 'small' | 'medium' | 'large' | 'extra_large';
+export type LogoAlignment = 'left' | 'center' | 'right';
+
+export interface LogoSettings {
+  sizePreset: LogoSizePreset;
+  customSize: number;       // px height, 0 = use preset
+  alignment: LogoAlignment;
+  marginTop: number;         // px
+  marginBottom: number;      // px
+  marginLeft: number;        // px
+  marginRight: number;       // px
+}
+
+export const LOGO_SIZE_PRESETS: Record<LogoSizePreset, { label: string; height: number }> = {
+  small: { label: 'Small', height: 30 },
+  medium: { label: 'Medium', height: 50 },
+  large: { label: 'Large', height: 75 },
+  extra_large: { label: 'Extra Large', height: 100 },
+};
+
+export const DEFAULT_LOGO_SETTINGS: LogoSettings = {
+  sizePreset: 'medium',
+  customSize: 0,
+  alignment: 'left',
+  marginTop: 0,
+  marginBottom: 0,
+  marginLeft: 0,
+  marginRight: 8,
+};
 
 export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   showPoNumber: false,

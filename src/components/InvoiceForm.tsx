@@ -1,7 +1,7 @@
 import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn, GstMode, ShipTo, TemplateSchema } from '../types';
 import { CustomerDetails } from './CustomerDetails';
 import { ProductTable } from './ProductTable';
-import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, FileText, IndianRupee } from 'lucide-react';
+import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, FileText, IndianRupee, Printer } from 'lucide-react';
 
 interface Props {
   invoice: Invoice;
@@ -13,6 +13,7 @@ interface Props {
   onSave: () => void;
   onExportPDF: () => void;
   onPreview: () => void;
+  onPrint: () => void;
   onCancel: () => void;
   onSaveNewProduct?: (item: ProductCatalogItem) => void;
   onRecordPayment?: (invoice: Invoice) => void;
@@ -34,6 +35,7 @@ export function InvoiceForm({
   onSave,
   onExportPDF,
   onPreview,
+  onPrint,
   onCancel,
   onSaveNewProduct,
   onRecordPayment,
@@ -325,10 +327,18 @@ export function InvoiceForm({
         <button
           onClick={onPreview}
           className="px-4 py-2 border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50 transition-colors flex items-center justify-center gap-2 order-3 sm:order-2"
-          title="Preview (Ctrl+P)"
+          title="Preview"
         >
           <Eye className="w-4 h-4" />
           Preview
+        </button>
+        <button
+          onClick={onPrint}
+          className="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors flex items-center justify-center gap-2 order-3.5 sm:order-2.5"
+          title="Print (Ctrl+P)"
+        >
+          <Printer className="w-4 h-4" />
+          Print
         </button>
         <button
           onClick={onExportPDF}

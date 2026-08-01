@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useEscapeStack } from './hooks/useEscapeStack';
-import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment } from './types';
+import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment, DEFAULT_TEMPLATE_SETTINGS } from './types';
 import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount, bulkMarkInvoicesPaid } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
 import { CustomerDetails } from './components/CustomerDetails';
@@ -30,6 +30,8 @@ import { isValidMobile, isValidGstin } from './utils/validation';
 import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle } from 'lucide-react';
 import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog';
 import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
+import { PrintCenter } from './components/PrintCenter';
+import { Printer } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports';
@@ -103,6 +105,8 @@ function App() {
 
   // Keyboard shortcuts modal state
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showPrintCenter, setShowPrintCenter] = useState(false);
+  const [printCenterDocType, setPrintCenterDocType] = useState<'quotation' | 'invoice'>('quotation');
 
   // Customer Management State
   const [customers, setCustomers] = useState<CustomerData[]>(storage.getCustomers);
@@ -206,14 +210,13 @@ function App() {
         return;
       }
 
-      // Ctrl+P → Preview
+      // Ctrl+P → Print Center (auto-save first, then open Print Center)
       if (isCtrlOrCmd && event.key === 'p') {
         event.preventDefault();
-        if (view === 'new' && selectedTemplateId) {
-          const template = storage.getTemplateById(selectedTemplateId);
-          if (template) setPreviewingTemplate(template);
+        if (view === 'new') {
+          openPrintCenterQuotation();
         } else if (view === 'editInvoice') {
-          previewInvoice();
+          openPrintCenterInvoice();
         }
         return;
       }
@@ -701,6 +704,99 @@ function App() {
     }
 
     setPendingSaveInvoice(toSave);
+  };
+
+  // ── Print Center: auto-save before printing ──────────────────────────────
+  // Validates the current form, persists silently (no navigation, no alert),
+  // then opens the Print Center. If validation or save fails, shows an error
+  // and does NOT open the Print Center — unsaved changes are never lost.
+  const openPrintCenterQuotation = () => {
+    const currentQuotation = buildCurrentQuotation();
+    if (!currentQuotation.customer.name) {
+      alert('Please enter customer name before printing');
+      return;
+    }
+    if (currentQuotation.products.length === 0) {
+      alert('Please add at least one product before printing');
+      return;
+    }
+
+    const gstMode = currentQuotation.gstMode ?? 'inclusive';
+    const taxSummary = calculateTaxSummary(currentQuotation.products, gstMode);
+    const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+    const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+    const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+    const grandTotalAmount = calculateGrandTotalAmount(currentQuotation.products, gstMode);
+    const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
+
+    const toSave: Quotation = {
+      ...currentQuotation,
+      totalAmount,
+      totalCgst,
+      totalSgst,
+      roundOff,
+      grandTotal: roundedGrandTotal,
+    };
+
+    try {
+      storage.saveQuotation(toSave);
+      setQuotations(storage.getQuotations());
+    } catch (e) {
+      alert('Failed to save quotation before printing. Please try saving manually.');
+      return;
+    }
+
+    setPrintCenterDocType('quotation');
+    setShowPrintCenter(true);
+  };
+
+  const openPrintCenterInvoice = () => {
+    if (!editingInvoice) return;
+    if (!editingInvoice.customer.name) {
+      alert('Please enter customer name before printing');
+      return;
+    }
+    if (editingInvoice.products.length === 0) {
+      alert('Please add at least one product before printing');
+      return;
+    }
+
+    const invoiceGstMode = editingInvoice.gstMode || 'inclusive';
+    const taxSummary = calculateTaxSummary(editingInvoice.products, invoiceGstMode);
+    const totalAmount = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+    const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+    const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+    const grandTotalAmount = calculateGrandTotalAmount(editingInvoice.products, invoiceGstMode);
+    const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
+
+    const toSave: Invoice = {
+      ...editingInvoice,
+      totalAmount,
+      totalCgst,
+      totalSgst,
+      roundOff,
+      grandTotal: roundedGrandTotal,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Block if duplicate invoice number
+    const dupInv = invoices.find(i => i.invoiceNumber === toSave.invoiceNumber && i.id !== toSave.id);
+    if (dupInv) {
+      alert(`Invoice number "${toSave.invoiceNumber}" already exists. Please use a different number.`);
+      return;
+    }
+
+    try {
+      storage.saveInvoice(toSave);
+      setInvoices(storage.getInvoices());
+      setEditingInvoice(toSave);
+    } catch (e) {
+      alert('Failed to save invoice before printing. Please try saving manually.');
+      return;
+    }
+
+    setPrintCenterDocType('invoice');
+    setShowPrintCenter(true);
   };
 
   // Apply the save decision chosen in the Payment Decision dialog. Persists
@@ -1727,10 +1823,18 @@ function App() {
                 <button
                   onClick={handlePreviewCurrentQuotation}
                   className="px-4 py-2 border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50 transition-colors flex items-center justify-center gap-2 order-3 sm:order-2"
-                  title="Preview (Ctrl+P)"
+                  title="Preview"
                 >
                   <Eye className="w-4 h-4" />
                   Preview
+                </button>
+                <button
+                  onClick={openPrintCenterQuotation}
+                  className="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors flex items-center justify-center gap-2 order-3.5 sm:order-2.5"
+                  title="Print (Ctrl+P)"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
                 </button>
                 <button
                   onClick={exportPDF}
@@ -1823,6 +1927,7 @@ function App() {
               onSave={saveInvoice}
               onExportPDF={exportInvoicePDF}
               onPreview={previewInvoice}
+              onPrint={openPrintCenterInvoice}
               onCancel={() => { setEditingInvoice(null); setView('invoiceList'); }}
               onSaveNewProduct={handleSaveNewProduct}
               onRecordPayment={handleRecordPayment}
@@ -2318,6 +2423,59 @@ function App() {
           }}
         />
       )}
+
+      {/* Enterprise Print Center */}
+      {showPrintCenter && (() => {
+        const template = getCurrentTemplate();
+        const settings = template?.settings ?? DEFAULT_TEMPLATE_SETTINGS;
+        const themeId = template?.themeId ?? 'professional_corporate';
+        const blocks = template?.blocks ?? [];
+        const tplSchema = template?.schema;
+
+        if (printCenterDocType === 'invoice' && editingInvoice) {
+          const invTemplate = editingInvoice.selectedTemplateId
+            ? storage.getTemplateById(editingInvoice.selectedTemplateId)
+            : template;
+          const invSettings = invTemplate?.settings ?? settings;
+          const invThemeId = invTemplate?.themeId ?? themeId;
+          const invBlocks = invTemplate?.blocks ?? blocks;
+          const invSchema = invTemplate?.schema ?? tplSchema;
+
+          return (
+            <PrintCenter
+              open={showPrintCenter}
+              onClose={() => setShowPrintCenter(false)}
+              docType="invoice"
+              company={companyProfile}
+              customer={editingInvoice.customer}
+              quotation={editingInvoice as unknown as Quotation}
+              products={editingInvoice.products}
+              invoice={editingInvoice}
+              templateSettings={invSettings}
+              customBlocks={invBlocks}
+              schema={invSchema}
+              themeId={invThemeId}
+            />
+          );
+        }
+
+        const currentQuotation = buildCurrentQuotation();
+        return (
+          <PrintCenter
+            open={showPrintCenter}
+            onClose={() => setShowPrintCenter(false)}
+            docType="quotation"
+            company={companyProfile}
+            customer={customer}
+            quotation={currentQuotation}
+            products={products}
+            templateSettings={settings}
+            customBlocks={blocks}
+            schema={tplSchema}
+            themeId={themeId}
+          />
+        );
+      })()}
     </div>
   );
 }

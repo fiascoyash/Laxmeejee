@@ -117,3 +117,34 @@
     padding-bottom: env(safe-area-inset-bottom, 20px);
   }
 }
+
+/* ── Enterprise Print Center — print-only styles ──────────────────────────── */
+/* When the Print Center triggers window.print(), only the cloned document
+   inside #print-center-print-area should be visible. Everything else —
+   sidebar, navigation, buttons, dashboard, toolbars — is hidden. */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #print-center-print-area,
+  #print-center-print-area * {
+    visibility: visible !important;
+  }
+  #print-center-print-area {
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* Hide non-printable UI elements */
+  .no-print,
+  .sidebar,
+  nav,
+  header,
+  footer,
+  button {
+    display: none !important;
+  }
+}

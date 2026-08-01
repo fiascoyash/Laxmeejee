@@ -18,6 +18,7 @@ import {
   StyleTheme, STYLE_THEMES, StyleThemeId, DEFAULT_STYLE_THEME_ID,
   TemplateBlock, BlockZone, TypographyElementId, DEFAULT_TYPOGRAPHY_VALUES,
   TemplateSchema, UNIT_OPTIONS,
+  DEFAULT_LOGO_SETTINGS, LOGO_SIZE_PRESETS,
 } from '../types';
 import {
   calculateProductAmount, calculateTaxSummary,
@@ -575,13 +576,30 @@ export function DocumentRenderer({
 
   const CompanyInfoBlock = ({ align }: { align: 'left' | 'center' | 'right' }) => (
     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flex: 1, flexDirection: align === 'center' ? 'column' : 'row', justifyContent: align === 'right' ? 'flex-end' : 'flex-start' }}>
-      {company.logo && (
-        <img
-          src={company.logo}
-          alt="Logo"
-          style={{ width: `${Math.round(52 * fontScale)}px`, height: `${Math.round(42 * fontScale)}px`, objectFit: 'contain', flexShrink: 0, alignSelf: align === 'center' ? 'center' : 'flex-start' }}
-        />
-      )}
+      {company.logo && (() => {
+        const ls = settings.logoSettings ?? DEFAULT_LOGO_SETTINGS;
+        const presetHeight = LOGO_SIZE_PRESETS[ls.sizePreset]?.height ?? 50;
+        const logoHeight = ls.customSize > 0 ? ls.customSize : presetHeight;
+        const scaledHeight = Math.round(logoHeight * fontScale);
+        const logoAlignStyle: React.CSSProperties = ls.alignment === 'center' ? { alignSelf: 'center' as const } : ls.alignment === 'right' ? { alignSelf: 'flex-end' as const } : { alignSelf: 'flex-start' as const };
+        return (
+          <img
+            src={company.logo}
+            alt="Logo"
+            style={{
+              height: `${scaledHeight}px`,
+              width: 'auto',
+              objectFit: 'contain',
+              flexShrink: 0,
+              marginTop: `${Math.round(ls.marginTop * fontScale)}px`,
+              marginBottom: `${Math.round(ls.marginBottom * fontScale)}px`,
+              marginLeft: `${Math.round(ls.marginLeft * fontScale)}px`,
+              marginRight: `${Math.round(ls.marginRight * fontScale)}px`,
+              ...logoAlignStyle,
+            }}
+          />
+        );
+      })()}
       <div style={{ textAlign: align }}>
         <T
           id="company_name"

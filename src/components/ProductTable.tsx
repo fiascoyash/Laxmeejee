@@ -51,7 +51,9 @@ const getBuiltinColumns = (): Record<string, TableColumn> => ({
 
 export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema, onSaveNewProduct }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
-  useEscapeStack(showCatalog ? () => { setShowCatalog(false); setCatalogSearch(''); } : null, 1);  const [saveDialogProduct, setSaveDialogProduct] = useState<Product | null>(null);
+  const [catalogSearch, setCatalogSearch] = useState('');
+  useEscapeStack(showCatalog ? () => { setShowCatalog(false); setCatalogSearch(''); } : null, 1);
+  const [saveDialogProduct, setSaveDialogProduct] = useState<Product | null>(null);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const columnSettingsRef = useRef<HTMLDivElement>(null);
   const catalogRef = useRef<HTMLDivElement>(null);
