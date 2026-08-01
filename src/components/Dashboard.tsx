@@ -367,6 +367,7 @@ export function Dashboard({
               icon={<PlusCircle className="w-5 h-5" />}
               color="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={onNewInvoice}
+              href="#newInvoice"
             />
             <QuickAction
               label="New Quotation"
@@ -374,6 +375,7 @@ export function Dashboard({
               icon={<FileText className="w-5 h-5" />}
               color="bg-blue-600 hover:bg-blue-700 text-white"
               onClick={onNewQuotation}
+              href="#selectTemplate"
             />
             <QuickAction
               label="Invoice History"
@@ -381,6 +383,7 @@ export function Dashboard({
               icon={<List className="w-5 h-5" />}
               color="bg-slate-100 hover:bg-slate-200 text-slate-700"
               onClick={() => onNavigate('invoiceList')}
+              href="#invoiceList"
             />
             <QuickAction
               label="Customers"
@@ -388,6 +391,7 @@ export function Dashboard({
               icon={<Users className="w-5 h-5" />}
               color="bg-slate-100 hover:bg-slate-200 text-slate-700"
               onClick={() => onNavigate('customers')}
+              href="#customers"
             />
             <QuickAction
               label="Suppliers"
@@ -395,6 +399,7 @@ export function Dashboard({
               icon={<Truck className="w-5 h-5" />}
               color="bg-slate-100 hover:bg-slate-200 text-slate-700"
               onClick={() => onNavigate('suppliers')}
+              href="#suppliers"
             />
             <QuickAction
               label="Product Catalog"
@@ -402,6 +407,7 @@ export function Dashboard({
               icon={<Package className="w-5 h-5" />}
               color="bg-slate-100 hover:bg-slate-200 text-slate-700"
               onClick={() => onNavigate('catalog')}
+              href="#catalog"
             />
           </div>
         </div>
@@ -457,12 +463,14 @@ export function Dashboard({
               <Receipt className="w-4 h-4 text-emerald-500" />
               Recent Invoices
             </h2>
-            <button
-              onClick={() => onNavigate('invoiceList')}
+            <a
+              href="#invoiceList"
+              onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); onNavigate('invoiceList'); }}
+              onAuxClick={(e) => e.preventDefault()}
               className="text-xs text-emerald-600 font-medium hover:text-emerald-700 flex items-center gap-0.5 transition-colors"
             >
               View all <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            </a>
           </div>
           {stats.recentInvoices.length === 0 ? (
             <EmptyState icon={<Receipt className="w-8 h-8" />} text="No invoices yet" sub="Create your first invoice to see it here" />
@@ -499,12 +507,14 @@ export function Dashboard({
               <FileText className="w-4 h-4 text-blue-500" />
               Recent Quotations
             </h2>
-            <button
-              onClick={() => onNavigate('list')}
+            <a
+              href="#list"
+              onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); onNavigate('list'); }}
+              onAuxClick={(e) => e.preventDefault()}
               className="text-xs text-blue-600 font-medium hover:text-blue-700 flex items-center gap-0.5 transition-colors"
             >
               View all <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            </a>
           </div>
           {stats.recentQuotations.length === 0 ? (
             <EmptyState icon={<FileText className="w-8 h-8" />} text="No quotations yet" sub="Create your first quotation to see it here" />
@@ -539,12 +549,14 @@ export function Dashboard({
               <Star className="w-4 h-4 text-amber-500" />
               Top Customers
             </h2>
-            <button
-              onClick={() => onNavigate('customers')}
+            <a
+              href="#customers"
+              onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); onNavigate('customers'); }}
+              onAuxClick={(e) => e.preventDefault()}
               className="text-xs text-amber-600 font-medium hover:text-amber-700 flex items-center gap-0.5 transition-colors"
             >
               View all <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            </a>
           </div>
           {stats.topCustomers.length === 0 ? (
             <EmptyState icon={<Users className="w-8 h-8" />} text="No customer data yet" sub="Customer rankings will appear as you create invoices" />
@@ -622,12 +634,14 @@ export function Dashboard({
                 </div>
               ))}
           </div>
-          <button
-            onClick={() => onNavigate('catalog')}
+          <a
+            href="#catalog"
+            onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); onNavigate('catalog'); }}
+            onAuxClick={(e) => e.preventDefault()}
             className="mt-4 text-sm font-medium text-amber-700 hover:text-amber-800 flex items-center gap-1 transition-colors"
           >
             Manage Inventory <ChevronRight className="w-4 h-4" />
-          </button>
+          </a>
         </section>
       )}
     </div>
@@ -659,14 +673,33 @@ function OverviewCard({ label, value, sub, icon, accent }: {
   );
 }
 
-function QuickAction({ label, sub, icon, color, onClick }: {
-  label: string; sub: string; icon: JSX.Element; color: string; onClick: () => void;
+function QuickAction({ label, sub, icon, color, onClick, href }: {
+  label: string; sub: string; icon: JSX.Element; color: string; onClick?: () => void; href?: string;
 }) {
+  const cls = `w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 hover:scale-[1.01] active:scale-100 ${color}`;
+  if (href) {
+    return (
+      <a
+        href={href}
+        onClick={(e) => {
+          if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+          e.preventDefault();
+          onClick?.();
+        }}
+        onAuxClick={(e) => e.preventDefault()}
+        className={cls}
+      >
+        {icon}
+        <div className="text-left flex-1">
+          <div className="font-semibold leading-tight">{label}</div>
+          <div className="text-xs opacity-70 font-normal">{sub}</div>
+        </div>
+        <ChevronRight className="w-4 h-4 opacity-60" />
+      </a>
+    );
+  }
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 hover:scale-[1.01] active:scale-100 ${color}`}
-    >
+    <button onClick={onClick} className={cls}>
       {icon}
       <div className="text-left flex-1">
         <div className="font-semibold leading-tight">{label}</div>

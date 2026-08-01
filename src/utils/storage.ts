@@ -20,6 +20,7 @@ const STORAGE_KEYS = {
   PRODUCT_PURCHASES: 'laxmeejee_product_purchases',
   PRODUCT_STOCK_MOVEMENTS: 'laxmeejee_product_stock_movements',
   INVOICE_PAYMENTS: 'laxmeejee_invoice_payments',
+  PRODUCT_USAGE: 'laxmeejee_product_usage',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -522,6 +523,45 @@ export const storage = {
     };
     storage.saveProductStockMovement(movement);
     return movement;
+  },
+
+  // ─── Product Usage Tracking (Recently / Frequently Used) ─────────────────────
+
+  getProductUsage: (): Record<string, { count: number; lastUsed: string }> => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.PRODUCT_USAGE);
+      return data ? JSON.parse(data) : {};
+    } catch { return {}; }
+  },
+
+  recordProductUsage: (productName: string): void => {
+    if (!productName.trim()) return;
+    const key = productName.trim().toLowerCase();
+    const usage = storage.getProductUsage();
+    const existing = usage[key] || { count: 0, lastUsed: '' };
+    usage[key] = {
+      count: existing.count + 1,
+      lastUsed: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEYS.PRODUCT_USAGE, JSON.stringify(usage));
+  },
+
+  getRecentlyUsedProducts: (catalog: ProductCatalogItem[], limit = 10): ProductCatalogItem[] => {
+    const usage = storage.getProductUsage();
+    return Object.entries(usage)
+      .sort((a, b) => new Date(b[1].lastUsed).getTime() - new Date(a[1].lastUsed).getTime())
+      .slice(0, limit)
+      .map(([key]) => catalog.find(c => c.name.trim().toLowerCase() === key))
+      .filter((c): c is ProductCatalogItem => !!c);
+  },
+
+  getFrequentlyUsedProducts: (catalog: ProductCatalogItem[], limit = 10): ProductCatalogItem[] => {
+    const usage = storage.getProductUsage();
+    return Object.entries(usage)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, limit)
+      .map(([key]) => catalog.find(c => c.name.trim().toLowerCase() === key))
+      .filter((c): c is ProductCatalogItem => !!c);
   },
 };
 

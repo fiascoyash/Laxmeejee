@@ -1,8 +1,11 @@
 import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UNIT_OPTIONS } from '../types';
 import { generateId, calculateProductAmount, calculateTaxSummary, calculateRoundOff, calculateGrandTotalAmount, roundTo2, getExpiryStatus, isLowStock, getDaysUntilExpiry } from '../utils/storage';
+import { storage } from '../utils/storage';
 import { Plus, Trash2, Package, ChevronDown, Settings2, AlertTriangle, AlertCircle, Clock, PackagePlus } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { SaveProductDialog } from './SaveProductDialog';
+import { ProductAutocomplete } from './ProductAutocomplete';
+import { useEscapeStack } from '../hooks/useEscapeStack';
 
 interface Props {
   products: Product[];
@@ -48,14 +51,15 @@ const getBuiltinColumns = (): Record<string, TableColumn> => ({
 
 export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema, onSaveNewProduct }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
-  const [saveDialogProduct, setSaveDialogProduct] = useState<Product | null>(null);
+  useEscapeStack(showCatalog ? () => { setShowCatalog(false); setCatalogSearch(''); } : null, 1);  const [saveDialogProduct, setSaveDialogProduct] = useState<Product | null>(null);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const columnSettingsRef = useRef<HTMLDivElement>(null);
   const catalogRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const catalogSearchRef = useRef<HTMLInputElement>(null);
-  const [catalogSearch, setCatalogSearch] = useState('');
   const [highlightedCatalogIndex, setHighlightedCatalogIndex] = useState(0);
+  const [recentlyUsed] = useState<ProductCatalogItem[]>(() => storage.getRecentlyUsedProducts(catalog));
+  const [frequentlyUsed] = useState<ProductCatalogItem[]>(() => storage.getFrequentlyUsedProducts(catalog));
 
   const settings = templateSettings || DEFAULT_TEMPLATE_SETTINGS;
 
@@ -118,9 +122,6 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
         if (item) {
           addFromCatalog(item);
         }
-      } else if (e.key === 'Escape') {
-        setShowCatalog(false);
-        setCatalogSearch('');
       }
     };
 
@@ -317,12 +318,35 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
           !catalog.some(c => c.name.trim().toLowerCase() === product.name.trim().toLowerCase());
         return (
           <div className="flex items-center gap-1">
-            <input
-              type="text"
+            <ProductAutocomplete
               value={product.name}
-              onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+              onChange={(val) => updateProduct(product.id, 'name', val)}
+              onSelect={(item) => {
+                onChange(products.map(p =>
+                  p.id === product.id ? {
+                    ...p,
+                    name: item.name,
+                    description: visibleKeys.has('description') ? (p.description || '') : undefined,
+                    hsnSacCode: item.hsnSacCode,
+                    gstPercent: item.gstPercent,
+                    unit: item.unit || 'piece',
+                    unitPrice: item.sellingPrice,
+                    isManualAmount: false,
+                    batchNumber: item.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
+                    expiryDate: item.expiryDate || (visibleKeys.has('expiryDate') ? '' : undefined),
+                    wattage: item.wattage || (visibleKeys.has('wattage') ? 0 : undefined),
+                    partNumber: item.partNumber || (visibleKeys.has('partNumber') ? '' : undefined),
+                    vehicleModel: item.modelNumber || (visibleKeys.has('vehicleModel') ? '' : undefined),
+                    warrantyMonths: item.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
+                    serialNumber: item.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
+                    attributes: item.attributes ? { ...item.attributes } : undefined,
+                  } : p
+                ));
+              }}
+              catalog={catalog}
+              recentlyUsed={recentlyUsed}
+              frequentlyUsed={frequentlyUsed}
               className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
-              placeholder="Product/Service name"
             />
             {isNew && (
               <button
@@ -788,12 +812,35 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               <div className="flex-1">
                 <div className="text-xs text-slate-500 mb-1">#{index + 1}</div>
                 <div className="flex items-center gap-1">
-                  <input
-                    type="text"
+                  <ProductAutocomplete
                     value={product.name}
-                    onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                    onChange={(val) => updateProduct(product.id, 'name', val)}
+                    onSelect={(item) => {
+                      onChange(products.map(p =>
+                        p.id === product.id ? {
+                          ...p,
+                          name: item.name,
+                          description: visibleKeys.has('description') ? (p.description || '') : undefined,
+                          hsnSacCode: item.hsnSacCode,
+                          gstPercent: item.gstPercent,
+                          unit: item.unit || 'piece',
+                          unitPrice: item.sellingPrice,
+                          isManualAmount: false,
+                          batchNumber: item.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
+                          expiryDate: item.expiryDate || (visibleKeys.has('expiryDate') ? '' : undefined),
+                          wattage: item.wattage || (visibleKeys.has('wattage') ? 0 : undefined),
+                          partNumber: item.partNumber || (visibleKeys.has('partNumber') ? '' : undefined),
+                          vehicleModel: item.modelNumber || (visibleKeys.has('vehicleModel') ? '' : undefined),
+                          warrantyMonths: item.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
+                          serialNumber: item.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
+                          attributes: item.attributes ? { ...item.attributes } : undefined,
+                        } : p
+                      ));
+                    }}
+                    catalog={catalog}
+                    recentlyUsed={recentlyUsed}
+                    frequentlyUsed={frequentlyUsed}
                     className="flex-1 min-w-0 px-3 py-2 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 text-sm min-h-[44px]"
-                    placeholder="Product/Service name"
                   />
                   {onSaveNewProduct &&
                     product.name.trim().length > 0 &&

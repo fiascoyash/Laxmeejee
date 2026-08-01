@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useEscapeStack } from './hooks/useEscapeStack';
 import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment } from './types';
 import { storage, generateId, generateQuotationNumber, generateInvoiceNumber, convertQuotationToInvoice, calculateTaxSummary, getDefaultProductColumns, incrementQuotationNumber, incrementInvoiceNumber, calculateRoundOff, roundTo2, calculateGrandTotalAmount, bulkMarkInvoicesPaid } from './utils/storage';
 import { CompanyProfile as CompanyProfileModal } from './components/CompanyProfile';
@@ -33,8 +34,16 @@ import { createClient } from '@supabase/supabase-js';
 
 type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports';
 
+const VALID_VIEWS: View[] = ['home', 'selectTemplate', 'new', 'list', 'catalog', 'settings', 'templates', 'newInvoice', 'invoiceList', 'editInvoice', 'customers', 'suppliers', 'smartImport', 'gstReports'];
+
+function getViewFromHash(): View {
+  const hash = window.location.hash.replace('#', '');
+  if (VALID_VIEWS.includes(hash as View)) return hash as View;
+  return 'home';
+}
+
 function App() {
-  const [view, setView] = useState<View>('home');
+  const [view, setView] = useState<View>(getViewFromHash);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Company Profile State
@@ -119,6 +128,16 @@ function App() {
   const [editingSupplier, setEditingSupplier] = useState<SupplierData | null>(null);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [viewingSupplier, setViewingSupplier] = useState<SupplierData | null>(null);
+
+  // Sync view state to URL hash and listen for hashchange (back/forward)
+  useEffect(() => {
+    const handleHashChange = () => {
+      setView(getViewFromHash());
+      setSidebarOpen(false);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Load data on mount
   useEffect(() => {
@@ -299,63 +318,42 @@ function App() {
     };
   }, [view, selectedTemplateId, customer, products, gstMode, editingInvoice, editingQuotationId, quotationNumber, quotationDate, shipTo, productColumns, quotation]);
 
-  // ESC key handler to close active modals/screens (layer by layer)
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        // Close keyboard shortcuts modal first
-        if (showShortcutsModal) {
-          setShowShortcutsModal(false);
-          return;
-        }
-        // Close highest active layer first (preview modal)
-        if (previewingTemplate) {
-          setPreviewingTemplate(null);
-          setPreviewType('quotation');
-          return;
-        }
-        // Close template builder
-        if (showTemplateBuilder) {
-          setShowTemplateBuilder(false);
-          setEditingTemplate(null);
-          return;
-        }
-        // Close company profile modal
-        if (showCompanyProfile) {
-          setShowCompanyProfile(false);
-          return;
-        }
-        // Close edit invoice screen
-        if (editingInvoice) {
-          setEditingInvoice(null);
-          setView('invoiceList');
-          return;
-        }
-        // Close edit quotation screen (if on 'new' view with editingQuotationId)
-        if (view === 'new' && editingQuotationId) {
-          resetForm();
-          setView('home');
-          return;
-        }
-        // Close new quotation screen (if on 'new' view without editing)
-        if (view === 'new') {
-          resetForm();
-          setView('home');
-          return;
-        }
-        // Navigate to Dashboard from any other page
-        if (view !== 'home') {
-          setView('home');
-          return;
-        }
-      }
-    };
+  // Centralized ESC handling via escape stack.
+  // Each overlay registers itself with a priority. The provider's capture-phase
+  // listener calls only the topmost handler. Page-level back navigation is
+  // priority 5 so it only fires when no overlays remain.
+  useEscapeStack(showShortcutsModal ? () => setShowShortcutsModal(false) : null, 3);
+  useEscapeStack(previewingTemplate ? () => { setPreviewingTemplate(null); setPreviewType('quotation'); } : null, 3);
+  useEscapeStack(showTemplateBuilder ? () => { setShowTemplateBuilder(false); setEditingTemplate(null); } : null, 3);
+  useEscapeStack(showCompanyProfile ? () => setShowCompanyProfile(false) : null, 3);
+  useEscapeStack(paymentInvoice ? () => setPaymentInvoice(null) : null, 3);
+  useEscapeStack(pendingSaveInvoice ? () => setPendingSaveInvoice(null) : null, 3);
+  useEscapeStack(duplicateQtWarning ? () => setDuplicateQtWarning(null) : null, 3);
+  useEscapeStack(duplicateInvWarning ? () => setDuplicateInvWarning(null) : null, 3);
+  useEscapeStack(similarQtPending ? () => setSimilarQtPending(null) : null, 3);
+  useEscapeStack(similarInvPending ? () => setSimilarInvPending(null) : null, 3);
+  useEscapeStack(viewingCustomer ? () => setViewingCustomer(null) : null, 3);
+  useEscapeStack(viewingSupplier ? () => setViewingSupplier(null) : null, 3);
+  useEscapeStack(showCustomerForm ? () => setShowCustomerForm(false) : null, 3);
+  useEscapeStack(showSupplierForm ? () => setShowSupplierForm(false) : null, 3);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [showShortcutsModal, previewingTemplate, showTemplateBuilder, showCompanyProfile, editingInvoice, view, editingQuotationId]);
+  // Page-level back navigation (priority 5 — lowest, fires only when no overlays active)
+  useEscapeStack(
+    editingInvoice ? () => { setEditingInvoice(null); navigateTo('invoiceList'); } : null,
+    4,
+  );
+  useEscapeStack(
+    (view === 'new' && editingQuotationId) ? () => { resetForm(); navigateTo('list'); } : null,
+    4,
+  );
+  useEscapeStack(
+    (view === 'new' && !editingQuotationId) ? () => { resetForm(); navigateTo('home'); } : null,
+    5,
+  );
+  useEscapeStack(
+    (view !== 'home' && view !== 'new' && !editingInvoice) ? () => navigateTo('home') : null,
+    5,
+  );
 
   // Navigate to a view, clearing any edit states
   const navigateTo = (targetView: View) => {
@@ -365,7 +363,11 @@ function App() {
     if (view === 'new' || view === 'selectTemplate') {
       resetForm();
     }
-    setView(targetView);
+    if (getViewFromHash() !== targetView) {
+      window.location.hash = targetView;
+    } else {
+      setView(targetView);
+    }
     setSidebarOpen(false);
   };
 
@@ -586,6 +588,7 @@ function App() {
 
   const commitQuotationSave = (newQuotation: Quotation, isNew: boolean) => {
     storage.saveQuotation(newQuotation);
+    newQuotation.products.forEach(p => storage.recordProductUsage(p.name));
     if (isNew) incrementQuotationNumber();
     setQuotations(storage.getQuotations());
     alert(isNew ? 'Quotation saved successfully!' : 'Quotation updated successfully!');
@@ -760,6 +763,7 @@ function App() {
 
     storage.saveInvoice(invoiceToPersist);
     if (isNewInvoice) incrementInvoiceNumber();
+    invoiceToPersist.products.forEach(p => storage.recordProductUsage(p.name));
 
     if (paymentToRecord) {
       storage.addPayment(paymentToRecord);
@@ -1334,8 +1338,14 @@ function App() {
     currentView: View;
     targetView: View;
   }) => (
-    <button
-      onClick={() => navigateTo(targetView)}
+    <a
+      href={`#${targetView}`}
+      onClick={(e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
+        navigateTo(targetView);
+      }}
+      onAuxClick={(e) => { e.preventDefault(); }}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
         currentView === targetView
           ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
@@ -1344,7 +1354,7 @@ function App() {
     >
       <Icon className="w-5 h-5" />
       <span className="font-medium">{label}</span>
-    </button>
+    </a>
   );
 
   const selectedTemplate = getCurrentTemplate();
@@ -1445,12 +1455,17 @@ function App() {
         <header className="hidden lg:block bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-slate-500">
-              <button
-                onClick={() => navigateTo('home')}
+              <a
+                href="#home"
+                onClick={(e) => {
+                  if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+                  e.preventDefault();
+                  navigateTo('home');
+                }}
                 className="hover:text-emerald-600 transition-colors"
               >
                 Dashboard
-              </button>
+              </a>
               {view !== 'home' && (
                 <>
                   <ChevronRight className="w-4 h-4" />
@@ -1536,12 +1551,14 @@ function App() {
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-md text-sm">
                       <Layout className="w-4 h-4 text-purple-600" />
                       <span className="text-purple-700 font-medium">{selectedTemplate.name}</span>
-                      <button
-                        onClick={() => setView('selectTemplate')}
+                      <a
+                        href="#selectTemplate"
+                        onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); setView('selectTemplate'); }}
+                        onAuxClick={(e) => e.preventDefault()}
                         className="text-purple-600 hover:text-purple-800 text-xs underline"
                       >
                         Change
-                      </button>
+                      </a>
                     </div>
                   )}
                   <input
@@ -1745,13 +1762,15 @@ function App() {
             <div className="max-w-4xl mx-auto">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Quotation History</h2>
-                <button
-                  onClick={startNewQuotation}
+                <a
+                  href="#selectTemplate"
+                  onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); startNewQuotation(); }}
+                  onAuxClick={(e) => e.preventDefault()}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
                 >
                   <FileText className="w-4 h-4" />
                   New Quotation
-                </button>
+                </a>
               </div>
               <QuotationList
                 quotations={quotations}
@@ -1771,19 +1790,23 @@ function App() {
               <h2 className="text-xl font-bold text-gray-800 mb-2">Create New Invoice</h2>
               <p className="text-gray-500 mb-6">Start a blank invoice or convert from a quotation.</p>
               <div className="flex justify-center gap-3">
-                <button
-                  onClick={startNewInvoice}
+                <a
+                  href="#newInvoice"
+                  onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); startNewInvoice(); }}
+                  onAuxClick={(e) => e.preventDefault()}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                 >
                   <Receipt className="w-5 h-5" />
                   Blank Invoice
-                </button>
-                <button
-                  onClick={() => navigateTo('list')}
+                </a>
+                <a
+                  href="#list"
+                  onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); navigateTo('list'); }}
+                  onAuxClick={(e) => e.preventDefault()}
                   className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   From Quotation
-                </button>
+                </a>
               </div>
             </div>
           )}
@@ -1811,13 +1834,15 @@ function App() {
             <div className="max-w-4xl mx-auto">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Invoice History</h2>
-                <button
-                  onClick={startNewInvoice}
+                <a
+                  href="#newInvoice"
+                  onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); startNewInvoice(); }}
+                  onAuxClick={(e) => e.preventDefault()}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
                 >
                   <Receipt className="w-4 h-4" />
                   New Invoice
-                </button>
+                </a>
               </div>
               <InvoiceList
                 invoices={invoices}
@@ -1942,8 +1967,10 @@ function App() {
                     <ChevronRight className="w-5 h-5 text-gray-400" />
                   </button>
 
-                  <button
-                    onClick={() => navigateTo('templates')}
+                  <a
+                    href="#templates"
+                    onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); navigateTo('templates'); }}
+                    onAuxClick={(e) => e.preventDefault()}
                     className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
@@ -1954,10 +1981,12 @@ function App() {
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-gray-400" />
-                  </button>
+                  </a>
 
-                  <button
-                    onClick={() => navigateTo('catalog')}
+                  <a
+                    href="#catalog"
+                    onClick={(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return; e.preventDefault(); navigateTo('catalog'); }}
+                    onAuxClick={(e) => e.preventDefault()}
                     className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
@@ -1968,7 +1997,7 @@ function App() {
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-gray-400" />
-                  </button>
+                  </a>
                 </div>
               </div>
 

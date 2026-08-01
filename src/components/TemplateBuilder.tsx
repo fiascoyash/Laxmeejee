@@ -11,6 +11,7 @@ import {
   ArrowUp, ArrowDown, Undo2, Redo2, Copy, Keyboard, X, PanelLeftClose, PanelLeft, Shield, Package, Hammer
 } from 'lucide-react';
 import { useTemplateHistory } from '../hooks/useTemplateHistory';
+import { useEscapeStack } from '../hooks/useEscapeStack';
 import { TemplateSettingsPanel } from './TemplateSettingsPanel';
 import { DocumentRenderer } from './DocumentRenderer';
 
@@ -129,8 +130,17 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+
+  // Register sub-layers with escape stack (priority 1 = dropdowns/panels, 2 = small popups)
+  useEscapeStack(showShortcutsHelp ? () => setShowShortcutsHelp(false) : null, 2);
+  useEscapeStack(showColumnSettings ? () => setShowColumnSettings(false) : null, 2);
+  useEscapeStack(showSettingsPanel ? () => setShowSettingsPanel(false) : null, 2);
   const [selectedZone, setSelectedZone] = useState<BlockZone | null>(null);
   const [selectedTypographyElement, setSelectedTypographyElement] = useState<TypographyElementId | undefined>(undefined);
+
+  // Register sub-layers with escape stack
+  useEscapeStack(showAddBlock ? () => { setShowAddBlock(false); setSelectedZone(null); } : null, 2);
+  useEscapeStack(selectedBlock ? () => setSelectedBlock(null) : null, 3);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const isUndoRedoRef = useRef(false);
@@ -365,13 +375,7 @@ export function TemplateBuilder({ template, companyProfile, sampleData, onSave, 
         return;
       }
 
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setSelectedBlock(null);
-        setShowAddBlock(false);
-        setShowShortcutsHelp(false);
-        return;
-      }
+
     };
 
     window.addEventListener('keydown', handleKeyDown);

@@ -1,6 +1,7 @@
 import { Customer, ShipTo, TemplateField, CustomerData } from '../types';
 import { User, MapPin, Phone, MapPinned, Truck, Copy, Save, Clock } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEscapeStack } from '../hooks/useEscapeStack';
 import { storage, generateId } from '../utils/storage';
 import { sanitizeMobile, sanitizeGstin, isValidMobile, isValidGstin } from '../utils/validation';
 
@@ -104,15 +105,18 @@ export function CustomerDetails({ customer, onChange, shipTo, onShipToChange, cu
         e.preventDefault();
         handleSelectCustomer(suggestions[highlightedSuggestionRef.current]);
         highlightedSuggestionRef.current = -1;
-      } else if (e.key === 'Escape') {
-        setShowSuggestions(false);
-        highlightedSuggestionRef.current = -1;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showSuggestions, suggestions]);
+
+  // Register suggestions dropdown with escape stack (priority 1 = dropdowns)
+  useEscapeStack(
+    showSuggestions && suggestions.length > 0 ? () => { setShowSuggestions(false); highlightedSuggestionRef.current = -1; } : null,
+    1,
+  );
 
   // Field navigation with Enter/Shift+Enter
   const handleFieldKeyDown = (e: React.KeyboardEvent, currentFieldId: string) => {
