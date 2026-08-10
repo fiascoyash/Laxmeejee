@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { ProductCatalogItem, UNIT_OPTIONS } from '../types';
 import { Package, Star, Clock, Search } from 'lucide-react';
 import { useEscapeStack } from '../hooks/useEscapeStack';
@@ -15,6 +15,7 @@ interface Props {
 }
 
 const MAX_RESULTS = 8;
+const DROPDOWN_GAP = 4;
 
 export function ProductAutocomplete({
   value,
@@ -31,6 +32,11 @@ export function ProductAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({
+    position: 'fixed',
+    visibility: 'hidden',
+  });
 
   useEscapeStack(isOpen ? () => setIsOpen(false) : null, 1);
 
@@ -92,11 +98,64 @@ export function ProductAutocomplete({
     }
   }, [highlightedIndex, isOpen]);
 
+  // Compute fixed-position dropdown coordinates whenever it opens or the viewport changes.
+  const updateDropdownPosition = useCallback(() => {
+    if (!isOpen || !inputRef.current) {
+      setDropdownStyle(prev => ({ ...prev, visibility: 'hidden' }));
+      return;
+    }
+    const rect = inputRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - DROPDOWN_GAP;
+    const spaceAbove = rect.top - DROPDOWN_GAP;
+    const preferredMax = 360;
+
+    let openDownward = spaceBelow >= 200 || spaceBelow >= spaceAbove;
+    let maxHeight: number;
+    let top: number;
+
+    if (openDownward) {
+      maxHeight = Math.min(preferredMax, spaceBelow);
+      top = rect.bottom + DROPDOWN_GAP;
+    } else {
+      maxHeight = Math.min(preferredMax, spaceAbove);
+      top = Math.max(0, rect.top - DROPDOWN_GAP - maxHeight);
+    }
+
+    const width = Math.max(rect.width, 320);
+
+    setDropdownStyle({
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${rect.left}px`,
+      width: `${width}px`,
+      maxHeight: `${Math.max(120, maxHeight)}px`,
+      overflowY: 'auto',
+      visibility: 'visible',
+      zIndex: 9999,
+    });
+  }, [isOpen]);
+
+  useLayoutEffect(() => {
+    updateDropdownPosition();
+  }, [updateDropdownPosition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handle = () => updateDropdownPosition();
+    window.addEventListener('scroll', handle, true);
+    window.addEventListener('resize', handle);
+    return () => {
+      window.removeEventListener('scroll', handle, true);
+      window.removeEventListener('resize', handle);
+    };
+  }, [isOpen, updateDropdownPosition]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (listRef.current?.contains(target)) return;
+      setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -162,22 +221,25 @@ export function ProductAutocomplete({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full">
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={(e) => { onChange(e.target.value); setIsOpen(true); }}
-        onFocus={() => setIsOpen(true)}
-        onKeyDown={handleKeyDown}
-        className={className || 'w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500'}
-        placeholder={placeholder}
-        autoComplete="off"
-      />
+    <>
+      <div ref={containerRef} className="relative w-full">
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => { onChange(e.target.value); setIsOpen(true); }}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+          className={className || 'w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500'}
+          placeholder={placeholder}
+          autoComplete="off"
+        />
+      </div>
       {isOpen && (
         <div
           ref={listRef}
-          className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-80 overflow-y-auto min-w-[320px]"
+          style={dropdownStyle}
+          className="bg-white border border-slate-200 rounded-lg shadow-lg min-w-[320px]"
         >
           {totalItems === 0 ? (
             <div className="p-4 text-slate-500 text-center text-sm">
@@ -217,6 +279,6 @@ export function ProductAutocomplete({
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }

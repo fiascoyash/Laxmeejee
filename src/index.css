@@ -118,6 +118,115 @@
   }
 }
 
+/* ── Landing page animations ──────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-32px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(32px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes floatGentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(2deg); }
+}
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+@keyframes brandCrossfade {
+  0%, 18% { opacity: 1; transform: translateY(0); }
+  22%, 28% { opacity: 0; transform: translateY(-10px); }
+  32%, 48% { opacity: 1; transform: translateY(0); }
+  52%, 58% { opacity: 0; transform: translateY(10px); }
+  62%, 100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmerText {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes countUp {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes orbitFloat {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(8px, -6px); }
+  50% { transform: translate(-4px, -10px); }
+  75% { transform: translate(-8px, 4px); }
+}
+@keyframes softScale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+@keyframes floatCard {
+  0% { opacity: 0; transform: translateY(12px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.landing-fade-up { animation: fadeInUp 0.7s ease-out both; }
+.landing-fade-in { animation: fadeIn 0.8s ease-out both; }
+.landing-slide-left { animation: slideInLeft 0.7s ease-out both; }
+.landing-slide-right { animation: slideInRight 0.7s ease-out both; }
+.landing-float { animation: floatGentle 4s ease-in-out infinite; }
+.landing-float-slow { animation: floatSlow 6s ease-in-out infinite; }
+.landing-pulse-glow { animation: pulseGlow 3s ease-in-out infinite; }
+.landing-orbit { animation: orbitFloat 5s ease-in-out infinite; }
+
+.landing-brand-stack {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+.landing-brand-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.landing-brand-layer.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+.landing-brand-layer.exit-up {
+  opacity: 0;
+  transform: translateY(-16px);
+}
+.landing-brand-layer.exit-down {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-fade-up,
+  .landing-fade-in,
+  .landing-slide-left,
+  .landing-slide-right,
+  .landing-float,
+  .landing-float-slow,
+  .landing-pulse-glow,
+  .landing-orbit {
+    animation: none !important;
+  }
+}
+
 /* ── Enterprise Print Center — print-only styles ──────────────────────────── */
 /* When the Print Center triggers window.print(), only the cloned document
    inside #print-center-print-area should be visible. Everything else —

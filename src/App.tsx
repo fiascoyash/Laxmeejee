@@ -33,15 +33,16 @@ import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
 import { PrintCenter } from './components/PrintCenter';
 import { Printer } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
+import { LandingPage } from './components/LandingPage';
 
-type View = 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports';
+type View = 'landing' | 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports';
 
-const VALID_VIEWS: View[] = ['home', 'selectTemplate', 'new', 'list', 'catalog', 'settings', 'templates', 'newInvoice', 'invoiceList', 'editInvoice', 'customers', 'suppliers', 'smartImport', 'gstReports'];
+const VALID_VIEWS: View[] = ['landing', 'home', 'selectTemplate', 'new', 'list', 'catalog', 'settings', 'templates', 'newInvoice', 'invoiceList', 'editInvoice', 'customers', 'suppliers', 'smartImport', 'gstReports'];
 
 function getViewFromHash(): View {
   const hash = window.location.hash.replace('#', '');
   if (VALID_VIEWS.includes(hash as View)) return hash as View;
-  return 'home';
+  return 'landing';
 }
 
 function App() {
@@ -1458,6 +1459,14 @@ function App() {
     ? storage.getTemplateById(editingInvoice.selectedTemplateId)
     : storage.getDefaultTemplate();
 
+  const enterApp = () => {
+    navigateTo('home');
+  };
+
+  if (view === 'landing') {
+    return <LandingPage onEnterApp={enterApp} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Mobile Header */}
@@ -1471,7 +1480,7 @@ function App() {
           </button>
           <div className="flex items-center gap-2">
             <Sun className="w-6 h-6 text-emerald-500" />
-            <span className="font-bold text-slate-800">Laxmeejee</span>
+            <span className="font-bold text-slate-800">Hisaaboo</span>
           </div>
           <button
             onClick={() => setShowCompanyProfile(true)}
@@ -1497,8 +1506,8 @@ function App() {
         }`}
       >
         <div className="p-6 border-b border-slate-700">
-          <h1 className="text-2xl font-bold text-white tracking-tight">Laxmeejee</h1>
-          <p className="text-slate-400 text-sm mt-1">GST Invoice System</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Hisaaboo</h1>
+          <p className="text-slate-400 text-sm mt-1">Hisaab rakho. Business chalao.</p>
         </div>
 
         <nav className="flex-1 py-6 overflow-y-auto">
