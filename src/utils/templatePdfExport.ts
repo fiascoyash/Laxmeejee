@@ -12,6 +12,7 @@ import {
   calculateProductAmount, calculateTaxSummary,
   calculateRoundOff, numberToWords, roundTo2, calculateGrandTotalAmount,
 } from './storage';
+import { getComplianceItemsForDocument } from './complianceDisplay';
 
 export type DocumentType = 'quotation' | 'invoice';
 
@@ -239,6 +240,13 @@ const generatePosReceipt = (
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(FS_SMALL);
     doc.text(`GSTIN: ${company.gstNumber}`, centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+    y += lh(FS_SMALL) + 0.5;
+  }
+
+  for (const item of getComplianceItemsForDocument(company, documentType)) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(FS_SMALL);
+    doc.text(`${item.label}: ${item.value}`, centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
     y += lh(FS_SMALL) + 0.5;
   }
 
@@ -752,6 +760,10 @@ const generateVectorPDF = async (
   if (settings.showGstin && company.gstNumber) {
     headerContentHeight += headerLineGap + lineHeightMm(companyGstinTypo.fontSizePt);
   }
+  const complianceItems = getComplianceItemsForDocument(company, documentType);
+  for (const _ of complianceItems) {
+    headerContentHeight += headerLineGap + lineHeightMm(companyGstinTypo.fontSizePt);
+  }
   if (settings.showPhone && company.phone) {
     headerContentHeight += pxToMm(2) * fontScale + lineHeightMm(companyPhoneTypo.fontSizePt);
   }
@@ -814,6 +826,11 @@ const generateVectorPDF = async (
       doc.text(`GSTIN ${company.gstNumber}`, centerX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8, { align: 'center' });
       cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
     }
+    for (const item of complianceItems) {
+      setFont(companyGstinTypo);
+      doc.text(`${item.label} ${item.value}`, centerX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8, { align: 'center' });
+      cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
+    }
     if (settings.showPhone && company.phone) {
       setFont(companyPhoneTypo);
       const phoneLine = company.email ? `Phone: ${company.phone}  Email: ${company.email}` : `Phone: ${company.phone}`;
@@ -862,6 +879,11 @@ const generateVectorPDF = async (
       doc.text(`GSTIN ${company.gstNumber}`, rightX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8, { align: 'right' });
       cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
     }
+    for (const item of complianceItems) {
+      setFont(companyGstinTypo);
+      doc.text(`${item.label} ${item.value}`, rightX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8, { align: 'right' });
+      cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
+    }
     if (settings.showPhone && company.phone) {
       setFont(companyPhoneTypo);
       const phoneLine = company.email ? `Phone: ${company.phone}  Email: ${company.email}` : `Phone: ${company.phone}`;
@@ -885,6 +907,11 @@ const generateVectorPDF = async (
     if (settings.showGstin && company.gstNumber) {
       setFont(companyGstinTypo);
       doc.text(`GSTIN ${company.gstNumber}`, textX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8);
+      cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
+    }
+    for (const item of complianceItems) {
+      setFont(companyGstinTypo);
+      doc.text(`${item.label} ${item.value}`, textX, cy + lineHeightMm(companyGstinTypo.fontSizePt) * 0.8);
       cy += lineHeightMm(companyGstinTypo.fontSizePt) + headerLineGap;
     }
     if (settings.showPhone && company.phone) {

@@ -24,6 +24,7 @@ import {
   calculateProductAmount, calculateTaxSummary,
   calculateRoundOff, numberToWords, roundTo2, calculateGrandTotalAmount,
 } from '../utils/storage';
+import { getComplianceItemsForDocument } from '../utils/complianceDisplay';
 
 export type DocType = 'quotation' | 'invoice';
 
@@ -622,6 +623,11 @@ export function DocumentRenderer({
             </T>
           </div>
         )}
+        {getComplianceItemsForDocument(company, docType).map((item) => (
+          <div key={item.label} style={{ marginTop: '2px', fontSize: `${12 * fontScale}px`, color: style.headerTextColor }}>
+            {item.label}&nbsp;<strong>{item.value}</strong>
+          </div>
+        ))}
         {settings.showPhone && company.phone && (
           <div style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: align === 'center' ? 'center' : 'flex-start' }}>
             <span>📞</span> <T id="company_phone">{company.phone}</T>

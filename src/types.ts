@@ -781,6 +781,7 @@ export type TypographyElementId =
   | 'company_name'
   | 'company_address'
   | 'company_gstin'
+  | 'company_compliance'
   | 'company_phone'
   | 'company_email'
   | 'doc_title'
@@ -844,6 +845,17 @@ export interface TypographyElementMeta {
   fontWeight: number;
   color: string;
   usesGlobal: boolean;
+}
+
+export type ComplianceBorderStyle = 'none' | 'bottom' | 'full';
+
+export interface ComplianceSectionStyle {
+  textAlign: 'left' | 'center' | 'right';
+  lineSpacing: number;
+  spacingBefore: number;
+  spacingAfter: number;
+  border: ComplianceBorderStyle;
+  borderColor: string;
 }
 
 // ─── Style Themes (Level 2) ──────────────────────────────────────────────────
@@ -1172,6 +1184,14 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   // NEW defaults
   globalDefaultFontSize: 12,
   typographyOverrides: {},
+  complianceSectionStyle: {
+    textAlign: 'left',
+    lineSpacing: 3,
+    spacingBefore: 3,
+    spacingAfter: 2,
+    border: 'none',
+    borderColor: '#CCCCCC',
+  },
   styleThemeId: DEFAULT_STYLE_THEME_ID,
 };
 
@@ -1180,6 +1200,7 @@ export const DEFAULT_TYPOGRAPHY_VALUES: Record<TypographyElementId, { fontSize: 
   company_name: { fontSize: 28, fontWeight: 700, color: '#000000' },
   company_address: { fontSize: 10, fontWeight: 400, color: '#000000' },
   company_gstin: { fontSize: 10, fontWeight: 700, color: '#000000' },
+  company_compliance: { fontSize: 10, fontWeight: 400, color: '#000000' },
   company_phone: { fontSize: 10, fontWeight: 400, color: '#000000' },
   company_email: { fontSize: 10, fontWeight: 400, color: '#000000' },
   doc_title: { fontSize: 22, fontWeight: 700, color: '#000000' },
