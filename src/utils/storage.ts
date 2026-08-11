@@ -52,6 +52,8 @@ export const storage = {
       bankIfsc: '',
       bankBranch: '',
       signature: '',
+      businessType: 'general',
+      compliance: {},
     };
   },
 

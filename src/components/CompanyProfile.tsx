@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { CompanyProfile as CompanyProfileType, BusinessType, BUSINESS_TYPE_OPTIONS } from '../types';
-import { Building2, Mail, Phone, MapPin, Save, Upload, X, Briefcase } from 'lucide-react';
+import { CompanyProfile as CompanyProfileType, BusinessType, BUSINESS_TYPE_OPTIONS, businessComplianceConfig, ComplianceFieldKey, ComplianceEntry, complianceValidation } from '../types';
+import { Building2, Mail, Phone, MapPin, Save, Upload, X, Briefcase, ShieldCheck } from 'lucide-react';
 import { sanitizeMobile, sanitizeGstin, isValidMobile, isValidGstin } from '../utils/validation';
+import { sanitizeComplianceValue, validateComplianceValue, getComplianceHelpText } from '../utils/complianceValidation';
 
 interface Props {
   profile: CompanyProfileType;
@@ -9,8 +10,72 @@ interface Props {
   onClose: () => void;
 }
 
+/**
+ * Normalize a loaded compliance object into the new ComplianceEntry format.
+ * Old saved data may have plain string values instead of { value, showOnQuotation, showOnInvoice }.
+ */
+function normalizeCompliance(
+  raw: Partial<Record<ComplianceFieldKey, ComplianceEntry | string>> | undefined,
+): Partial<Record<ComplianceFieldKey, ComplianceEntry>> {
+  if (!raw) return {};
+  const result: Partial<Record<ComplianceFieldKey, ComplianceEntry>> = {};
+  for (const key of Object.keys(raw) as ComplianceFieldKey[]) {
+    const entry = raw[key];
+    if (typeof entry === 'string') {
+      result[key] = { value: entry, showOnQuotation: false, showOnInvoice: false };
+    } else if (entry && typeof entry === 'object') {
+      result[key] = {
+        value: entry.value || '',
+        showOnQuotation: entry.showOnQuotation ?? false,
+        showOnInvoice: entry.showOnInvoice ?? false,
+      };
+    }
+  }
+  return result;
+}
+
 export function CompanyProfile({ profile, onSave, onClose }: Props) {
-  const [formData, setFormData] = useState<CompanyProfileType>(profile);
+  const [formData, setFormData] = useState<CompanyProfileType>({
+    ...profile,
+    compliance: normalizeCompliance(profile.compliance as Partial<Record<ComplianceFieldKey, ComplianceEntry | string>> | undefined),
+  });
+
+  const complianceFields = businessComplianceConfig[formData.businessType || 'general'] || [];
+
+  const getEntry = (key: ComplianceFieldKey): ComplianceEntry => {
+    const existing = formData.compliance?.[key];
+    if (existing && typeof existing === 'object') {
+      return existing;
+    }
+    return { value: '', showOnQuotation: false, showOnInvoice: false };
+  };
+
+  const handleComplianceValueChange = (key: ComplianceFieldKey, raw: string) => {
+    const sanitized = sanitizeComplianceValue(key, raw);
+    setFormData(prev => {
+      const current = prev.compliance?.[key];
+      const entry: ComplianceEntry = typeof current === 'object' && current
+        ? { ...current, value: sanitized }
+        : { value: sanitized, showOnQuotation: false, showOnInvoice: false };
+      return {
+        ...prev,
+        compliance: { ...(prev.compliance || {}), [key]: entry },
+      };
+    });
+  };
+
+  const handleComplianceToggle = (key: ComplianceFieldKey, field: 'showOnQuotation' | 'showOnInvoice') => {
+    setFormData(prev => {
+      const current = prev.compliance?.[key];
+      const entry: ComplianceEntry = typeof current === 'object' && current
+        ? { ...current, [field]: !current[field] }
+        : { value: '', [field]: true, [(field === 'showOnQuotation' ? 'showOnInvoice' : 'showOnQuotation') as 'showOnInvoice' | 'showOnQuotation']: false };
+      return {
+        ...prev,
+        compliance: { ...(prev.compliance || {}), [key]: entry },
+      };
+    });
+  };
 
   const handleImageUpload = (field: 'logo' | 'signature') => {
     const input = document.createElement('input');
@@ -241,6 +306,94 @@ export function CompanyProfile({ profile, onSave, onClose }: Props) {
               </div>
             </div>
           </div>
+
+          {/* Business Compliance Details — full-width, industry-specific fields */}
+          {complianceFields.length > 0 && (
+            <div className="mt-6 bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+              <h3 className="font-semibold text-slate-800 mb-1 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                Business Compliance Details
+              </h3>
+
+              {/* Document Display sub-section */}
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-slate-700 mb-1">Document Display</h4>
+                <p className="text-xs text-slate-500">
+                  Choose which business compliance details should appear on your quotations and invoices.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {complianceFields.map(field => {
+                  const entry = getEntry(field.key);
+                  const error = validateComplianceValue(field.key, entry.value);
+                  const helpText = getComplianceHelpText(field.key, entry.value);
+                  const config = complianceValidation[field.key];
+                  const isComplete = config?.exactLength !== undefined && entry.value.length === config.exactLength;
+                  return (
+                    <div key={field.key} className="bg-white rounded-md p-3 border border-emerald-100">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">{field.label}</label>
+                          <input
+                            type="text"
+                            value={entry.value}
+                            onChange={(e) => handleComplianceValueChange(field.key, e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-emerald-500 bg-white font-mono ${
+                              error
+                                ? 'border-red-400 focus:border-red-500'
+                                : isComplete
+                                ? 'border-emerald-400 focus:border-emerald-500'
+                                : 'border-slate-300 focus:border-blue-500'
+                            } ${config?.uppercase ? 'uppercase' : ''}`}
+                            placeholder={field.placeholder || ''}
+                            maxLength={config?.maxLength}
+                          />
+                          {error && (
+                            <p className="text-xs text-red-500 mt-1">{error}</p>
+                          )}
+                          {!error && helpText && (
+                            <p className={`text-xs mt-1 ${isComplete ? 'text-emerald-600' : 'text-slate-500'}`}>
+                              {helpText}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Display toggles */}
+                        <div>
+                          <span className="block text-sm font-medium text-slate-700 mb-1">Display on:</span>
+                          <div className="flex items-center gap-4 h-[42px]">
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={entry.showOnQuotation}
+                                onChange={() => handleComplianceToggle(field.key, 'showOnQuotation')}
+                                className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span className="text-sm text-slate-700">Quotation</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={entry.showOnInvoice}
+                                onChange={() => handleComplianceToggle(field.key, 'showOnInvoice')}
+                                className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span className="text-sm text-slate-700">Invoice</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs text-slate-500 mt-3">
+                Fields shown are based on the selected Business Type. Values are saved with your profile and preserved when switching types.
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
             <button

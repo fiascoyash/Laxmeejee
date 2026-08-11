@@ -12,7 +12,152 @@ export interface CompanyProfile {
   signature: string;
   // Business Type
   businessType?: BusinessType;
+  // Business Compliance Details (industry-specific licence/registration numbers)
+  // Each field stores a value + per-document display toggles.
+  compliance?: Partial<Record<ComplianceFieldKey, ComplianceEntry>>;
 }
+
+// A single compliance field entry: the licence/registration number plus
+// independent toggles controlling whether it appears on quotations/invoices.
+export interface ComplianceEntry {
+  value: string;
+  showOnQuotation: boolean;
+  showOnInvoice: boolean;
+}
+
+// Keys for all possible compliance fields across business types
+export interface BusinessComplianceFields {
+  pan: string;
+  msmeUdyam: string;
+  tradeLicence: string;
+  drugLicence: string;
+  fssai: string;
+  bisRegistration: string;
+  rtoTradeCertificate: string;
+  iec: string;
+  discomEmpanelment: string;
+  upnedaEmpanelment: string;
+  vendorEmpanelment: string;
+  reraRegistration: string;
+}
+
+export type ComplianceFieldKey = keyof BusinessComplianceFields;
+
+export interface ComplianceFieldConfig {
+  key: ComplianceFieldKey;
+  label: string;
+  placeholder?: string;
+}
+
+// Validation/sanitization rules per compliance field.
+export interface ComplianceValidationConfig {
+  maxLength: number;
+  exactLength?: number;
+  uppercase?: boolean;
+  digitsOnly?: boolean;
+  allowedChars?: string; // regex char-class body, e.g. "A-Z0-9-"
+  helpText?: string;
+}
+
+export const complianceValidation: Partial<Record<ComplianceFieldKey, ComplianceValidationConfig>> = {
+  pan: { maxLength: 10, exactLength: 10, uppercase: true, allowedChars: 'A-Z0-9', helpText: '10-character alphanumeric PAN' },
+  msmeUdyam: { maxLength: 19, uppercase: true, allowedChars: 'A-Z0-9-', helpText: 'Format: UDYAM-XX-00-0000000' },
+  fssai: { maxLength: 14, exactLength: 14, digitsOnly: true, helpText: '14-digit FSSAI number' },
+  iec: { maxLength: 10, exactLength: 10, uppercase: true, allowedChars: 'A-Z0-9', helpText: '10-character alphanumeric IEC' },
+  tradeLicence: { maxLength: 30, allowedChars: 'A-Za-z0-9\-/', helpText: 'Letters, numbers, hyphens, slashes' },
+  drugLicence: { maxLength: 30, allowedChars: 'A-Za-z0-9\-/', helpText: 'Letters, numbers, hyphens, slashes' },
+  bisRegistration: { maxLength: 20, uppercase: true, allowedChars: 'A-Z0-9-', helpText: 'Alphanumeric with hyphens' },
+  rtoTradeCertificate: { maxLength: 30, allowedChars: 'A-Za-z0-9\-/', helpText: 'Letters, numbers, hyphens, slashes' },
+  discomEmpanelment: { maxLength: 30, allowedChars: 'A-Za-z0-9\-/', helpText: 'Letters, numbers, hyphens, slashes' },
+  upnedaEmpanelment: { maxLength: 30, allowedChars: 'A-Za-z0-9\-/', helpText: 'Letters, numbers, hyphens, slashes' },
+  vendorEmpanelment: { maxLength: 30, allowedChars: 'A-Za-z0-9\-/', helpText: 'Letters, numbers, hyphens, slashes' },
+  reraRegistration: { maxLength: 30, allowedChars: 'A-Za-z0-9\-/', helpText: 'Letters, numbers, hyphens, slashes' },
+};
+
+// Maps each business type to the compliance fields it should display.
+// The GST Number field remains in its existing location and is NOT
+// duplicated here.
+export const businessComplianceConfig: Partial<Record<BusinessType, ComplianceFieldConfig[]>> = {
+  pharmacy_medical: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+    { key: 'drugLicence', label: 'Drug Licence No.' },
+  ],
+  restaurant_hotel: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+    { key: 'fssai', label: 'FSSAI No.', placeholder: '10020031000123' },
+  ],
+  jewellery: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+    { key: 'bisRegistration', label: 'BIS Registration No.' },
+  ],
+  automobile: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+    { key: 'rtoTradeCertificate', label: 'RTO Trade Certificate No.' },
+  ],
+  import_export: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+    { key: 'iec', label: 'IEC', placeholder: 'ABCDE1234F' },
+  ],
+  solar_vendor: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+    { key: 'discomEmpanelment', label: 'DISCOM Empanelment No.' },
+    { key: 'upnedaEmpanelment', label: 'UPNEDA Empanelment No.' },
+    { key: 'vendorEmpanelment', label: 'Vendor/Empanelment No.' },
+  ],
+  real_estate: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+    { key: 'reraRegistration', label: 'RERA Registration No.' },
+  ],
+  general: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+  ],
+  retail_garments: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+  ],
+  education: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+  ],
+  electronics_mobile: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+  ],
+  service: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+  ],
+  hardware_cement: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+  ],
+  custom: [
+    { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+    { key: 'msmeUdyam', label: 'MSME/Udyam No.', placeholder: 'UDYAM-XX-00-0000000' },
+    { key: 'tradeLicence', label: 'Trade Licence No.' },
+  ],
+};
 
 // Business Types for Company Profile
 export type BusinessType =
@@ -26,6 +171,9 @@ export type BusinessType =
   | 'automobile'
   | 'service'
   | 'hardware_cement'
+  | 'import_export'
+  | 'solar_vendor'
+  | 'real_estate'
   | 'custom';
 
 // Business Type Options for Dropdown
@@ -40,6 +188,9 @@ export const BUSINESS_TYPE_OPTIONS: { value: BusinessType; label: string }[] = [
   { value: 'automobile', label: 'Automobile / Spare Parts' },
   { value: 'service', label: 'Service Business' },
   { value: 'hardware_cement', label: 'Hardware / Cement' },
+  { value: 'import_export', label: 'Import / Export' },
+  { value: 'solar_vendor', label: 'Solar Vendor' },
+  { value: 'real_estate', label: 'Real Estate' },
   { value: 'custom', label: 'Custom Business' },
 ];
 
@@ -135,6 +286,13 @@ export const BUSINESS_TYPE_FIELDS: Record<BusinessType, BusinessTypeFieldConfig[
     { key: 'brand', label: 'Brand', type: 'text', placeholder: 'Brand name' },
     { key: 'grade', label: 'Grade', type: 'text', placeholder: 'e.g., OPC 43' },
   ],
+  import_export: [],
+  solar_vendor: [
+    { key: 'wattage', label: 'Wattage (W)', type: 'text', placeholder: 'Wattage' },
+    { key: 'brand', label: 'Brand', type: 'text', placeholder: 'Brand name' },
+    { key: 'warrantyMonths', label: 'Warranty', type: 'text', placeholder: 'e.g., 25 years' },
+  ],
+  real_estate: [],
   custom: [],
 };
 
@@ -147,6 +305,7 @@ export const getIndustryTypeFromBusinessType = (businessType?: BusinessType): In
     case 'automobile': return 'automobile';
     case 'hardware_cement': return 'hardware';
     case 'service': return 'services';
+    case 'solar_vendor': return 'solar';
     default: return 'retail';
   }
 };
