@@ -552,6 +552,11 @@ export function TemplateSettingsPanel({
             checked={settings.showWatermark}
             onChange={(v) => updateSetting('showWatermark', v)}
           />
+          <SettingToggle
+            label="Show Hisaaboo Branding"
+            checked={settings.showHisaabooBranding ?? true}
+            onChange={(v) => updateSetting('showHisaabooBranding', v)}
+          />
         </SettingsSection>
       </div>
 

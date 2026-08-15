@@ -4,6 +4,7 @@ import {
   DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UnitType, IndustryType, ExpiryStatus, UNIT_OPTIONS,
   SupplierData, SupplierTransaction, ProductPurchase, ProductStockMovement, StockMovementType,
   InvoicePayment,
+  DocumentLabelsNotesSettings, DEFAULT_DOCUMENT_LABELS_NOTES, DocumentNoteConfig, COMMON_NOTE_DEFINITIONS,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -22,6 +23,7 @@ const STORAGE_KEYS = {
   PRODUCT_STOCK_MOVEMENTS: 'laxmeejee_product_stock_movements',
   INVOICE_PAYMENTS: 'laxmeejee_invoice_payments',
   PRODUCT_USAGE: 'laxmeejee_product_usage',
+  DOCUMENT_LABELS_NOTES: 'laxmeejee_document_labels_notes',
 };
 
 const getDefaultNumberingSettings = (): NumberingSettings => ({
@@ -211,6 +213,22 @@ export const storage = {
 
   saveNumberingSettings: (settings: NumberingSettings): void => {
     localStorage.setItem(STORAGE_KEYS.NUMBERING, JSON.stringify(settings));
+  },
+
+  // Document Labels & Notes
+  getDocumentLabelsNotes: (): DocumentLabelsNotesSettings => {
+    const data = localStorage.getItem(STORAGE_KEYS.DOCUMENT_LABELS_NOTES);
+    if (!data) return JSON.parse(JSON.stringify(DEFAULT_DOCUMENT_LABELS_NOTES));
+    try {
+      const parsed = JSON.parse(data) as DocumentLabelsNotesSettings;
+      return migrateDocumentLabelsNotes(parsed);
+    } catch {
+      return JSON.parse(JSON.stringify(DEFAULT_DOCUMENT_LABELS_NOTES));
+    }
+  },
+
+  saveDocumentLabelsNotes: (settings: DocumentLabelsNotesSettings): void => {
+    localStorage.setItem(STORAGE_KEYS.DOCUMENT_LABELS_NOTES, JSON.stringify(settings));
   },
 
   // Invoices

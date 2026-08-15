@@ -606,6 +606,15 @@ const generatePosReceipt = (
   doc.text('Computer-generated document. No signature required.', centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
   y += lh(FS_SMALL) + 2;
 
+  // ═══ SECTION 13: Hisaaboo Branding Footer ═══
+  if (settings.showHisaabooBranding !== false) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(FS_SMALL);
+    doc.setTextColor(156, 163, 175);
+    doc.text('Generated with Hisaaboo — Hisaab rakho. Business badhao.', centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+    y += lh(FS_SMALL) + 2;
+  }
+
   return y;
 };
 
@@ -769,7 +778,15 @@ const generateVectorPDF = async (
   }
   // Doc title + original for recipient on right side
   const rightSideHeight = lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(3) * fontScale + lineHeightMm(origForRecTypo.fontSizePt) + 2;
-  const headerHeight = headerPadTop + Math.max(headerContentHeight, rightSideHeight) + headerPadBottom;
+
+  // For center alignment, doc title sits ABOVE company info (stacked vertically),
+  // so total height = doc title + gap + company content height.
+  // For left/right alignment, they sit side-by-side, so use the taller of the two.
+  const isCenterAlign = headerAlign === 'center';
+  const docTitleStackHeight = isCenterAlign
+    ? lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(6) * fontScale + headerContentHeight
+    : 0;
+  const headerHeight = headerPadTop + Math.max(headerContentHeight, rightSideHeight, docTitleStackHeight) + headerPadBottom;
 
   // Fill header background
   doc.setFillColor(...headerBgRgb);
@@ -1651,6 +1668,19 @@ const generateVectorPDF = async (
   doc.setTextColor(170, 170, 170);
   doc.text('Computer-generated document. No signature required.', paperWidth / 2, y + lineHeightMm(footerStripTypo.fontSizePt) * 0.8, { align: 'center' });
   y += lineHeightMm(footerStripTypo.fontSizePt) + footerStripPadTop;
+
+  // ── Hisaaboo branding footer ───────────────────────────────────────────
+  if (settings.showHisaabooBranding !== false) {
+    ensureSpace(5);
+    const brandingFs = 9 * fontScale * PX_TO_PT;
+    const brandingPad = pxToMm(3) * fontScale;
+    y += brandingPad;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(brandingFs);
+    doc.setTextColor(156, 163, 175);
+    doc.text('Generated with Hisaaboo — Hisaab rakho. Business badhao.', paperWidth / 2, y + lineHeightMm(brandingFs) * 0.8, { align: 'center' });
+    y += lineHeightMm(brandingFs) + brandingPad;
+  }
 
   // ── Draw outer border (if theme has it) on all pages ────────────────────
   if (theme.outerBorder) {

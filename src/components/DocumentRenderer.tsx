@@ -1334,6 +1334,22 @@ export function DocumentRenderer({
     </div>
   );
 
+  // ── Hisaaboo branding footer ──────────────────────────────────────────────
+  const showBranding = settings.showHisaabooBranding !== false;
+  const HisaabooBranding = showBranding ? (
+    <div
+      style={{
+        ...secNoBorder,
+        padding: pad('3px 16px 5px'),
+        textAlign: 'center',
+      }}
+    >
+      <span style={{ fontSize: `${9 * fontScale}px`, color: '#9ca3af', fontStyle: 'italic' }}>
+        Generated with Hisaaboo — Hisaab rakho. Business badhao.
+      </span>
+    </div>
+  ) : null;
+
   // ── Render ────────────────────────────────────────────────────────
   return (
     <div style={outerStyle} id="document-renderer-root" onClick={() => onTypographyElementClick?.('custom_block')}>
@@ -1385,6 +1401,7 @@ export function DocumentRenderer({
       <ZoneIndicator zone="footer" />
 
       {FooterStrip}
+      {HisaabooBranding}
     </div>
   );
 }

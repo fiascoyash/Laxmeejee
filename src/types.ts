@@ -1074,6 +1074,7 @@ export interface TemplateSettings {
   showTermsConditions: boolean;
   showWatermark: boolean;
   showTaxSummary: boolean;
+  showHisaabooBranding: boolean;
   // Header Layout
   headerAlignment: 'left' | 'center' | 'right';
   // Typography Colors
@@ -1162,6 +1163,7 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   showTermsConditions: true,
   showWatermark: false,
   showTaxSummary: true,
+  showHisaabooBranding: true,
   headerAlignment: 'left',
   headerTextColor: '#000000',
   bodyTextColor: '#000000',
@@ -1194,6 +1196,156 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   },
   styleThemeId: DEFAULT_STYLE_THEME_ID,
 };
+
+// ─── Document Labels & Notes ─────────────────────────────────────────────────
+export type DocumentLabelType =
+  | 'none'
+  | 'original_for_recipient'
+  | 'duplicate_for_transporter'
+  | 'triplicate_for_supplier'
+  | 'duplicate_for_supplier'
+  | 'proforma_invoice'
+  | 'tax_invoice'
+  | 'bill_of_supply'
+  | 'delivery_challan'
+  | 'credit_note'
+  | 'debit_note'
+  | 'receipt'
+  | 'payment_receipt'
+  | 'custom';
+
+export const DOCUMENT_LABEL_OPTIONS: { value: DocumentLabelType; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'original_for_recipient', label: 'Original for Recipient' },
+  { value: 'duplicate_for_transporter', label: 'Duplicate for Transporter' },
+  { value: 'triplicate_for_supplier', label: 'Triplicate for Supplier' },
+  { value: 'duplicate_for_supplier', label: 'Duplicate for Supplier' },
+  { value: 'proforma_invoice', label: 'Proforma Invoice' },
+  { value: 'tax_invoice', label: 'Tax Invoice' },
+  { value: 'bill_of_supply', label: 'Bill of Supply' },
+  { value: 'delivery_challan', label: 'Delivery Challan' },
+  { value: 'credit_note', label: 'Credit Note' },
+  { value: 'debit_note', label: 'Debit Note' },
+  { value: 'receipt', label: 'Receipt' },
+  { value: 'payment_receipt', label: 'Payment Receipt' },
+  { value: 'custom', label: 'Custom Label' },
+];
+
+export const DOCUMENT_LABEL_TEXT: Record<DocumentLabelType, string> = {
+  none: '',
+  original_for_recipient: 'ORIGINAL FOR RECIPIENT',
+  duplicate_for_transporter: 'DUPLICATE FOR TRANSPORTER',
+  triplicate_for_supplier: 'TRIPLICATE FOR SUPPLIER',
+  duplicate_for_supplier: 'DUPLICATE FOR SUPPLIER',
+  proforma_invoice: 'PROFORMA INVOICE',
+  tax_invoice: 'TAX INVOICE',
+  bill_of_supply: 'BILL OF SUPPLY',
+  delivery_challan: 'DELIVERY CHALLAN',
+  credit_note: 'CREDIT NOTE',
+  debit_note: 'DEBIT NOTE',
+  receipt: 'RECEIPT',
+  payment_receipt: 'PAYMENT RECEIPT',
+  custom: '',
+};
+
+export type DocumentNoteId =
+  | 'e_and_oe'
+  | 'subject_to_terms'
+  | 'goods_once_sold'
+  | 'no_claim_after_delivery'
+  | 'payment_due_days'
+  | 'interest_on_delay'
+  | 'prices_subject_to_change'
+  | 'warranty_manufacturer'
+  | 'computer_generated'
+  | 'no_signature_required'
+  | 'reverse_charge'
+  | 'itc_not_admissible'
+  | 'supply_under_lut'
+  | 'supply_for_export'
+  | 'custom';
+
+export interface DocumentNoteConfig {
+  id: DocumentNoteId;
+  label: string;
+  defaultText: string;
+  enabled: boolean;
+  customText: string;
+  paymentDays?: number;
+}
+
+export interface DocumentLabelConfig {
+  labelType: DocumentLabelType;
+  customLabelText: string;
+}
+
+export interface DocumentLabelsNotesSettings {
+  quotation: {
+    label: DocumentLabelConfig;
+    notes: DocumentNoteConfig[];
+  };
+  invoice: {
+    label: DocumentLabelConfig;
+    notes: DocumentNoteConfig[];
+  };
+}
+
+export const COMMON_NOTE_DEFINITIONS: Omit<DocumentNoteConfig, 'enabled' | 'customText' | 'paymentDays'>[] = [
+  { id: 'e_and_oe', label: 'E. & O.E.', defaultText: 'E. & O.E.' },
+  { id: 'subject_to_terms', label: 'Subject to our Terms & Conditions', defaultText: 'Subject to our Terms & Conditions.' },
+  { id: 'goods_once_sold', label: 'Goods once sold will not be taken back', defaultText: 'Goods once sold will not be taken back or exchanged.' },
+  { id: 'no_claim_after_delivery', label: 'No claim after delivery', defaultText: 'No claim will be entertained after delivery.' },
+  { id: 'payment_due_days', label: 'Payment due within ___ days', defaultText: 'Payment due within {days} days.' },
+  { id: 'interest_on_delay', label: 'Interest on delayed payments', defaultText: 'Interest applicable on delayed payments.' },
+  { id: 'prices_subject_to_change', label: 'Prices subject to change', defaultText: 'Prices are subject to change without prior notice.' },
+  { id: 'warranty_manufacturer', label: 'Warranty as per manufacturer', defaultText: 'Warranty as per manufacturer\'s terms.' },
+  { id: 'computer_generated', label: 'Computer-generated document', defaultText: 'This is a computer-generated document.' },
+  { id: 'no_signature_required', label: 'No signature required', defaultText: 'No signature is required.' },
+  { id: 'reverse_charge', label: 'Reverse Charge (Yes/No)', defaultText: 'Reverse Charge: No' },
+  { id: 'itc_not_admissible', label: 'ITC not admissible', defaultText: 'Input Tax Credit not admissible.' },
+  { id: 'supply_under_lut', label: 'Supply under LUT', defaultText: 'Supply under LUT without payment of IGST.' },
+  { id: 'supply_for_export', label: 'Supply meant for Export', defaultText: 'Supply meant for Export.' },
+  { id: 'custom', label: 'Custom Note', defaultText: '' },
+];
+
+function makeDefaultNotes(): DocumentNoteConfig[] {
+  return COMMON_NOTE_DEFINITIONS.map(def => ({
+    ...def,
+    enabled: false,
+    customText: '',
+    paymentDays: def.id === 'payment_due_days' ? 30 : undefined,
+  }));
+}
+
+export const DEFAULT_DOCUMENT_LABELS_NOTES: DocumentLabelsNotesSettings = {
+  quotation: {
+    label: { labelType: 'none', customLabelText: '' },
+    notes: makeDefaultNotes(),
+  },
+  invoice: {
+    label: { labelType: 'none', customLabelText: '' },
+    notes: makeDefaultNotes(),
+  },
+};
+
+export function getDocumentLabelText(config: DocumentLabelConfig): string {
+  if (config.labelType === 'none') return '';
+  if (config.labelType === 'custom') return config.customLabelText || '';
+  return DOCUMENT_LABEL_TEXT[config.labelType] || '';
+}
+
+export function getDocumentNoteText(note: DocumentNoteConfig): string {
+  if (note.id === 'custom') return note.customText || '';
+  let text = note.customText || note.defaultText;
+  if (note.id === 'payment_due_days' && note.paymentDays) {
+    text = text.replace('{days}', String(note.paymentDays));
+  }
+  return text;
+}
+
+export function getEnabledNotes(notes: DocumentNoteConfig[]): DocumentNoteConfig[] {
+  return notes.filter(n => n.enabled);
+}
 
 // Default typography values for each element (used when resetting)
 export const DEFAULT_TYPOGRAPHY_VALUES: Record<TypographyElementId, { fontSize: number; fontWeight: number; color: string }> = {
