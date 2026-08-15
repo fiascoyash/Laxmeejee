@@ -16,7 +16,8 @@ const STORAGE_KEYS = {
   CUSTOMERS: 'solar_customers',
   SUPPLIERS: 'laxmeejee_suppliers',
   SUPPLIER_TRANSACTIONS: 'laxmeejee_supplier_transactions',
-  LAST_USED_COLUMNS: 'laxmeejee_last_used_columns',
+  LAST_USED_QUOTATION_COLUMNS: 'laxmeejee_last_used_quotation_columns',
+  LAST_USED_INVOICE_COLUMNS: 'laxmeejee_last_used_invoice_columns',
   PRODUCT_PURCHASES: 'laxmeejee_product_purchases',
   PRODUCT_STOCK_MOVEMENTS: 'laxmeejee_product_stock_movements',
   INVOICE_PAYMENTS: 'laxmeejee_invoice_payments',
@@ -392,18 +393,23 @@ export const storage = {
     localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify([...allTxns, ...updatedTxns]));
   },
 
-  // Last Used Column Configuration - persists user's preferred column visibility
-  getLastUsedColumns: (): TableColumn[] | null => {
-    const data = localStorage.getItem(STORAGE_KEYS.LAST_USED_COLUMNS);
+  // Last Used Column Configuration - persisted separately for quotations and invoices
+  getLastUsedQuotationColumns: (): TableColumn[] | null => {
+    const data = localStorage.getItem(STORAGE_KEYS.LAST_USED_QUOTATION_COLUMNS);
     return data ? JSON.parse(data) : null;
   },
 
-  saveLastUsedColumns: (columns: TableColumn[]): void => {
-    localStorage.setItem(STORAGE_KEYS.LAST_USED_COLUMNS, JSON.stringify(columns));
+  saveLastUsedQuotationColumns: (columns: TableColumn[]): void => {
+    localStorage.setItem(STORAGE_KEYS.LAST_USED_QUOTATION_COLUMNS, JSON.stringify(columns));
   },
 
-  clearLastUsedColumns: (): void => {
-    localStorage.removeItem(STORAGE_KEYS.LAST_USED_COLUMNS);
+  getLastUsedInvoiceColumns: (): TableColumn[] | null => {
+    const data = localStorage.getItem(STORAGE_KEYS.LAST_USED_INVOICE_COLUMNS);
+    return data ? JSON.parse(data) : null;
+  },
+
+  saveLastUsedInvoiceColumns: (columns: TableColumn[]): void => {
+    localStorage.setItem(STORAGE_KEYS.LAST_USED_INVOICE_COLUMNS, JSON.stringify(columns));
   },
 
   // ─── Product Purchases (Stock History) ─────────────────────────────────────

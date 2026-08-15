@@ -196,12 +196,6 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     if (!onColumnsChange) return;
     const updatedColumns = activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } as TableColumn : c);
     onColumnsChange(updatedColumns);
-
-    // If GST column is being hidden, reset all products' GST to 0%
-    const gstColumn = updatedColumns.find(c => c.key === 'gstPercent');
-    if (gstColumn && !gstColumn.visible) {
-      onChange(products.map(p => ({ ...p, gstPercent: 0 })));
-    }
   };
 
   // Get visible column keys from activeColumns (single source of truth)
@@ -694,7 +688,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               <ChevronDown className="w-4 h-4 hidden sm:inline" />
             </button>
             {showColumnSettings && (
-              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-10 p-3">
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-10 p-3 max-h-[400px] overflow-y-auto">
                 <div className="text-xs font-semibold text-slate-600 mb-2">Toggle Columns</div>
                 {activeColumns.filter(c => c.key !== 'sno' && c.key !== 'amount').map(col => (
                   <label key={col.id} className="flex items-center gap-2 py-1.5 text-sm cursor-pointer hover:bg-slate-50 rounded px-1 min-h-[44px]">
