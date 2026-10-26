@@ -17,6 +17,7 @@ import {
   BookOpen,
   HelpCircle,
   ArrowRight,
+  FileSearch,
 } from 'lucide-react';
 import { Invoice, CompanyProfile } from '../types';
 import {
@@ -39,6 +40,7 @@ import { HsnSacSummary } from './gst/HsnSacSummary';
 import { SalesRegister } from './gst/SalesRegister';
 import { PurchaseRegister } from './gst/PurchaseRegister';
 import { Gstr1Report } from './gst/Gstr1Report';
+import { Gstr2bAnalyzer } from './gst/Gstr2bAnalyzer';
 import { DateFilter } from './gst/DateFilter';
 import { ExportButtons } from './gst/ExportButtons';
 import { GstHealthCheck } from './gst/GstHealthCheck';
@@ -54,7 +56,8 @@ type GstReportView =
   | 'hsn_sac_summary'
   | 'sales_register'
   | 'purchase_register'
-  | 'gstr1';
+  | 'gstr1'
+  | 'gstr2b';
 
 interface GstReportsProps {
   invoices: Invoice[];
@@ -66,6 +69,10 @@ export const GstReports: React.FC<GstReportsProps> = ({
   companyProfile,
 }) => {
   const [activeView, setActiveView] = useState<GstReportView>('dashboard');
+  // GSTR-2B analyzer stays mounted once opened so results survive tab switches
+  const [gstr2bMounted, setGstr2bMounted] = useState(false);
+  const [uploadRequest, setUploadRequest] = useState(0);
+  const [has2bResult, setHas2bResult] = useState(false);
   const [filterType, setFilterType] = useState<DateFilterType>('this_month');
   const [customRange, setCustomRange] = useState<DateRange>({
     startDate: new Date().toISOString().split('T')[0],
@@ -128,6 +135,7 @@ export const GstReports: React.FC<GstReportsProps> = ({
     { view: 'sales_register', label: 'Sales Register', icon: List },
     { view: 'purchase_register', label: 'Purchase Register', icon: ShoppingBag },
     { view: 'gstr1', label: 'GSTR-1 Ready', icon: FileSpreadsheet },
+    { view: 'gstr2b', label: 'GSTR-2B Analyzer', icon: FileSearch },
   ];
 
   const getExportColumns = () => {
@@ -231,7 +239,7 @@ export const GstReports: React.FC<GstReportsProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {activeView !== 'dashboard' && activeView !== 'gstr1' && (
+          {activeView !== 'dashboard' && activeView !== 'gstr1' && activeView !== 'gstr2b' && (
             <ExportButtons
               data={getExportData()}
               reportName={getReportName()}
@@ -379,13 +387,43 @@ export const GstReports: React.FC<GstReportsProps> = ({
         onViewInvoices={(issue) => setSelectedIssue(issue)}
       />
 
+      {/* GSTR-2B Analyzer entry card */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-emerald-50 rounded-lg">
+            <FileSearch className="w-5 h-5 text-emerald-600" aria-hidden="true" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-800 text-sm">GSTR-2B Analyzer</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Upload your GST Portal Excel file to analyze supplier invoices and available ITC.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {has2bResult && (
+            <button
+              onClick={() => setActiveView('gstr2b')}
+              className="px-3 py-2 text-sm font-medium text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+            >
+              View Analyzer
+            </button>
+          )}
+          <button
+            onClick={() => { setActiveView('gstr2b'); setGstr2bMounted(true); setUploadRequest((n) => n + 1); }}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4" aria-hidden="true" />
+            Upload GSTR-2B Excel
+          </button>
+        </div>
+      </div>
+
       {/* Navigation Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="flex overflow-x-auto border-b border-slate-200">
           {navItems.map((item) => (
             <button
               key={item.view}
-              onClick={() => setActiveView(item.view)}
+              onClick={() => { setActiveView(item.view); if (item.view === 'gstr2b') setGstr2bMounted(true); }}
               className={`flex items-center gap-2 px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                 activeView === item.view
                   ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50'
@@ -407,6 +445,11 @@ export const GstReports: React.FC<GstReportsProps> = ({
         {activeView === 'sales_register' && <SalesRegister data={reportData.salesRegister} />}
         {activeView === 'purchase_register' && <PurchaseRegister data={reportData.purchaseRegister} />}
         {activeView === 'gstr1' && <Gstr1Report data={reportData.gstr1} />}
+        {gstr2bMounted && (
+          <div hidden={activeView !== 'gstr2b'}>
+            <Gstr2bAnalyzer uploadRequest={uploadRequest} onResultChange={setHas2bResult} />
+          </div>
+        )}
       </div>
 
       {/* Date Range Info */}
