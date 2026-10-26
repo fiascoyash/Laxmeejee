@@ -1,0 +1,1236 @@
+// @ts-nocheck -- original Hisaaboo code, type-checked loosely
+import { Product, ProductCatalogItem, TableColumn, GstMode, TemplateField, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, TemplateSchema, UNIT_OPTIONS } from '../types';
+import { generateId, calculateProductAmount, calculateTaxSummary, calculateRoundOff, calculateGrandTotalAmount, roundTo2, getExpiryStatus, isLowStock, getDaysUntilExpiry } from '../utils/storage';
+import { storage } from '../utils/storage';
+import { Plus, Trash2, Package, ChevronDown, Settings2, AlertTriangle, AlertCircle, Clock, PackagePlus } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { SaveProductDialog } from './SaveProductDialog';
+import { ProductAutocomplete } from './ProductAutocomplete';
+import { useEscapeStack } from '../hooks/useEscapeStack';
+
+interface Props {
+  products: Product[];
+  onChange: (products: Product[]) => void;
+  catalog: ProductCatalogItem[];
+  columns?: TableColumn[];
+  onColumnsChange?: (columns: TableColumn[]) => void;
+  gstMode?: GstMode;
+  onGstModeChange?: (mode: GstMode) => void;
+  // Custom fields from template schema
+  customFields?: TemplateField[];
+  // Template settings - controls which columns are visible
+  templateSettings?: TemplateSettings;
+  // Template schema - defines industry-specific columns (SINGLE SOURCE OF TRUTH)
+  schema?: TemplateSchema;
+  // Callback to save a new product directly to the global catalog
+  onSaveNewProduct?: (item: ProductCatalogItem) => void;
+}
+
+// Built-in columns for standard fields
+// DEFAULT VISIBILITY: Only Product Name, Qty/Unit, Rate, Amount are visible by default
+// HSN/SAC, GST%, and other columns are hidden but available for toggling
+const getBuiltinColumns = (): Record<string, TableColumn> => ({
+  sno: { id: 'col_sno', key: 'sno', label: '#', width: 6, visible: true, order: 0 },
+  name: { id: 'col_name', key: 'name', label: 'Product Name', width: 25, visible: true, order: 1 },
+  description: { id: 'col_description', key: 'description', label: 'Description', width: 15, visible: false, order: 2 },
+  hsnSacCode: { id: 'col_hsn_sac', key: 'hsnSacCode', label: 'HSN/SAC', width: 10, visible: false, order: 3 },
+  batchNumber: { id: 'col_batch', key: 'batchNumber', label: 'Batch No.', width: 10, visible: false, order: 4 },
+  expiryDate: { id: 'col_expiry', key: 'expiryDate', label: 'Expiry', width: 10, visible: false, order: 5 },
+  mrp: { id: 'col_mrp', key: 'mrp', label: 'MRP', width: 10, visible: false, order: 6 },
+  gstPercent: { id: 'col_gst', key: 'gstPercent', label: 'GST%', width: 8, visible: false, order: 7 },
+  quantityUnit: { id: 'col_qty_unit', key: 'quantityUnit', label: 'Qty/Unit', width: 14, visible: true, order: 8 },
+  unitPrice: { id: 'col_rate', key: 'unitPrice', label: 'Rate', width: 12, visible: true, order: 10 },
+  discount: { id: 'col_discount', key: 'discount', label: 'Disc%', width: 8, visible: false, order: 11 },
+  amount: { id: 'col_amount', key: 'amount', label: 'Amount', width: 12, visible: true, order: 12 },
+  wattage: { id: 'col_wattage', key: 'wattage', label: 'Wattage', width: 10, visible: false, order: 3 },
+  partNumber: { id: 'col_partnum', key: 'partNumber', label: 'Part No.', width: 12, visible: false, order: 3 },
+  vehicleModel: { id: 'col_vehicle', key: 'vehicleModel', label: 'Vehicle', width: 14, visible: false, order: 4 },
+  warrantyMonths: { id: 'col_warranty', key: 'warrantyMonths', label: 'Warranty', width: 10, visible: false, order: 5 },
+  serialNumber: { id: 'col_serial', key: 'serialNumber', label: 'Serial/IMEI', width: 14, visible: false, order: 6 },
+  notes: { id: 'col_notes', key: 'notes', label: 'Notes', width: 15, visible: false, order: 13 },
+});
+
+export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema, onSaveNewProduct }: Props) {
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState('');
+  useEscapeStack(showCatalog ? () => { setShowCatalog(false); setCatalogSearch(''); } : null, 1);
+  const [saveDialogProduct, setSaveDialogProduct] = useState<Product | null>(null);
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const columnSettingsRef = useRef<HTMLDivElement>(null);
+  const catalogRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const catalogSearchRef = useRef<HTMLInputElement>(null);
+  const [highlightedCatalogIndex, setHighlightedCatalogIndex] = useState(0);
+  const [recentlyUsed] = useState<ProductCatalogItem[]>(() => storage.getRecentlyUsedProducts(catalog));
+  const [frequentlyUsed] = useState<ProductCatalogItem[]>(() => storage.getFrequentlyUsedProducts(catalog));
+
+  const settings = templateSettings || DEFAULT_TEMPLATE_SETTINGS;
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSettingsRef.current && !columnSettingsRef.current.contains(event.target as Node)) {
+        setShowColumnSettings(false);
+      }
+      if (catalogRef.current && !catalogRef.current.contains(event.target as Node)) {
+        setShowCatalog(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Filtered catalog for search
+  const filteredCatalog = useMemo(() => {
+    if (!catalogSearch) return catalog;
+    const searchLower = catalogSearch.toLowerCase();
+    return catalog.filter(item =>
+      item.name.toLowerCase().includes(searchLower) ||
+      item.hsnSacCode?.toLowerCase().includes(searchLower) ||
+      item.brand?.toLowerCase().includes(searchLower) ||
+      item.sku?.toLowerCase().includes(searchLower)
+    );
+  }, [catalog, catalogSearch]);
+
+  // Sorted catalog by expiry
+  const sortedCatalog = useMemo(() => {
+    return [...filteredCatalog].sort((a, b) => {
+      const statusA = getExpiryStatus(a.expiryDate);
+      const statusB = getExpiryStatus(b.expiryDate);
+      if (statusA === 'expired' && statusB !== 'expired') return -1;
+      if (statusA !== 'expired' && statusB === 'expired') return 1;
+      if (statusA === 'expiring_soon' && statusB === 'safe') return -1;
+      if (statusA === 'safe' && statusB === 'expiring_soon') return 1;
+      return 0;
+    });
+  }, [filteredCatalog]);
+
+  // Keyboard navigation for catalog dropdown
+  useEffect(() => {
+    if (!showCatalog || sortedCatalog.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedCatalogIndex(prev => Math.min(prev + 1, sortedCatalog.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedCatalogIndex(prev => Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter' && highlightedCatalogIndex >= 0) {
+        e.preventDefault();
+        const item = sortedCatalog[highlightedCatalogIndex];
+        if (item) {
+          addFromCatalog(item);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCatalog, sortedCatalog, highlightedCatalogIndex]);
+
+  // Reset highlight when catalog opens
+  useEffect(() => {
+    if (showCatalog) {
+      setHighlightedCatalogIndex(0);
+      // Auto focus search input
+      setTimeout(() => catalogSearchRef.current?.focus(), 50);
+    } else {
+      setCatalogSearch('');
+    }
+  }, [showCatalog]);
+
+  // Build the FULL master list of all available columns from schema/settings
+  // Always includes ALL built-in columns so they are available for toggling.
+  const masterColumns = useMemo(() => {
+    const allColumns = Object.values(getBuiltinColumns());
+
+    if (schema?.productColumns && schema.productColumns.length > 0) {
+      const schemaMap = new Map(schema.productColumns.map(c => [c.key, c]));
+      return allColumns.map(col => {
+        const schemaCol = schemaMap.get(col.key);
+        if (schemaCol) {
+          // Column is in schema: use schema visibility
+          return { ...col, ...schemaCol, visible: schemaCol.visible !== false };
+        }
+        // Column is NOT in schema: hidden by default but available for toggling
+        return { ...col, visible: false };
+      });
+    }
+
+    return allColumns.map(col => {
+      const settingMap: Record<string, boolean> = {
+        description: settings.showDescription,
+        quantityUnit: settings.showQuantity || settings.showUnit,
+        discount: settings.showDiscount,
+        tax: settings.showTax,
+        batchNumber: settings.showBatchNumber,
+        expiryDate: settings.showExpiryDate,
+      };
+      if (col.key in settingMap) {
+        return { ...col, visible: settingMap[col.key] ?? col.visible };
+      }
+      return col;
+    });
+  }, [schema, settings]);
+
+  // Overlay user toggled visibility on top of master columns
+  const activeColumns = useMemo(() => {
+    if (columns && columns.length > 0) {
+      const userVis = new Map(columns.map(c => [c.key, c.visible]));
+      return masterColumns.map(col => {
+        if (userVis.has(col.key)) {
+          return { ...col, visible: userVis.get(col.key) };
+        }
+        return col;
+      });
+    }
+    return masterColumns;
+  }, [columns, masterColumns]);
+
+  const visibleColumns = activeColumns.filter(c => c.visible).sort((a, b) => a.order - b.order);
+
+  const toggleColumn = (colId: string) => {
+    if (!onColumnsChange) return;
+    const updatedColumns = activeColumns.map(c => c.id === colId ? { ...c, visible: !c.visible } as TableColumn : c);
+    onColumnsChange(updatedColumns);
+  };
+
+  // Get visible column keys from activeColumns (single source of truth)
+  const getVisibleColumnKeys = (): Set<string> => {
+    return new Set(activeColumns.filter(c => c.visible).map(c => c.key));
+  };
+
+  const visibleKeys = getVisibleColumnKeys();
+
+  const addProduct = () => {
+    const newProduct: Product = {
+      id: generateId(),
+      name: '',
+      description: visibleKeys.has('description') ? '' : undefined,
+      hsnSacCode: '',
+      gstPercent: 0,
+      quantity: 1,
+      unit: 'piece',
+      unitPrice: 0,
+      // Initialize schema-specific fields
+      batchNumber: visibleKeys.has('batchNumber') ? '' : undefined,
+      expiryDate: visibleKeys.has('expiryDate') ? '' : undefined,
+      mrp: visibleKeys.has('mrp') ? 0 : undefined,
+      discount: visibleKeys.has('discount') ? 0 : undefined,
+      wattage: visibleKeys.has('wattage') ? 0 : undefined,
+      partNumber: visibleKeys.has('partNumber') ? '' : undefined,
+      vehicleModel: visibleKeys.has('vehicleModel') ? '' : undefined,
+      warrantyMonths: visibleKeys.has('warrantyMonths') ? 0 : undefined,
+      serialNumber: visibleKeys.has('serialNumber') ? '' : undefined,
+      notes: visibleKeys.has('notes') ? '' : undefined,
+      customFields: {},
+    };
+    onChange([...products, newProduct]);
+  };
+
+  const addFromCatalog = (catalogItem: ProductCatalogItem) => {
+    // Check for expiry warning
+    const expiryStatus = getExpiryStatus(catalogItem.expiryDate);
+    const daysUntilExpiry = getDaysUntilExpiry(catalogItem.expiryDate);
+
+    if (expiryStatus === 'expired') {
+      const proceed = confirm(`WARNING: This product expired on ${catalogItem.expiryDate}.\n\nDo you still want to add it to the quotation?`);
+      if (!proceed) return;
+    } else if (expiryStatus === 'expiring_soon') {
+      const proceed = confirm(`WARNING: This product will expire in ${daysUntilExpiry} days (on ${catalogItem.expiryDate}).\n\nDo you want to continue adding it?`);
+      if (!proceed) return;
+    }
+
+    const newProduct: Product = {
+      id: generateId(),
+      name: catalogItem.name,
+      description: visibleKeys.has('description') ? '' : undefined,
+      hsnSacCode: catalogItem.hsnSacCode,
+      gstPercent: catalogItem.gstPercent,
+      quantity: 1,
+      unit: catalogItem.unit || 'piece',
+      unitPrice: catalogItem.sellingPrice,
+      // Initialize schema-specific fields
+      batchNumber: catalogItem.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
+      expiryDate: catalogItem.expiryDate || (visibleKeys.has('expiryDate') ? '' : undefined),
+      mrp: visibleKeys.has('mrp') ? 0 : undefined,
+      discount: visibleKeys.has('discount') ? 0 : undefined,
+      wattage: catalogItem.wattage || (visibleKeys.has('wattage') ? 0 : undefined),
+      partNumber: catalogItem.partNumber || (visibleKeys.has('partNumber') ? '' : undefined),
+      vehicleModel: catalogItem.modelNumber || (visibleKeys.has('vehicleModel') ? '' : undefined),
+      warrantyMonths: catalogItem.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
+      serialNumber: catalogItem.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
+      notes: visibleKeys.has('notes') ? '' : undefined,
+      customFields: {},
+      // Carry attributes from catalog (NEW)
+      attributes: catalogItem.attributes ? { ...catalogItem.attributes } : undefined,
+    };
+    onChange([...products, newProduct]);
+    setShowCatalog(false);
+  };
+
+  const removeProduct = (id: string) => {
+    onChange(products.filter(p => p.id !== id));
+  };
+
+  const updateProduct = (id: string, field: keyof Product, value: string | number) => {
+    onChange(products.map(p =>
+      p.id === id ? { ...p, [field]: value } : p
+    ));
+  };
+
+  const updateCustomField = (productId: string, fieldKey: string, value: string | number | boolean) => {
+    onChange(products.map(p =>
+      p.id === productId
+        ? { ...p, customFields: { ...p.customFields, [fieldKey]: value } }
+        : p
+    ));
+  };
+
+  const isColumnVisible = (key: string) => visibleColumns.some(c => c.key === key);
+
+  // GST visibility logic: Check if GST column is visible AND if any product has GST > 0
+  const gstColumnVisible = isColumnVisible('gstPercent');
+  const hasAnyGst = products.some(p => (p.gstPercent || 0) > 0);
+  // Show tax summary and CGST/SGST only if GST column is visible AND some products have GST > 0
+  const showGstDetails = gstColumnVisible && hasAnyGst;
+
+  const taxSummary = calculateTaxSummary(products, gstMode);
+  const grandTotalAmount = calculateGrandTotalAmount(products, gstMode);
+  const totalTaxable = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.taxableAmount, 0));
+  const totalCgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.cgstAmount, 0));
+  const totalSgst = roundTo2(Array.from(taxSummary.values()).reduce((sum, t) => sum + t.sgstAmount, 0));
+  const { roundOff, roundedGrandTotal } = calculateRoundOff(grandTotalAmount);
+
+  const renderCell = (product: Product, colKey: string) => {
+    switch (colKey) {
+      case 'sno': return null;
+      case 'name': {
+        const isNew = onSaveNewProduct &&
+          product.name.trim().length > 0 &&
+          !catalog.some(c => c.name.trim().toLowerCase() === product.name.trim().toLowerCase());
+        return (
+          <div className="flex items-center gap-1">
+            <ProductAutocomplete
+              value={product.name}
+              onChange={(val) => updateProduct(product.id, 'name', val)}
+              onSelect={(item) => {
+                onChange(products.map(p =>
+                  p.id === product.id ? {
+                    ...p,
+                    name: item.name,
+                    description: visibleKeys.has('description') ? (p.description || '') : undefined,
+                    hsnSacCode: item.hsnSacCode,
+                    gstPercent: item.gstPercent,
+                    unit: item.unit || 'piece',
+                    unitPrice: item.sellingPrice,
+                    isManualAmount: false,
+                    batchNumber: item.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
+                    expiryDate: item.expiryDate || (visibleKeys.has('expiryDate') ? '' : undefined),
+                    wattage: item.wattage || (visibleKeys.has('wattage') ? 0 : undefined),
+                    partNumber: item.partNumber || (visibleKeys.has('partNumber') ? '' : undefined),
+                    vehicleModel: item.modelNumber || (visibleKeys.has('vehicleModel') ? '' : undefined),
+                    warrantyMonths: item.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
+                    serialNumber: item.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
+                    attributes: item.attributes ? { ...item.attributes } : undefined,
+                  } : p
+                ));
+              }}
+              catalog={catalog}
+              recentlyUsed={recentlyUsed}
+              frequentlyUsed={frequentlyUsed}
+              className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
+            />
+            {isNew && (
+              <button
+                type="button"
+                onClick={() => setSaveDialogProduct(product)}
+                className="flex-shrink-0 p-1.5 rounded text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                title="Save to Product Catalog"
+              >
+                <PackagePlus className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        );
+      }
+      case 'description':
+        return (
+          <textarea
+            value={product.description || ''}
+            onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-sm resize-y min-h-16"
+            placeholder="Description..."
+            rows={2}
+          />
+        );
+      case 'hsnSacCode':
+        return (
+          <input
+            type="text"
+            value={product.hsnSacCode}
+            onChange={(e) => updateProduct(product.id, 'hsnSacCode', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center font-mono"
+            placeholder="HSN/SAC"
+          />
+        );
+      case 'gstPercent':
+        return (
+          <select
+            value={product.gstPercent}
+            onChange={(e) => updateProduct(product.id, 'gstPercent', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
+          >
+            <option value={0}>0%</option>
+            <option value={5}>5%</option>
+            <option value={18}>18%</option>
+            <option value={28}>28%</option>
+            <option value={40}>40%</option>
+          </select>
+        );
+      case 'quantityUnit':
+        return (
+          <div className="flex gap-1 items-center">
+            <input
+              type="number"
+              min="1"
+              value={product.quantity || ''}
+              onChange={(e) => {
+                const newQuantity = Number(e.target.value) || 1;
+                // If manual amount is set, recalculate rate from amount/quantity
+                if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
+                  const newRate = roundTo2(product.manualAmount / newQuantity);
+                  onChange(products.map(p =>
+                    p.id === product.id ? {
+                      ...p,
+                      quantity: newQuantity,
+                      unitPrice: newRate,
+                      isManualAmount: true  // Keep manual amount flag
+                    } : p
+                  ));
+                } else {
+                  // Normal behavior: just update quantity
+                  onChange(products.map(p =>
+                    p.id === product.id ? { ...p, quantity: newQuantity, isManualAmount: false } : p
+                  ));
+                }
+              }}
+              className="w-16 px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
+            />
+            <select
+              value={product.unit || 'piece'}
+              onChange={(e) => updateProduct(product.id, 'unit', e.target.value)}
+              className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-sm"
+            >
+              {UNIT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        );
+      case 'unitPrice':
+        return (
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={product.unitPrice || ''}
+            onChange={(e) => {
+              // Reset manual amount when rate changes
+              onChange(products.map(p =>
+                p.id === product.id ? { ...p, unitPrice: Number(e.target.value), isManualAmount: false } : p
+              ));
+            }}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-right"
+          />
+        );
+      case 'amount':
+        const displayAmount = product.isManualAmount && product.manualAmount !== undefined
+          ? (product.manualAmount || '')
+          : (calculateProductAmount(product) || '');
+        return (
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={displayAmount}
+            onChange={(e) => {
+              const manualValue = Number(e.target.value);
+              // REVERSE CALCULATION: Calculate rate from amount/quantity
+              // Formula: Rate = Amount / Quantity
+              // For GST Inclusive: Rate = Amount / Quantity / (1 + GST/100)
+              if (product.quantity > 0 && manualValue > 0) {
+                let calculatedRate: number;
+                if (gstMode === 'inclusive' && product.gstPercent > 0) {
+                  // Inclusive GST: extract base rate from amount
+                  // Rate = Amount / Quantity / (1 + GST/100)
+                  calculatedRate = roundTo2(manualValue / product.quantity / (1 + product.gstPercent / 100));
+                } else {
+                  // Exclusive GST or 0% GST: simple division
+                  // Rate = Amount / Quantity
+                  calculatedRate = roundTo2(manualValue / product.quantity);
+                }
+                onChange(products.map(p =>
+                  p.id === product.id ? {
+                    ...p,
+                    manualAmount: manualValue,
+                    isManualAmount: true,
+                    unitPrice: calculatedRate
+                  } : p
+                ));
+              } else {
+                // Zero or invalid: just store the manual amount
+                onChange(products.map(p =>
+                  p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true } : p
+                ));
+              }
+            }}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-right font-medium"
+          />
+        );
+      case 'batchNumber':
+        return (
+          <input
+            type="text"
+            value={product.batchNumber || ''}
+            onChange={(e) => updateProduct(product.id, 'batchNumber', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center font-mono"
+            placeholder="Batch#"
+          />
+        );
+      case 'expiryDate':
+        return (
+          <input
+            type="month"
+            value={product.expiryDate || ''}
+            onChange={(e) => updateProduct(product.id, 'expiryDate', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
+            placeholder="MM/YYYY"
+          />
+        );
+      case 'discount':
+        return (
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value={product.discount || ''}
+            onChange={(e) => updateProduct(product.id, 'discount', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
+          />
+        );
+      case 'mrp':
+        return (
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={product.mrp || ''}
+            onChange={(e) => updateProduct(product.id, 'mrp', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-right"
+          />
+        );
+      case 'partNumber':
+        return (
+          <input
+            type="text"
+            value={product.partNumber || ''}
+            onChange={(e) => updateProduct(product.id, 'partNumber', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 font-mono"
+            placeholder="Part#"
+          />
+        );
+      case 'vehicleModel':
+        return (
+          <input
+            type="text"
+            value={product.vehicleModel || ''}
+            onChange={(e) => updateProduct(product.id, 'vehicleModel', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
+            placeholder="Vehicle"
+          />
+        );
+      case 'warrantyMonths':
+        return (
+          <input
+            type="number"
+            min="0"
+            value={product.warrantyMonths || ''}
+            onChange={(e) => updateProduct(product.id, 'warrantyMonths', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
+          />
+        );
+      case 'wattage':
+        return (
+          <input
+            type="number"
+            min="0"
+            value={product.wattage || ''}
+            onChange={(e) => updateProduct(product.id, 'wattage', Number(e.target.value))}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
+            placeholder="W"
+          />
+        );
+      case 'serialNumber':
+        return (
+          <input
+            type="text"
+            value={product.serialNumber || ''}
+            onChange={(e) => updateProduct(product.id, 'serialNumber', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 font-mono text-sm"
+            placeholder="Serial/IMEI"
+          />
+        );
+      case 'notes':
+        return (
+          <input
+            type="text"
+            value={product.notes || ''}
+            onChange={(e) => updateProduct(product.id, 'notes', e.target.value)}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-sm"
+            placeholder="Notes..."
+          />
+        );
+      default:
+        // Handle custom fields from template schema
+        const customField = customFields.find(f => f.key === colKey);
+        if (customField) {
+          const value = product.customFields?.[colKey] ?? customField.defaultValue ?? '';
+          if (customField.type === 'number') {
+            return (
+              <input
+                type="number"
+                value={value === '' ? '' : (value as number) || ''}
+                onChange={(e) => updateCustomField(product.id, colKey, Number(e.target.value))}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
+                placeholder={customField.placeholder}
+              />
+            );
+          }
+          if (customField.type === 'date') {
+            return (
+              <input
+                type="month"
+                value={value as string}
+                onChange={(e) => updateCustomField(product.id, colKey, e.target.value)}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
+              />
+            );
+          }
+          if (customField.type === 'select' && customField.options) {
+            return (
+              <select
+                value={value as string}
+                onChange={(e) => updateCustomField(product.id, colKey, e.target.value)}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
+              >
+                <option value="">Select...</option>
+                {customField.options.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            );
+          }
+          // Default: text input
+          return (
+            <input
+              type="text"
+              value={value as string}
+              onChange={(e) => updateCustomField(product.id, colKey, e.target.value)}
+              className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500"
+              placeholder={customField.placeholder}
+            />
+          );
+        }
+        return null;
+    }
+  };
+
+  const getCellClass = (colKey: string) => {
+    if (colKey === 'name') return 'px-3 py-2 min-w-64';
+    if (colKey === 'sno') return 'px-3 py-2 text-slate-500 w-8';
+    if (colKey === 'amount') return 'px-3 py-2 text-right font-medium text-slate-800';
+    if (colKey === 'quantityUnit' || colKey === 'gstPercent') return 'px-3 py-2';
+    return 'px-3 py-2';
+  };
+
+  const getHeaderClass = (colKey: string) => {
+    if (colKey === 'name') return 'px-3 py-3 text-left font-semibold text-slate-700 min-w-64';
+    if (colKey === 'sno') return 'px-3 py-3 text-left font-semibold text-slate-700 w-8';
+    if (colKey === 'amount') return 'px-3 py-3 text-right font-semibold text-slate-700 w-32';
+    if (colKey === 'quantityUnit') return 'px-3 py-3 text-center font-semibold text-slate-700 w-36';
+    if (colKey === 'gstPercent') return 'px-3 py-3 text-center font-semibold text-slate-700 w-24';
+    if (colKey === 'hsnSacCode') return 'px-3 py-3 text-left font-semibold text-slate-700 w-24';
+    if (colKey === 'unitPrice') return 'px-3 py-3 text-right font-semibold text-slate-700 w-32';
+    return 'px-3 py-3 text-left font-semibold text-slate-700';
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+        <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <Package className="w-5 h-5 text-blue-600" />
+          Products / Services
+        </h3>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none" ref={columnSettingsRef}>
+            <button
+              onClick={() => setShowColumnSettings(!showColumnSettings)}
+              className="w-full sm:w-auto px-3 py-2.5 sm:py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-gray-200 transition-colors flex items-center justify-center sm:justify-start gap-2 text-sm min-h-[44px]"
+              title="Toggle column visibility"
+            >
+              <Settings2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Columns</span>
+              <ChevronDown className="w-4 h-4 hidden sm:inline" />
+            </button>
+            {showColumnSettings && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-10 p-3 max-h-[400px] overflow-y-auto">
+                <div className="text-xs font-semibold text-slate-600 mb-2">Toggle Columns</div>
+                {activeColumns.filter(c => c.key !== 'sno' && c.key !== 'amount').map(col => (
+                  <label key={col.id} className="flex items-center gap-2 py-1.5 text-sm cursor-pointer hover:bg-slate-50 rounded px-1 min-h-[44px]">
+                    <input
+                      type="checkbox"
+                      checked={col.visible}
+                      onChange={() => toggleColumn(col.id)}
+                      className="rounded w-5 h-5"
+                    />
+                    <span className="text-slate-700">{col.label}</span>
+                  </label>
+                ))}
+                <div className="text-xs text-slate-400 mt-2 pt-2 border-t border-gray-100">
+                  # and Amount columns are always visible.
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="relative flex-1 sm:flex-none" ref={catalogRef}>
+            <button
+              onClick={() => setShowCatalog(!showCatalog)}
+              className="w-full sm:w-auto px-3 py-2.5 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center sm:justify-start gap-2 text-sm min-h-[44px]"
+            >
+              <Package className="w-4 h-4" />
+              <span>Catalog</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {showCatalog && (
+              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto left-0 sm:left-auto">
+                {/* Search input */}
+                <div className="sticky top-0 bg-white border-b border-slate-200 p-2">
+                  <input
+                    ref={catalogSearchRef}
+                    type="text"
+                    value={catalogSearch}
+                    onChange={(e) => {
+                      setCatalogSearch(e.target.value);
+                      setHighlightedCatalogIndex(0);
+                    }}
+                    placeholder="Search catalog... (type to filter)"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                  <div className="text-xs text-slate-400 mt-1">
+                    Use arrow keys to navigate, Enter to select, Esc to close
+                  </div>
+                </div>
+                {sortedCatalog.length === 0 ? (
+                  <div className="p-4 text-slate-500 text-center text-sm">
+                    {catalogSearch ? 'No products match your search' : 'No products in catalog'}
+                  </div>
+                ) : (
+                  sortedCatalog.map((item, idx) => {
+                    const expiryStatus = getExpiryStatus(item.expiryDate);
+                    const lowStock = isLowStock(item);
+                    const daysUntilExpiry = getDaysUntilExpiry(item.expiryDate);
+                    const isHighlighted = highlightedCatalogIndex === idx;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => addFromCatalog(item)}
+                        className={`w-full px-4 py-3 text-left border-b border-gray-100 last:border-b-0 flex justify-between items-center min-h-[60px] ${
+                          isHighlighted ? 'bg-emerald-50' : 'hover:bg-blue-50'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-slate-800 truncate">{item.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {item.sku && <span className="font-mono mr-2">{item.sku}</span>}
+                            HSN/SAC: {item.hsnSacCode} | GST: {item.gstPercent}%
+                            {item.brand && <span className="ml-2">| {item.brand}</span>}
+                          </div>
+                          {/* Show warnings */}
+                          <div className="flex gap-2 mt-1">
+                            {expiryStatus === 'expired' && (
+                              <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                                <AlertCircle className="w-3 h-3" /> Expired
+                              </span>
+                            )}
+                            {expiryStatus === 'expiring_soon' && (
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                                <Clock className="w-3 h-3" /> {daysUntilExpiry} days left
+                              </span>
+                            )}
+                            {lowStock && (
+                              <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                                <AlertTriangle className="w-3 h-3" /> Low Stock ({item.stockQuantity})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right ml-4">
+                          <div className="text-emerald-600 font-medium">Rs. {item.sellingPrice.toLocaleString()}</div>
+                          <div className="text-xs text-slate-500">{UNIT_OPTIONS.find(u => u.value === item.unit)?.label || item.unit}</div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={addProduct}
+            className="w-full sm:w-auto px-3 py-2.5 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center sm:justify-start gap-2 text-sm min-h-[44px]"
+          >
+            <Plus className="w-4 h-4" />
+            Add Row
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Card Layout */}
+      <div className="md:hidden space-y-3">
+        {products.map((product, index) => (
+          <div key={product.id} className="bg-slate-50 rounded-lg border border-slate-200 p-3">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex-1">
+                <div className="text-xs text-slate-500 mb-1">#{index + 1}</div>
+                <div className="flex items-center gap-1">
+                  <ProductAutocomplete
+                    value={product.name}
+                    onChange={(val) => updateProduct(product.id, 'name', val)}
+                    onSelect={(item) => {
+                      onChange(products.map(p =>
+                        p.id === product.id ? {
+                          ...p,
+                          name: item.name,
+                          description: visibleKeys.has('description') ? (p.description || '') : undefined,
+                          hsnSacCode: item.hsnSacCode,
+                          gstPercent: item.gstPercent,
+                          unit: item.unit || 'piece',
+                          unitPrice: item.sellingPrice,
+                          isManualAmount: false,
+                          batchNumber: item.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
+                          expiryDate: item.expiryDate || (visibleKeys.has('expiryDate') ? '' : undefined),
+                          wattage: item.wattage || (visibleKeys.has('wattage') ? 0 : undefined),
+                          partNumber: item.partNumber || (visibleKeys.has('partNumber') ? '' : undefined),
+                          vehicleModel: item.modelNumber || (visibleKeys.has('vehicleModel') ? '' : undefined),
+                          warrantyMonths: item.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
+                          serialNumber: item.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
+                          attributes: item.attributes ? { ...item.attributes } : undefined,
+                        } : p
+                      ));
+                    }}
+                    catalog={catalog}
+                    recentlyUsed={recentlyUsed}
+                    frequentlyUsed={frequentlyUsed}
+                    className="flex-1 min-w-0 px-3 py-2 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 text-sm min-h-[44px]"
+                  />
+                  {onSaveNewProduct &&
+                    product.name.trim().length > 0 &&
+                    !catalog.some(c => c.name.trim().toLowerCase() === product.name.trim().toLowerCase()) && (
+                    <button
+                      type="button"
+                      onClick={() => setSaveDialogProduct(product)}
+                      className="flex-shrink-0 p-2 rounded text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      title="Save to Product Catalog"
+                    >
+                      <PackagePlus className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => removeProduct(product.id)}
+                className="text-red-500 hover:text-red-700 p-2 ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Qty/Unit */}
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Qty/Unit</label>
+                <div className="flex gap-1">
+                  <input
+                    type="number"
+                    min="1"
+                    value={product.quantity || ''}
+                    onChange={(e) => {
+                      const newQuantity = Number(e.target.value) || 1;
+                      if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
+                        const newRate = roundTo2(product.manualAmount / newQuantity);
+                        onChange(products.map(p =>
+                          p.id === product.id ? {
+                            ...p,
+                            quantity: newQuantity,
+                            unitPrice: newRate,
+                            isManualAmount: true
+                          } : p
+                        ));
+                      } else {
+                        onChange(products.map(p =>
+                          p.id === product.id ? { ...p, quantity: newQuantity, isManualAmount: false } : p
+                        ));
+                      }
+                    }}
+                    className="flex-1 px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
+                  />
+                  <select
+                    value={product.unit || 'piece'}
+                    onChange={(e) => updateProduct(product.id, 'unit', e.target.value)}
+                    className="flex-1 px-2 py-2 border border-slate-300 rounded text-sm min-h-[44px]"
+                  >
+                    {UNIT_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Rate */}
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Rate</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={product.unitPrice || ''}
+                  onChange={(e) => {
+                    onChange(products.map(p =>
+                      p.id === product.id ? { ...p, unitPrice: Number(e.target.value), isManualAmount: false } : p
+                    ));
+                  }}
+                  className="w-full px-2 py-2 border border-slate-300 rounded text-right text-sm min-h-[44px]"
+                />
+              </div>
+
+              {/* GST */}
+              {isColumnVisible('gstPercent') && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">GST%</label>
+                  <select
+                    value={product.gstPercent}
+                    onChange={(e) => updateProduct(product.id, 'gstPercent', Number(e.target.value))}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
+                  >
+                    <option value={0}>0%</option>
+                    <option value={5}>5%</option>
+                    <option value={18}>18%</option>
+                    <option value={28}>28%</option>
+                    <option value={40}>40%</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Amount */}
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={product.isManualAmount && product.manualAmount !== undefined
+                    ? (product.manualAmount || '')
+                    : (calculateProductAmount(product) || '')}
+                  onChange={(e) => {
+                    const manualValue = Number(e.target.value);
+                    if (product.quantity > 0 && manualValue > 0) {
+                      let calculatedRate: number;
+                      if (gstMode === 'inclusive' && product.gstPercent > 0) {
+                        calculatedRate = roundTo2(manualValue / product.quantity / (1 + product.gstPercent / 100));
+                      } else {
+                        calculatedRate = roundTo2(manualValue / product.quantity);
+                      }
+                      onChange(products.map(p =>
+                        p.id === product.id ? {
+                          ...p,
+                          manualAmount: manualValue,
+                          isManualAmount: true,
+                          unitPrice: calculatedRate
+                        } : p
+                      ));
+                    } else {
+                      onChange(products.map(p =>
+                        p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true } : p
+                      ));
+                    }
+                  }}
+                  className="w-full px-2 py-2 border border-slate-300 rounded text-right text-sm font-medium min-h-[44px]"
+                />
+              </div>
+
+              {/* HSN/SAC */}
+              {isColumnVisible('hsnSacCode') && (
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-500 mb-1 block">HSN/SAC</label>
+                  <input
+                    type="text"
+                    value={product.hsnSacCode}
+                    onChange={(e) => updateProduct(product.id, 'hsnSacCode', e.target.value)}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center font-mono text-sm min-h-[44px]"
+                    placeholder="HSN/SAC Code"
+                  />
+                </div>
+              )}
+
+              {/* Additional mobile fields based on visibility */}
+              {isColumnVisible('batchNumber') && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Batch No.</label>
+                  <input
+                    type="text"
+                    value={product.batchNumber || ''}
+                    onChange={(e) => updateProduct(product.id, 'batchNumber', e.target.value)}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center font-mono text-sm min-h-[44px]"
+                    placeholder="Batch#"
+                  />
+                </div>
+              )}
+
+              {isColumnVisible('expiryDate') && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Expiry</label>
+                  <input
+                    type="month"
+                    value={product.expiryDate || ''}
+                    onChange={(e) => updateProduct(product.id, 'expiryDate', e.target.value)}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
+                  />
+                </div>
+              )}
+
+              {isColumnVisible('discount') && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Disc%</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={product.discount || ''}
+                    onChange={(e) => updateProduct(product.id, 'discount', Number(e.target.value))}
+                    className="w-full px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {products.length === 0 && (
+          <div className="text-center text-slate-500 py-8">
+            No products added. Click "Add Row" or "Catalog" to add products.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table Layout */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-y border-slate-200">
+            <tr>
+              {visibleColumns.map(col => (
+                <th key={col.id} className={getHeaderClass(col.key)}>{col.label}</th>
+              ))}
+              <th className="px-3 py-3 text-center font-semibold text-slate-700 w-12"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product, index) => (
+              <tr key={product.id} className="border-b border-gray-100 hover:bg-slate-50">
+                {visibleColumns.map(col => (
+                  <td key={col.id} className={getCellClass(col.key)}>
+                    {col.key === 'sno' ? index + 1 : renderCell(product, col.key)}
+                  </td>
+                ))}
+                <td className="px-3 py-2 text-center">
+                  <button
+                    onClick={() => removeProduct(product.id)}
+                    className="text-red-500 hover:text-red-700 p-1"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {products.length === 0 && (
+              <tr>
+                <td colSpan={visibleColumns.length + 1} className="px-3 py-8 text-center text-slate-500">
+                  No products added. Click "Add Row" or "From Catalog" to add products.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Tax Summary Table - Hidden when GST column is hidden OR all GST = 0 */}
+      {products.length > 0 && showGstDetails && (
+        <div className="mt-4 sm:mt-6">
+          <h4 className="text-sm font-semibold text-slate-700 mb-3">Tax Summary (HSN/SAC-wise)</h4>
+          {/* Mobile Card Layout */}
+          <div className="md:hidden space-y-2">
+            {Array.from(taxSummary.entries()).map(([key, data]) => {
+              const hsnSacCode = key.split('_')[0];
+              return (
+                <div key={key} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  {isColumnVisible('hsnSacCode') && (
+                    <div className="text-sm font-mono text-slate-600 mb-2">HSN/SAC: {hsnSacCode}</div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Taxable:</span>
+                      <span className="font-medium">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">CGST:</span>
+                        <span className="font-medium">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">SGST:</span>
+                        <span className="font-medium">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </>
+                    <div className="flex justify-between font-bold">
+                      <span className="text-slate-700">Total:</span>
+                      <span>{(data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Desktop Table Layout */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
+              <thead className="bg-slate-100">
+                <tr>
+                  {isColumnVisible('hsnSacCode') && (
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">HSN/SAC</th>
+                  )}
+                  <th className="px-3 py-2 text-right font-semibold text-slate-700">Taxable Amount</th>
+                  <>
+                    <th className="px-3 py-2 text-center font-semibold text-slate-700">CGST %</th>
+                    <th className="px-3 py-2 text-right font-semibold text-slate-700">CGST Amt</th>
+                    <th className="px-3 py-2 text-center font-semibold text-slate-700">SGST %</th>
+                    <th className="px-3 py-2 text-right font-semibold text-slate-700">SGST Amt</th>
+                  </>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-700">Total Amt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from(taxSummary.entries()).map(([key, data]) => {
+                  const hsnSacCode = key.split('_')[0];
+                  return (
+                    <tr key={key} className="border-b border-gray-100">
+                      {isColumnVisible('hsnSacCode') && (
+                        <td className="px-3 py-2 font-mono">{hsnSacCode}</td>
+                      )}
+                      <td className="px-3 py-2 text-right">{data.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <>
+                        <td className="px-3 py-2 text-center">{data.cgstRate}%</td>
+                        <td className="px-3 py-2 text-right">{data.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2 text-center">{data.sgstRate}%</td>
+                        <td className="px-3 py-2 text-right">{data.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      </>
+                      <td className="px-3 py-2 text-right font-medium">
+                        {(data.taxableAmount + data.cgstAmount + data.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Totals */}
+      {products.length > 0 && (
+        <div className="mt-4 sm:mt-6 flex flex-col gap-4">
+          {/* GST Mode Toggle */}
+          {onGstModeChange && (
+            <div className="bg-slate-50 rounded-lg p-3 sm:p-4 border border-slate-200">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">GST Mode</label>
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+                  <input
+                    type="radio"
+                    name="gstMode"
+                    checked={gstMode === 'inclusive'}
+                    onChange={() => onGstModeChange('inclusive')}
+                    className="w-5 h-5 text-blue-600"
+                  />
+                  <span className="text-sm text-slate-700">Inclusive GST (price includes GST)</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+                  <input
+                    type="radio"
+                    name="gstMode"
+                    checked={gstMode === 'exclusive'}
+                    onChange={() => onGstModeChange('exclusive')}
+                    className="w-5 h-5 text-blue-600"
+                  />
+                  <span className="text-sm text-slate-700">Exclusive GST (add GST on top)</span>
+                </label>
+              </div>
+            </div>
+          )}
+          <div className="w-full sm:w-80 bg-slate-50 rounded-lg p-3 sm:p-4 border border-slate-200">
+            <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
+              <span className="text-slate-600">Taxable Amount:</span>
+              <span className="font-medium">Rs. {totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
+            {showGstDetails && (
+              <>
+                <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
+                  <span className="text-slate-600">CGST:</span>
+                  <span className="font-medium">Rs. {totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
+                  <span className="text-slate-600">SGST:</span>
+                  <span className="font-medium">Rs. {totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-between py-1.5 sm:py-1 text-sm sm:text-base">
+              <span className="text-slate-600">Round Off:</span>
+              <span className="font-medium">Rs. {roundOff >= 0 ? roundOff.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '(' + Math.abs(roundOff).toLocaleString('en-IN', { minimumFractionDigits: 2 }) + ')'}</span>
+            </div>
+            <div className="flex justify-between py-2 sm:py-2 border-t-2 border-slate-300 mt-2 text-base sm:text-lg">
+              <span className="text-slate-800 font-bold">Grand Total:</span>
+              <span className="font-bold text-blue-600">Rs. {roundedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    {/* Save Product to Catalog Dialog */}
+    {saveDialogProduct && (
+      <SaveProductDialog
+        product={saveDialogProduct}
+        catalog={catalog}
+        onSave={(item) => {
+          if (onSaveNewProduct) onSaveNewProduct(item);
+          setSaveDialogProduct(null);
+        }}
+        onClose={() => setSaveDialogProduct(null)}
+      />
+    )}
+    </div>
+  );
+}

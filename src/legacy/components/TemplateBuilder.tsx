@@ -1,0 +1,1302 @@
+// @ts-nocheck -- original Hisaaboo code, type-checked loosely
+import { useState, useRef, useCallback, useEffect } from 'react';
+import {
+  QuotationTemplate, TemplateBlock, BlockType, TableColumn,
+  CompanyProfile, Customer, Quotation, Product, A4_WIDTH, A4_HEIGHT, A5_WIDTH, A5_HEIGHT, POS_WIDTH, TemplateSettings, DEFAULT_TEMPLATE_SETTINGS, ThemeId, INVOICE_THEMES, STYLE_THEMES, StyleThemeId, BlockZone, TypographyElementId,
+  LogoSettings, LogoSizePreset, LogoAlignment, DEFAULT_LOGO_SETTINGS, LOGO_SIZE_PRESETS,
+} from '../types';
+import { generateId, getDefaultProductColumns } from '../utils/storage';
+import {
+  Trash2, Plus, Save, Settings, Type, Image, RotateCcw,
+  Building2, User, FileText, Calendar, Table, CreditCard, PenTool, FileWarning, Truck,
+  ChevronDown, GripVertical, LucideIcon, Square, Minus, MoveVertical, AlignJustify,
+  ArrowUp, ArrowDown, Undo2, Redo2, Copy, Keyboard, X, PanelLeftClose, PanelLeft, Shield, Package, Hammer
+} from 'lucide-react';
+import { useTemplateHistory } from '../hooks/useTemplateHistory';
+import { useEscapeStack } from '../hooks/useEscapeStack';
+import { TemplateSettingsPanel } from './TemplateSettingsPanel';
+import { DocumentRenderer } from './DocumentRenderer';
+
+interface Props {
+  template: QuotationTemplate;
+  companyProfile: CompanyProfile;
+  sampleData: {
+    customer: Customer;
+    quotation: Quotation;
+    products: Product[];
+  };
+  onSave: (template: QuotationTemplate) => void;
+  onClose: () => void;
+}
+
+const BLOCK_ICONS: Record<BlockType, LucideIcon> = {
+  company_logo: Image,
+  company_details: Building2,
+  customer_details: User,
+  ship_to_details: Truck,
+  quotation_number: FileText,
+  quotation_date: Calendar,
+  product_table: Table,
+  gst_summary: FileText,
+  bank_details: CreditCard,
+  signature_box: PenTool,
+  footer_notes: Type,
+  terms_conditions: FileWarning,
+  totals: FileText,
+  text_block: Type,
+  rectangle: Square,
+  horizontal_line: Minus,
+  vertical_line: MoveVertical,
+  divider: AlignJustify,
+  warranty: Shield,
+  transport_details: Truck,
+  delivery_details: Package,
+  installation_details: Hammer,
+};
+
+const BLOCK_LABELS: Record<BlockType, string> = {
+  company_logo: 'Company Logo',
+  company_details: 'Company Details',
+  customer_details: 'Customer Details (Bill To)',
+  ship_to_details: 'Ship To Details',
+  quotation_number: 'Quotation Number',
+  quotation_date: 'Quotation Date',
+  product_table: 'Product Table',
+  gst_summary: 'GST Summary',
+  bank_details: 'Bank Details',
+  signature_box: 'Signature Box',
+  footer_notes: 'Footer Notes',
+  terms_conditions: 'Terms & Conditions',
+  totals: 'Totals',
+  text_block: 'Custom Text',
+  rectangle: 'Rectangle',
+  horizontal_line: 'Horizontal Line',
+  vertical_line: 'Vertical Line',
+  divider: 'Divider',
+  warranty: 'Warranty',
+  transport_details: 'Transport Details',
+  delivery_details: 'Delivery Details',
+  installation_details: 'Installation Details',
+};
+
+// Only these block types can be added as custom blocks
+const INSERTABLE_BLOCKS: BlockType[] = [
+  'bank_details',
+  'signature_box',
+  'terms_conditions',
+  'footer_notes',
+  'warranty',
+  'transport_details',
+  'delivery_details',
+  'installation_details',
+  'divider',
+  'text_block',
+];
+
+const ZONE_LABELS: Record<BlockZone, string> = {
+  // Horizontal flow zones
+  after_header: 'After Header',
+  after_meta: 'After Invoice Details',
+  after_party: 'After Party Details',
+  after_products: 'After Product Table',
+  after_totals: 'After Totals',
+  after_bank: 'After Bank Details',
+  footer: 'At Footer',
+  // Split zones
+  party_left: 'Bill To Area (Left)',
+  party_right: 'Ship To Area (Right)',
+  bank_left: 'Bank Area (Left)',
+  bank_right: 'Signature Area (Right)',
+  footer_left: 'Footer Left',
+  footer_center: 'Footer Center',
+  footer_right: 'Footer Right',
+  // Legacy
+  canvas: 'Free Position (Legacy)',
+};
+
+// Group zones by category
+const ZONE_GROUPS = {
+  horizontal: ['after_header', 'after_meta', 'after_party', 'after_products', 'after_totals', 'after_bank', 'footer'] as BlockZone[],
+  split: ['party_left', 'party_right', 'bank_left', 'bank_right', 'footer_left', 'footer_center', 'footer_right'] as BlockZone[],
+};
+
+export function TemplateBuilder({ template, companyProfile, sampleData, onSave, onClose }: Props) {
+  const [blocks, setBlocks] = useState<TemplateBlock[]>(template.blocks || []);
+  const [productColumns, setProductColumns] = useState<TableColumn[]>(template.productColumns || getDefaultProductColumns());
+  const [templateSettings, setTemplateSettings] = useState<TemplateSettings>(template.settings || DEFAULT_TEMPLATE_SETTINGS);
+  const [themeId] = useState<ThemeId>((template as any).themeId || 'professional_corporate');
+  const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
+  const [templateName, setTemplateName] = useState(template.name);
+  const [templateDescription, setTemplateDescription] = useState(template.description || '');
+  const [showAddBlock, setShowAddBlock] = useState(false);
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+
+  // Register sub-layers with escape stack (priority 1 = dropdowns/panels, 2 = small popups)
+  useEscapeStack(showShortcutsHelp ? () => setShowShortcutsHelp(false) : null, 2);
+  useEscapeStack(showColumnSettings ? () => setShowColumnSettings(false) : null, 2);
+  const [showLogoPanel, setShowLogoPanel] = useState(false);
+  useEscapeStack(showSettingsPanel ? () => setShowSettingsPanel(false) : null, 2);
+  useEscapeStack(showLogoPanel ? () => setShowLogoPanel(false) : null, 2);
+  const [selectedZone, setSelectedZone] = useState<BlockZone | null>(null);
+  const [selectedTypographyElement, setSelectedTypographyElement] = useState<TypographyElementId | undefined>(undefined);
+
+  // Register sub-layers with escape stack
+  useEscapeStack(showAddBlock ? () => { setShowAddBlock(false); setSelectedZone(null); } : null, 2);
+  useEscapeStack(selectedBlock ? () => setSelectedBlock(null) : null, 3);
+
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const isUndoRedoRef = useRef(false);
+  const clipboardRef = useRef<TemplateBlock | null>(null);
+
+  // Style themes shown in the builder dropdown are scoped to the template's
+  // structure. Professional Corporate exposes its 4 dedicated style variants;
+  // other structures expose the generic style themes. This keeps each
+  // template's styling options isolated without affecting the others.
+  const isProfessionalCorporate = themeId === 'professional_corporate';
+  const availableStyleThemes = Object.values(STYLE_THEMES).filter(
+    (t) => isProfessionalCorporate ? t.id.startsWith('pc_') : !t.id.startsWith('pc_')
+  );
+  // If the stored styleThemeId isn't valid for this structure (e.g. an older
+  // Professional Corporate template still on a generic theme), fall back to
+  // the structure's default so the dropdown always shows a valid selection.
+  const effectiveStyleThemeId: StyleThemeId =
+    availableStyleThemes.some((t) => t.id === templateSettings.styleThemeId)
+      ? (templateSettings.styleThemeId as StyleThemeId)
+      : (availableStyleThemes[0]?.id ?? 'pc_classic_premium');
+
+  // Persist the fallback so the saved template carries a style theme that
+  // matches its structure. Runs once on mount when the stored value is invalid.
+  useEffect(() => {
+    if (effectiveStyleThemeId !== templateSettings.styleThemeId) {
+      setTemplateSettings({ ...templateSettings, styleThemeId: effectiveStyleThemeId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const {
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    pushState,
+    getCurrentState,
+  } = useTemplateHistory({ maxHistorySize: 50 });
+
+  useEffect(() => {
+    pushState({ blocks: template.blocks || [], productColumns: template.productColumns || getDefaultProductColumns() });
+  }, []);
+
+  useEffect(() => {
+    const state = getCurrentState();
+    if (state && isUndoRedoRef.current) {
+      setBlocks(state.blocks);
+      setProductColumns(state.productColumns);
+      isUndoRedoRef.current = false;
+    }
+  }, [getCurrentState]);
+
+  // No calculations needed for the builder
+
+  const addBlock = (type: BlockType, zone: BlockZone) => {
+    const zoneBlocks = blocks.filter(b => b.zone === zone);
+    const maxOrder = zoneBlocks.reduce((max, b) => Math.max(max, b.order), -1);
+
+    const newBlock: TemplateBlock = {
+      id: generateId(),
+      type,
+      zone,
+      order: maxOrder + 1,
+      visible: true,
+      content: getDefaultContent(type),
+    };
+
+    const newBlocks = [...blocks, newBlock];
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
+    setSelectedBlock(newBlock.id);
+    setShowAddBlock(false);
+    setSelectedZone(null);
+  };
+
+  const getDefaultContent = (type: BlockType): string | undefined => {
+    switch (type) {
+      case 'terms_conditions':
+        return '1. Goods once sold will not be taken back or exchanged.\n2. All disputes are subject to local jurisdiction only.\n3. Payment due within 30 days of the invoice/quotation date.';
+      case 'warranty':
+        return 'Product warranty: 12 months from date of purchase.\nWarranty covers manufacturing defects only.';
+      case 'transport_details':
+        return 'Transport: To be arranged by buyer';
+      case 'delivery_details':
+        return 'Delivery: Within 7-10 working days\nDelivery charges extra as applicable';
+      case 'installation_details':
+        return 'Installation: To be done by our certified technician\nInstallation charges included in the quote';
+      case 'footer_notes':
+        return 'Thank you for your business!';
+      default:
+        return undefined;
+    }
+  };
+
+  const removeBlock = useCallback((id: string) => {
+    const newBlocks = blocks.filter(b => b.id !== id);
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
+    setSelectedBlock(null);
+  }, [blocks, productColumns, pushState]);
+
+  const duplicateBlock = useCallback((id: string) => {
+    const block = blocks.find(b => b.id === id);
+    if (!block) return;
+
+    const zoneBlocks = blocks.filter(b => b.zone === block.zone);
+    const maxOrder = zoneBlocks.reduce((max, b) => Math.max(max, b.order), -1);
+
+    const duplicatedBlock: TemplateBlock = {
+      ...block,
+      id: generateId(),
+      order: maxOrder + 1,
+    };
+
+    const newBlocks = [...blocks, duplicatedBlock];
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
+    setSelectedBlock(duplicatedBlock.id);
+  }, [blocks, productColumns, pushState]);
+
+  const moveBlockInZone = (id: string, direction: 'up' | 'down') => {
+    const block = blocks.find(b => b.id === id);
+    if (!block) return;
+
+    const zoneBlocks = blocks.filter(b => b.zone === block.zone).sort((a, b) => a.order - b.order);
+    const idx = zoneBlocks.findIndex(b => b.id === id);
+    if (idx === -1) return;
+
+    if (direction === 'up' && idx > 0) {
+      [zoneBlocks[idx - 1].order, zoneBlocks[idx].order] = [zoneBlocks[idx].order, zoneBlocks[idx - 1].order];
+    } else if (direction === 'down' && idx < zoneBlocks.length - 1) {
+      [zoneBlocks[idx + 1].order, zoneBlocks[idx].order] = [zoneBlocks[idx].order, zoneBlocks[idx + 1].order];
+    }
+
+    const newBlocks = blocks.map(b => {
+      const zoneBlock = zoneBlocks.find(zb => zb.id === b.id);
+      return zoneBlock ? { ...b, order: zoneBlock.order } : b;
+    });
+
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
+  };
+
+  const updateBlockContent = (id: string, content: string) => {
+    const newBlocks = blocks.map(b => b.id === id ? { ...b, content } : b);
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
+  };
+
+  const updateBlockZone = (id: string, zone: BlockZone) => {
+    const block = blocks.find(b => b.id === id);
+    if (!block) return;
+
+    const zoneBlocks = blocks.filter(b => b.zone === zone);
+    const maxOrder = zoneBlocks.reduce((max, b) => Math.max(max, b.order), -1);
+
+    const newBlocks = blocks.map(b =>
+      b.id === id ? { ...b, zone, order: maxOrder + 1 } : b
+    );
+
+    setBlocks(newBlocks);
+    pushState({ blocks: newBlocks, productColumns });
+  };
+
+  const handleSave = useCallback(() => {
+    const updatedTemplate: QuotationTemplate = {
+      ...template,
+      id: template.id || generateId(),
+      name: templateName,
+      description: templateDescription,
+      category: template.category || 'professional',
+      themeId,
+      blocks,
+      productColumns,
+      settings: templateSettings,
+      updatedAt: new Date().toISOString(),
+    };
+    onSave(updatedTemplate);
+  }, [template, templateName, templateDescription, blocks, productColumns, templateSettings, themeId, onSave]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (isInput) return;
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+
+      if (ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          isUndoRedoRef.current = true;
+          undo();
+        }
+        return;
+      }
+
+      if ((ctrlKey && e.key === 'y') || (ctrlKey && e.shiftKey && e.key === 'z')) {
+        e.preventDefault();
+        if (canRedo) {
+          isUndoRedoRef.current = true;
+          redo();
+        }
+        return;
+      }
+
+      if (ctrlKey && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+
+      if (ctrlKey && e.key === 'd' && selectedBlock) {
+        e.preventDefault();
+        duplicateBlock(selectedBlock);
+        return;
+      }
+
+      if (ctrlKey && e.key === 'c' && selectedBlock) {
+        e.preventDefault();
+        const block = blocks.find(b => b.id === selectedBlock);
+        if (block) {
+          clipboardRef.current = { ...block };
+        }
+        return;
+      }
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlock && !isInput) {
+        e.preventDefault();
+        removeBlock(selectedBlock);
+        return;
+      }
+
+
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, canUndo, canRedo, selectedBlock, blocks, removeBlock, duplicateBlock, handleSave]);
+
+  const handleZoneClick = (zone: BlockZone) => {
+    setSelectedZone(zone);
+    setShowAddBlock(true);
+  };
+
+  const selectedBlockData = selectedBlock ? blocks.find(b => b.id === selectedBlock) : null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/90 z-50 flex flex-col lg:flex-row">
+      {/* Mobile Header - Preview Toggle and Actions */}
+      <div className="lg:hidden bg-white border-b border-slate-200 p-3 flex items-center justify-between gap-2 safe-area-inset">
+        <input
+          type="text"
+          value={templateName}
+          onChange={(e) => setTemplateName(e.target.value)}
+          className="flex-1 px-3 py-2 border border-slate-300 rounded-md font-semibold text-base min-h-[44px]"
+          placeholder="Template Name"
+        />
+        <button
+          onClick={handleSave}
+          className="px-4 py-2 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2 min-h-[44px]"
+        >
+          <Save className="w-4 h-4" /> Save
+        </button>
+        <button
+          onClick={onClose}
+          className="px-3 py-2 border border-slate-300 rounded-md min-h-[44px] min-w-[44px] flex items-center justify-center"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Mobile Layout - Accordion Style */}
+      <div className="lg:hidden flex-1 overflow-y-auto bg-gray-100">
+        {/* Preview Section - Always visible */}
+        <div className="bg-white border-b border-slate-200">
+          <div className="p-3 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-800">Preview</h3>
+            <select
+              value={effectiveStyleThemeId}
+              onChange={(e) => setTemplateSettings({ ...templateSettings, styleThemeId: e.target.value as StyleThemeId })}
+              className="px-2 py-1.5 border border-slate-300 rounded text-sm min-h-[40px]"
+            >
+              {availableStyleThemes.map(theme => (
+                <option key={theme.id} value={theme.id}>{theme.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="overflow-x-auto p-3 bg-gray-100">
+            <div className="inline-block min-w-[300px] transform origin-top-left"
+              style={{ transform: 'scale(0.5)', transformOrigin: 'top left', marginLeft: '-50%' }}>
+              <CanvasArea themeId={themeId} canvasRef={canvasRef}>
+                <DocumentRenderer
+                  themeId={themeId}
+                  settings={templateSettings}
+                  company={companyProfile}
+                  customer={sampleData.customer}
+                  quotation={sampleData.quotation}
+                  products={sampleData.products}
+                  docType="quotation"
+                  customBlocks={blocks}
+                  showZones={true}
+                  onZoneClick={handleZoneClick}
+                  onBlockClick={(id) => { if (id) setSelectedBlock(id); else setSelectedBlock(null); }}
+                  selectedBlockId={selectedBlock ?? undefined}
+                  onTypographyElementClick={setSelectedTypographyElement}
+                  selectedTypographyElementId={selectedTypographyElement}
+                  schema={template.schema}
+                />
+              </CanvasArea>
+            </div>
+          </div>
+        </div>
+
+        {/* Controls Section - Collapsible */}
+        <div className="bg-white border-b border-slate-200 mt-2">
+          <button
+            onClick={() => setShowAddBlock(!showAddBlock)}
+            className="w-full p-4 flex items-center justify-between"
+          >
+            <span className="font-semibold text-slate-800 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-emerald-600" />
+              Add Block / Controls
+            </span>
+            <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showAddBlock ? 'rotate-180' : ''}`} />
+          </button>
+          {showAddBlock && (
+            <div className="p-4 pt-0 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowColumnSettings(!showColumnSettings)}
+                  className="px-3 py-3 border border-slate-300 rounded-md text-sm flex items-center justify-center gap-2 hover:bg-slate-50 min-h-[44px]"
+                >
+                  <Settings className="w-4 h-4" />
+                  Columns
+                </button>
+                <button
+                  onClick={() => setShowSettingsPanel(!showSettingsPanel)}
+                  className={`px-3 py-3 rounded-md text-sm flex items-center justify-center gap-2 min-h-[44px] ${
+                    showSettingsPanel
+                      ? 'bg-emerald-600 text-white'
+                      : 'border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </button>
+                <button
+                  onClick={() => setShowLogoPanel(!showLogoPanel)}
+                  className={`px-3 py-3 rounded-md text-sm flex items-center justify-center gap-2 min-h-[44px] col-span-2 ${
+                    showLogoPanel
+                      ? 'bg-blue-600 text-white'
+                      : 'border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <Image className="w-4 h-4" />
+                  Logo Customization
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">Template (structure)</label>
+                <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded text-sm text-slate-600">
+                  {INVOICE_THEMES[themeId]?.name ?? 'Custom'}
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  isUndoRedoRef.current = true;
+                  undo();
+                }}
+                disabled={!canUndo}
+                className={`w-full px-3 py-3 rounded-md flex items-center justify-center gap-2 text-sm min-h-[44px] ${
+                  canUndo
+                    ? 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+                    : 'bg-slate-50 text-gray-300 cursor-not-allowed border border-slate-200'
+                }`}
+              >
+                <Undo2 className="w-4 h-4" /> Undo
+              </button>
+              <button
+                onClick={() => {
+                  isUndoRedoRef.current = true;
+                  redo();
+                }}
+                disabled={!canRedo}
+                className={`w-full px-3 py-3 rounded-md flex items-center justify-center gap-2 text-sm min-h-[44px] ${
+                  canRedo
+                    ? 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+                    : 'bg-slate-50 text-gray-300 cursor-not-allowed border border-slate-200'
+                }`}
+              >
+                <Redo2 className="w-4 h-4" /> Redo
+              </button>
+
+              {/* Blocks List */}
+              <div>
+                <h4 className="font-medium text-sm text-slate-700 mb-2">Custom Blocks</h4>
+                {blocks.length === 0 ? (
+                  <div className="text-sm text-slate-500 text-center py-4 bg-slate-50 rounded">
+                    No blocks added. Tap a zone in preview to add.
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {blocks.sort((a, b) => {
+                      const zoneOrder: BlockZone[] = ['after_header', 'after_party', 'after_products', 'after_totals', 'after_bank', 'footer'];
+                      const zoneA = zoneOrder.indexOf(a.zone);
+                      const zoneB = zoneOrder.indexOf(b.zone);
+                      if (zoneA !== zoneB) return zoneA - zoneB;
+                      return a.order - b.order;
+                    }).map(block => {
+                      const Icon = BLOCK_ICONS[block.type];
+                      return (
+                        <button
+                          key={block.id}
+                          onClick={() => setSelectedBlock(block.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-3 rounded text-left min-h-[44px] ${
+                            selectedBlock === block.id ? 'bg-blue-100 border border-blue-300' : 'bg-slate-50 border border-slate-200'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 text-slate-500" />
+                          <span className="text-sm flex-1">{BLOCK_LABELS[block.type]}</span>
+                          <Trash2
+                            className="w-4 h-4 text-red-400"
+                            onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Settings Panel - When Open */}
+        {showSettingsPanel && (
+          <div className="bg-white border-b border-slate-200 mt-2">
+            <div className="p-4">
+              <TemplateSettingsPanel
+                settings={templateSettings}
+                onChange={setTemplateSettings}
+                selectedTypographyElement={selectedTypographyElement}
+                onTypographyElementSelect={setSelectedTypographyElement}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Logo Customization Panel - Mobile */}
+        {showLogoPanel && (
+          <div className="bg-white border-b border-slate-200 mt-2">
+            <div className="p-4">
+              <LogoCustomizationPanel
+                settings={templateSettings}
+                onChange={setTemplateSettings}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Block Properties - When Selected */}
+        {selectedBlockData && (
+          <div className="bg-white border-b border-slate-200 mt-2 p-4">
+            <h4 className="font-semibold text-slate-800 mb-3">Block Properties</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Zone</label>
+                <select
+                  value={selectedBlockData.zone}
+                  onChange={(e) => updateBlockZone(selectedBlockData.id, e.target.value as BlockZone)}
+                  className="w-full px-3 py-2 border rounded text-sm min-h-[44px]"
+                >
+                  {Object.entries(ZONE_LABELS).map(([zone, label]) => (
+                    <option key={zone} value={zone}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              {['text_block', 'terms_conditions', 'warranty', 'transport_details', 'delivery_details', 'installation_details', 'footer_notes'].includes(selectedBlockData.type) && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Content</label>
+                  <textarea
+                    value={selectedBlockData.content || ''}
+                    onChange={(e) => updateBlockContent(selectedBlockData.id, e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm resize-none min-h-[88px]"
+                    rows={3}
+                  />
+                </div>
+              )}
+              <button
+                onClick={() => removeBlock(selectedBlockData.id)}
+                className="w-full px-3 py-3 bg-red-50 text-red-600 rounded flex items-center justify-center gap-2 min-h-[44px]"
+              >
+                <Trash2 className="w-4 h-4" /> Delete Block
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Layout */}
+      {/* Left Sidebar - Tools */}
+      <div className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col h-full overflow-y-auto">
+        <div className="p-4 border-b">
+          <input
+            type="text"
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-md font-semibold text-lg"
+            placeholder="Template Name"
+          />
+          <textarea
+            value={templateDescription}
+            onChange={(e) => setTemplateDescription(e.target.value)}
+            className="w-full mt-2 px-3 py-2 border border-slate-300 rounded-md text-sm resize-none"
+            rows={2}
+            placeholder="Template description..."
+          />
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => {
+                isUndoRedoRef.current = true;
+                undo();
+              }}
+              disabled={!canUndo}
+              className={`flex-1 px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${
+                canUndo
+                  ? 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+                  : 'bg-slate-50 text-gray-300 cursor-not-allowed border border-slate-200'
+              }`}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" /> Undo
+            </button>
+            <button
+              onClick={() => {
+                isUndoRedoRef.current = true;
+                redo();
+              }}
+              disabled={!canRedo}
+              className={`flex-1 px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${
+                canRedo
+                  ? 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+                  : 'bg-slate-50 text-gray-300 cursor-not-allowed border border-slate-200'
+              }`}
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 className="w-4 h-4" /> Redo
+            </button>
+            <button
+              onClick={() => setShowShortcutsHelp(!showShortcutsHelp)}
+              className={`px-2 py-1.5 rounded-md text-sm transition-colors ${
+                showShortcutsHelp
+                  ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                  : 'bg-slate-100 hover:bg-gray-200 text-slate-700 border border-slate-300'
+              }`}
+              title="Keyboard Shortcuts"
+            >
+              <Keyboard className="w-4 h-4" />
+            </button>
+          </div>
+          {showShortcutsHelp && (
+            <div className="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold text-slate-700">Keyboard Shortcuts</span>
+                <button onClick={() => setShowShortcutsHelp(false)} className="p-0.5 hover:bg-gray-200 rounded">
+                  <X className="w-3 h-3 text-slate-500" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-slate-600">
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+Z</kbd> Undo</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+D</kbd> Duplicate</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+Y</kbd> Redo</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Del</kbd> Delete</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+C</kbd> Copy</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+S</kbd> Save</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Ctrl+V</kbd> Paste</span>
+                <span><kbd className="px-1 bg-gray-200 rounded">Esc</kbd> Unselect</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-b">
+          <h3 className="font-semibold text-slate-800 mb-2">Add Custom Block</h3>
+          <div className="relative">
+            <button
+              onClick={() => setShowAddBlock(!showAddBlock)}
+              className="w-full px-3 py-2.5 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2 min-h-[44px]"
+            >
+              <Plus className="w-4 h-4" /> Add Block
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="mt-3">
+            <button
+              onClick={() => setShowColumnSettings(!showColumnSettings)}
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm flex items-center justify-center gap-2 hover:bg-slate-50 min-h-[44px]"
+            >
+              <Settings className="w-4 h-4" />
+              Table Columns
+            </button>
+          </div>
+          <div className="mt-2">
+            <button
+              onClick={() => setShowSettingsPanel(!showSettingsPanel)}
+              className={`w-full px-3 py-2.5 rounded-md text-sm flex items-center justify-center gap-2 min-h-[44px] ${
+                showSettingsPanel
+                  ? 'bg-emerald-600 text-white'
+                  : 'border border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              {showSettingsPanel ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+              Template Settings
+            </button>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Template (structure)</label>
+            <div className="px-2 py-2 bg-slate-100 border border-slate-200 rounded text-sm text-slate-600">
+              {INVOICE_THEMES[themeId]?.name ?? 'Custom'}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">Structure is fixed by the template. Use themes below to restyle.</p>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Theme (style)</label>
+            <select
+              value={effectiveStyleThemeId}
+              onChange={(e) => setTemplateSettings({ ...templateSettings, styleThemeId: e.target.value as StyleThemeId })}
+              className="w-full px-2 py-2 border border-slate-300 rounded text-sm min-h-[44px]"
+            >
+              {availableStyleThemes.map(theme => (
+                <option key={theme.id} value={theme.id}>{theme.name}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1">Changes colors, typography, borders only.</p>
+          </div>
+        </div>
+
+        {/* Column Settings Panel */}
+        {showColumnSettings && (
+          <div className="p-4 bg-slate-50 border-b max-h-64 overflow-y-auto">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-medium text-sm">Product Table Columns</h4>
+              <button
+                onClick={() => {
+                  const newColumn: TableColumn = {
+                    id: generateId(),
+                    key: `custom_${productColumns.length}`,
+                    label: 'New Column',
+                    width: 15,
+                    visible: true,
+                    order: productColumns.length,
+                  };
+                  setProductColumns([...productColumns, newColumn]);
+                }}
+                className="text-blue-600 text-xs hover:underline"
+              >
+                + Add
+              </button>
+            </div>
+            <div className="space-y-1">
+              {[...productColumns].sort((a, b) => a.order - b.order).map(col => (
+                <div key={col.id} className="flex items-center gap-1 bg-white p-1 rounded border text-xs">
+                  <GripVertical className="w-3 h-3 text-slate-400 cursor-move" />
+                  <input
+                    type="checkbox"
+                    checked={col.visible}
+                    onChange={(e) => {
+                      const newCols = productColumns.map(c => c.id === col.id ? { ...c, visible: e.target.checked } : c);
+                      setProductColumns(newCols);
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <input
+                    type="text"
+                    value={col.label}
+                    onChange={(e) => {
+                      const newCols = productColumns.map(c => c.id === col.id ? { ...c, label: e.target.value } : c);
+                      setProductColumns(newCols);
+                    }}
+                    className="flex-1 px-1 py-0.5 border-0 text-xs"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Blocks List */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <h3 className="font-semibold text-slate-800 mb-2">Custom Blocks</h3>
+          {blocks.length === 0 ? (
+            <div className="text-sm text-slate-500 text-center py-4">
+              No custom blocks added yet. Click "Add Block" or click a zone in the preview.
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {blocks.sort((a, b) => {
+                const zoneOrder: BlockZone[] = ['after_header', 'after_party', 'after_products', 'after_totals', 'after_bank', 'footer'];
+                const zoneA = zoneOrder.indexOf(a.zone);
+                const zoneB = zoneOrder.indexOf(b.zone);
+                if (zoneA !== zoneB) return zoneA - zoneB;
+                return a.order - b.order;
+              }).map(block => {
+                const Icon = BLOCK_ICONS[block.type];
+                return (
+                  <div
+                    key={block.id}
+                    className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer transition-colors min-h-[44px] ${
+                      selectedBlock === block.id ? 'bg-blue-100 border-blue-300' : 'hover:bg-slate-100'
+                    }`}
+                    onClick={() => setSelectedBlock(block.id)}
+                  >
+                    <Icon className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm flex-1 truncate">{BLOCK_LABELS[block.type]}</span>
+                    <span className="text-xs text-slate-400">{zoneLabels(block.zone)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="p-4 border-t bg-slate-50 space-y-2">
+          <button
+            onClick={handleSave}
+            className="w-full px-4 py-3 bg-emerald-600 text-white rounded-md flex items-center justify-center gap-2 min-h-[44px]"
+          >
+            <Save className="w-4 h-4" /> Save Template
+          </button>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-3 border border-slate-300 rounded-md min-h-[44px]"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Main Canvas Area - Document Renderer (Desktop) */}
+      <div className="hidden lg:block flex-1 overflow-auto p-8 bg-gray-200 flex items-start justify-center">
+        <CanvasArea themeId={themeId} canvasRef={canvasRef}>
+          <DocumentRenderer
+            themeId={themeId}
+            settings={templateSettings}
+            company={companyProfile}
+            customer={sampleData.customer}
+            quotation={sampleData.quotation}
+            products={sampleData.products}
+            docType="quotation"
+            customBlocks={blocks}
+            showZones={true}
+            onZoneClick={handleZoneClick}
+            onBlockClick={(id) => { if (id) setSelectedBlock(id); else setSelectedBlock(null); }}
+            selectedBlockId={selectedBlock ?? undefined}
+            onTypographyElementClick={setSelectedTypographyElement}
+            selectedTypographyElementId={selectedTypographyElement}
+            schema={template.schema}
+          />
+        </CanvasArea>
+      </div>
+
+      {/* Right Sidebar - Block Properties or Settings Panel (Desktop) */}
+      {showSettingsPanel ? (
+        <div className="hidden lg:block w-72 border-l border-slate-200 bg-white overflow-y-auto">
+          <TemplateSettingsPanel
+            settings={templateSettings}
+            onChange={setTemplateSettings}
+            selectedTypographyElement={selectedTypographyElement}
+            onTypographyElementSelect={setSelectedTypographyElement}
+          />
+        </div>
+      ) : selectedBlockData ? (
+        <div className="hidden lg:block w-64 bg-white border-l border-slate-200 p-4 overflow-y-auto">
+          <h3 className="font-semibold text-slate-800 mb-4">Properties</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Block Type</label>
+              <div className="px-3 py-2 bg-slate-100 rounded text-sm">
+                {BLOCK_LABELS[selectedBlockData.type]}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Zone</label>
+              <select
+                value={selectedBlockData.zone}
+                onChange={(e) => updateBlockZone(selectedBlockData.id, e.target.value as BlockZone)}
+                className="w-full px-2 py-2 border rounded text-sm"
+              >
+                {Object.entries(ZONE_LABELS).map(([zone, label]) => (
+                  <option key={zone} value={zone}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => moveBlockInZone(selectedBlockData.id, 'up')}
+                className="flex-1 px-2 py-2 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50 min-h-[44px]"
+              >
+                <ArrowUp className="w-3 h-3" /> Up
+              </button>
+              <button
+                onClick={() => moveBlockInZone(selectedBlockData.id, 'down')}
+                className="flex-1 px-2 py-2 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50 min-h-[44px]"
+              >
+                <ArrowDown className="w-3 h-3" /> Down
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 min-h-[44px]">
+              <input
+                type="checkbox"
+                id="blockVisible"
+                checked={selectedBlockData.visible}
+                onChange={(e) => {
+                  const newBlocks = blocks.map(b =>
+                    b.id === selectedBlockData.id ? { ...b, visible: e.target.checked } : b
+                  );
+                  setBlocks(newBlocks);
+                  pushState({ blocks: newBlocks, productColumns });
+                }}
+                className="w-5 h-5"
+              />
+              <label htmlFor="blockVisible" className="text-sm">Visible</label>
+            </div>
+
+            {['text_block', 'terms_conditions', 'warranty', 'transport_details', 'delivery_details', 'installation_details', 'footer_notes'].includes(selectedBlockData.type) && (
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Content</label>
+                <textarea
+                  value={selectedBlockData.content || ''}
+                  onChange={(e) => updateBlockContent(selectedBlockData.id, e.target.value)}
+                  className="w-full px-2 py-2 border rounded text-sm resize-none"
+                  rows={4}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => duplicateBlock(selectedBlockData.id)}
+                className="flex-1 px-2 py-2 border rounded text-sm flex items-center justify-center gap-1 hover:bg-slate-50 min-h-[44px]"
+              >
+                <Copy className="w-3 h-3" /> Duplicate
+              </button>
+              <button
+                onClick={() => removeBlock(selectedBlockData.id)}
+                className="flex-1 px-2 py-2 bg-red-50 text-red-600 rounded text-sm flex items-center justify-center gap-1 hover:bg-red-100 min-h-[44px]"
+              >
+                <Trash2 className="w-3 h-3" /> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="hidden lg:block w-64 bg-white border-l border-slate-200 p-4 overflow-y-auto">
+          <h3 className="font-semibold text-slate-800 mb-4">Properties</h3>
+          <div className="text-sm text-slate-500">
+            <p>Select a block to edit its properties.</p>
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-700">
+                <strong>Tips:</strong><br />
+                - Click a zone to add blocks<br />
+                - Blocks are rendered in flow layout<br />
+                - Use settings to toggle fixed sections
+              </p>
+            </div>
+          </div>
+          <div className="mt-6">
+            <LogoCustomizationPanel
+              settings={templateSettings}
+              onChange={setTemplateSettings}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Add Block Modal */}
+      {showAddBlock && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAddBlock(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-[600px] max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Add Custom Block</h2>
+              <button onClick={() => setShowAddBlock(false)} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 max-h-[65vh] overflow-y-auto">
+              {/* Zone Selection - Grouped by type */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Insert Into Zone</label>
+
+                {/* Horizontal Flow Zones */}
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Full Width Sections</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ZONE_GROUPS.horizontal.map(zone => (
+                      <button
+                        key={zone}
+                        onClick={() => setSelectedZone(zone)}
+                        className={`p-2.5 border rounded-lg text-left transition-colors ${
+                          selectedZone === zone
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="text-sm font-medium">{ZONE_LABELS[zone]}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Split Zones */}
+                <div>
+                  <div className="text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Split Columns (Side by Side)</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {ZONE_GROUPS.split.map(zone => (
+                      <button
+                        key={zone}
+                        onClick={() => setSelectedZone(zone)}
+                        className={`p-2 border rounded-lg text-left transition-colors ${
+                          selectedZone === zone
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="text-xs font-medium">{ZONE_LABELS[zone]}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Block Types Grid */}
+              {selectedZone && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-slate-700">Select Block Type</label>
+                    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                      Zone: {ZONE_LABELS[selectedZone]}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {INSERTABLE_BLOCKS.map(type => {
+                      const Icon = BLOCK_ICONS[type];
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => addBlock(type, selectedZone)}
+                          className="flex items-center gap-3 p-3 border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors text-left"
+                        >
+                          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                            <Icon className="w-5 h-5 text-slate-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm">{BLOCK_LABELS[type]}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LogoCustomizationPanel({
+  settings,
+  onChange,
+}: {
+  settings: TemplateSettings;
+  onChange: (s: TemplateSettings) => void;
+}) {
+  const logo: LogoSettings = settings.logoSettings ?? DEFAULT_LOGO_SETTINGS;
+
+  const updateLogo = (patch: Partial<LogoSettings>) => {
+    onChange({ ...settings, logoSettings: { ...logo, ...patch } });
+  };
+
+  const presetEntries = Object.entries(LOGO_SIZE_PRESETS) as [LogoSizePreset, { label: string; height: number }][];
+  const currentHeight = logo.customSize > 0 ? logo.customSize : (LOGO_SIZE_PRESETS[logo.sizePreset]?.height ?? 50);
+
+  return (
+    <div className="space-y-4">
+      <h4 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+        <Image className="w-4 h-4 text-blue-600" />
+        Logo Customization
+      </h4>
+
+      {/* Size Presets */}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1.5">Logo Size</label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {presetEntries.map(([key, val]) => (
+            <button
+              key={key}
+              onClick={() => updateLogo({ sizePreset: key, customSize: 0 })}
+              className={`px-2 py-2 rounded text-xs font-medium border transition-colors ${
+                logo.sizePreset === key && logo.customSize === 0
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+              }`}
+            >
+              {val.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Custom Size Slider */}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1.5">
+          Custom Size: {currentHeight}px height
+        </label>
+        <input
+          type="range"
+          min={10}
+          max={200}
+          value={currentHeight}
+          onChange={(e) => updateLogo({ customSize: parseInt(e.target.value) })}
+          className="w-full accent-blue-600"
+        />
+        <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+          <span>10px</span>
+          <span>200px</span>
+        </div>
+      </div>
+
+      {/* Alignment */}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1.5">Logo Alignment</label>
+        <div className="grid grid-cols-3 gap-1.5">
+          {(['left', 'center', 'right'] as LogoAlignment[]).map(align => (
+            <button
+              key={align}
+              onClick={() => updateLogo({ alignment: align })}
+              className={`px-2 py-2 rounded text-xs font-medium border transition-colors capitalize ${
+                logo.alignment === align
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+              }`}
+            >
+              {align}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Margins */}
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1.5">Margins (px)</label>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ['marginTop', 'Top'],
+            ['marginBottom', 'Bottom'],
+            ['marginLeft', 'Left'],
+            ['marginRight', 'Right'],
+          ] as [keyof Pick<LogoSettings, 'marginTop' | 'marginBottom' | 'marginLeft' | 'marginRight'>, string][]).map(([key, label]) => (
+            <div key={key}>
+              <label className="block text-[10px] text-slate-500 mb-0.5">{label}</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={logo[key]}
+                onChange={(e) => updateLogo({ [key]: parseInt(e.target.value) || 0 } as Partial<LogoSettings>)}
+                className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Reset */}
+      <button
+        onClick={() => onChange({ ...settings, logoSettings: { ...DEFAULT_LOGO_SETTINGS } })}
+        className="w-full px-3 py-2.5 border border-amber-300 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-50 transition-colors flex items-center justify-center gap-2"
+      >
+        <RotateCcw className="w-4 h-4" />
+        Reset Logo Settings
+      </button>
+
+      <p className="text-[10px] text-slate-400 leading-relaxed">
+        Logo scales proportionally without distortion. Settings are saved per template and apply to invoices, quotations, preview, PDF export, and print across all paper sizes.
+      </p>
+    </div>
+  );
+}
+
+function zoneLabels(zone: BlockZone): string {
+  const labels: Record<BlockZone, string> = {
+    after_header: '↓ Header',
+    after_meta: '↓ Meta',
+    after_party: '↓ Party',
+    after_products: '↓ Products',
+    after_totals: '↓ Totals',
+    after_bank: '↓ Bank',
+    footer: '↓ Footer',
+    party_left: '← Bill To',
+    party_right: '→ Ship To',
+    bank_left: '← Bank',
+    bank_right: '→ Signature',
+    footer_left: '← Left',
+    footer_center: '● Center',
+    footer_right: '→ Right',
+    canvas: 'Canvas',
+  };
+  return labels[zone] || zone;
+}
+
+// Canvas area component that handles different paper sizes.
+// Uses mm-based width to match the PDF export container exactly so the builder
+// canvas renders identically to the preview and the exported PDF.
+function CanvasArea({ themeId, canvasRef, children }: { themeId: ThemeId; canvasRef: React.RefObject<HTMLDivElement>; children: React.ReactNode }) {
+  const theme = INVOICE_THEMES[themeId] ?? INVOICE_THEMES['professional_corporate'];
+
+  const getPaperDimensions = () => {
+    switch (theme.paperSize) {
+      case 'a5':
+        return { width: A5_WIDTH, height: A5_HEIGHT };
+      case 'pos':
+        return { width: POS_WIDTH, height: 0 }; // POS height is dynamic (content-driven)
+      default:
+        return { width: A4_WIDTH, height: A4_HEIGHT };
+    }
+  };
+  const dims = getPaperDimensions();
+
+  return (
+    <div
+      ref={canvasRef}
+      className="bg-white shadow-2xl relative"
+      style={{
+        width: `${dims.width}mm`,
+        minHeight: dims.height > 0 ? `${dims.height}mm` : undefined,
+      }}
+    >
+      {children}
+    </div>
+  );
+}

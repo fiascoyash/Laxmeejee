@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792859917777,
+      "tag": "0000_hisaaboo_base_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792905091609,
+      "tag": "0001_add_stock_details_and_atomic_history",
+      "breakpoints": true
+    }
+  ]
+}
