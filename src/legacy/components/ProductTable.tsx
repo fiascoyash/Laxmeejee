@@ -50,6 +50,16 @@ const getBuiltinColumns = (): Record<string, TableColumn> => ({
   notes: { id: 'col_notes', key: 'notes', label: 'Notes', width: 15, visible: false, order: 13 },
 });
 
+const GST_PERCENT_OPTIONS = [0, 0.25, 1, 1.5, 3, 5, 6, 7.5, 12, 18, 28, 40];
+const GST_CATEGORY_OPTIONS = ['None', 'Nil Rated', 'Non-GST', 'Exempt'];
+const gstSelectValue = (p: any) => (p.gstCategory ? `cat:${p.gstCategory}` : String(p.gstPercent ?? 0));
+const GST_SELECT_OPTIONS = (
+  <>
+    {GST_CATEGORY_OPTIONS.map(c => <option key={c} value={`cat:${c}`}>{c}</option>)}
+    {GST_PERCENT_OPTIONS.map(r => <option key={r} value={r}>{r}%</option>)}
+  </>
+);
+
 export function ProductTable({ products, onChange, catalog, columns, onColumnsChange, gstMode = 'inclusive', onGstModeChange, customFields = [], templateSettings, schema, onSaveNewProduct }: Props) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -283,6 +293,16 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     ));
   };
 
+  // Non-percentage categories are stored as 0% GST plus a label, so tax maths stays at zero.
+  const updateGst = (id: string, raw: string) => {
+    onChange(products.map(p => {
+      if (p.id !== id) return p;
+      if (raw.startsWith('cat:')) return { ...p, gstPercent: 0, gstCategory: raw.slice(4) };
+      const { gstCategory, ...rest } = p as any;
+      return { ...rest, gstPercent: Number(raw) };
+    }));
+  };
+
   const updateCustomField = (productId: string, fieldKey: string, value: string | number | boolean) => {
     onChange(products.map(p =>
       p.id === productId
@@ -381,15 +401,11 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       case 'gstPercent':
         return (
           <select
-            value={product.gstPercent}
-            onChange={(e) => updateProduct(product.id, 'gstPercent', Number(e.target.value))}
+            value={gstSelectValue(product)}
+            onChange={(e) => updateGst(product.id, e.target.value)}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
           >
-            <option value={0}>0%</option>
-            <option value={5}>5%</option>
-            <option value={18}>18%</option>
-            <option value={28}>28%</option>
-            <option value={40}>40%</option>
+            {GST_SELECT_OPTIONS}
           </select>
         );
       case 'quantityUnit':
@@ -924,15 +940,11 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                 <div>
                   <label className="text-xs text-slate-500 mb-1 block">GST%</label>
                   <select
-                    value={product.gstPercent}
-                    onChange={(e) => updateProduct(product.id, 'gstPercent', Number(e.target.value))}
+                    value={gstSelectValue(product)}
+                    onChange={(e) => updateGst(product.id, e.target.value)}
                     className="w-full px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
                   >
-                    <option value={0}>0%</option>
-                    <option value={5}>5%</option>
-                    <option value={18}>18%</option>
-                    <option value={28}>28%</option>
-                    <option value={40}>40%</option>
+                    {GST_SELECT_OPTIONS}
                   </select>
                 </div>
               )}

@@ -2,6 +2,7 @@
 import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyProfile, QuotationTemplate, TableColumn, GstMode, ShipTo, TemplateSchema } from '../types';
 import { CustomerDetails } from './CustomerDetails';
 import { ProductTable } from './ProductTable';
+import { TermsEditor } from './TermsEditor';
 import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, FileText, IndianRupee, Printer } from 'lucide-react';
 
 interface Props {
@@ -295,13 +296,7 @@ export function InvoiceForm({
             {selectedTemplate.settings.showTermsConditions && (
               <div className="lg:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Terms & Conditions</label>
-                <textarea
-                  value={invoice.terms || ''}
-                  onChange={(e) => update({ terms: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-blue-500"
-                  rows={3}
-                  placeholder="1. Goods once sold will not be taken back or exchanged.&#10;2. All disputes are subject to local jurisdiction only."
-                />
+                <TermsEditor value={invoice.terms || ''} onChange={(v) => update({ terms: v })} />
               </div>
             )}
           </div>

@@ -433,3 +433,48 @@
   .hs-fade-in, .hs-pop-in { animation: none; }
   .hs-check-circle, .hs-check-mark { animation: none; stroke-dashoffset: 0; }
 }
+
+/* Dashboard company name: subtle light sweep clipped to the letters */
+@keyframes hb-sweep { 0% { background-position: 150% 0; } 60%, 100% { background-position: -50% 0; } }
+.hb-name-shimmer {
+  color: inherit;
+  background-image: linear-gradient(100deg, currentColor 0%, currentColor 40%, color-mix(in oklab, currentColor 45%, white) 50%, currentColor 60%, currentColor 100%);
+  background-size: 250% 100%;
+  background-position: 150% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: hb-sweep-rare 9s ease-in-out infinite;
+  transition: filter .4s ease;
+}
+@keyframes hb-sweep-rare { 0% { background-position: 150% 0; filter: none; } 22% { filter: drop-shadow(0 0 6px color-mix(in oklab, currentColor 22%, transparent)); } 35%, 100% { background-position: -50% 0; filter: none; } }
+@media (hover: hover) { .hb-name-shimmer:hover { filter: drop-shadow(0 0 5px color-mix(in oklab, currentColor 25%, transparent)) brightness(1.06); } }
+
+/* Hisaaboo logo: solar halo + wordmark shimmer (filters only, no layout change) */
+@keyframes hb-sun-halo {
+  0%, 100% { transform: rotate(0deg); filter: drop-shadow(0 0 2px color-mix(in oklab, currentColor 45%, transparent)); }
+  50% { transform: rotate(180deg); filter: drop-shadow(0 0 5px color-mix(in oklab, currentColor 55%, transparent)); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes hb-sun-pulse { 0%, 86%, 100% { scale: 1; } 92% { scale: 1.08; } }
+@keyframes hb-sun-ripple { 0% { scale: 1; } 40% { scale: 1.14; } 100% { scale: 1; } }
+.hb-logo-sun { animation: hb-sun-halo 24s linear infinite, hb-sun-pulse 7s ease-in-out infinite; transform-origin: center; cursor: default; }
+.hb-logo-sun:hover { animation: hb-sun-halo 24s linear infinite, hb-sun-ripple .6s ease-out 1; }
+.hb-logo-sun:active { scale: .92; }
+.hb-wordmark {
+  background-image: linear-gradient(100deg, currentColor 0%, currentColor 42%, color-mix(in oklab, currentColor 55%, #fde68a) 50%, currentColor 58%, currentColor 100%);
+  background-size: 250% 100%; background-position: 150% 0;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: hb-sweep-rare 8s ease-in-out infinite;
+  transition: filter .3s ease, text-shadow .3s ease;
+}
+.hb-wordmark:hover { filter: brightness(1.12) drop-shadow(0 1px 1px color-mix(in oklab, currentColor 30%, transparent)); }
+.hb-wordmark:active { filter: brightness(1.2); }
+@media (prefers-reduced-motion: reduce) {
+  .hb-name-shimmer, .hb-wordmark { animation: none; -webkit-text-fill-color: currentColor; background: none; }
+  .hb-logo-sun, .hb-logo-sun:hover { animation: none; }
+}
+
+/* Inline validation */
+.hb-field-invalid { border-color: var(--color-red-400, #f87171) !important; box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-red-400, #f87171) 18%, transparent) !important; }
+.hb-inline-error { margin-top: 0.25rem; font-size: 0.75rem; color: var(--color-red-600, #dc2626); animation: hs-fade-in 0.18s ease-out both; }

@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { parseGstr2bWorkbook, FIELD_LABELS, Gstr2bError } from '../../utils/gstr2b';
+import { Gstr3bPrep } from './Gstr3bPrep';
 
 const inr = (v: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 const NA = <span className="text-slate-400 italic">Not in file</span>;
@@ -36,6 +37,7 @@ export const Gstr2bAnalyzer: React.FC<{ uploadRequest?: number; onResultChange?:
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [prep3b, setPrep3b] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingPickRef = useRef(false);
 
@@ -73,7 +75,7 @@ export const Gstr2bAnalyzer: React.FC<{ uploadRequest?: number; onResultChange?:
   };
 
   const resetFilters = () => { setSearch(''); setGstinFilter(''); setTypeFilter(''); setItcFilter(''); setSortBy(''); setPage(0); };
-  const clearAll = () => { setResult(null); setError(''); setSelected(null); setActiveSheet(''); resetFilters(); };
+  const clearAll = () => { setPrep3b(false); setResult(null); setError(''); setSelected(null); setActiveSheet(''); resetFilters(); };
 
   const sheet = result?.sheets.find((s) => s.name === activeSheet);
 
@@ -193,6 +195,8 @@ export const Gstr2bAnalyzer: React.FC<{ uploadRequest?: number; onResultChange?:
     );
   }
 
+  if (prep3b) return <Gstr3bPrep result={result} onBack={() => setPrep3b(false)} />;
+
   const h = result.headline;
   const m = result.meta;
   const card = (label, value, sub?) => (
@@ -212,6 +216,7 @@ export const Gstr2bAnalyzer: React.FC<{ uploadRequest?: number; onResultChange?:
           <p className="text-sm text-slate-500 flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-emerald-600" />{result.fileName} analysed</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setPrep3b(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"><FileText className="w-4 h-4" />Prepare GSTR-3B</button>
           <button onClick={exportPdf} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"><FileDown className="w-4 h-4" />Summary PDF</button>
           <button onClick={() => exportRecords('xlsx')} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"><FileSpreadsheet className="w-4 h-4" />Excel</button>
           <button onClick={() => exportRecords('csv')} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"><FileText className="w-4 h-4" />CSV</button>

@@ -253,7 +253,7 @@ export function Dashboard({
         <div>
           <p className="text-sm font-medium text-slate-400 uppercase tracking-widest mb-1">{greeting}</p>
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">
-            {companyProfile.companyName || 'Business Dashboard'}
+            <span className="hb-name-shimmer">{companyProfile.companyName || 'Business Dashboard'}</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             {today.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

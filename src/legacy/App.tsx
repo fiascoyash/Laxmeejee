@@ -1,5 +1,6 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { useState, useEffect, useRef } from 'react';
+import { notify, invalidField } from './utils/notify';
 import { Button } from '@/components/ui/button';
 import { SaveSuccessOverlay, SaveSuccessInfo } from './components/SaveSuccessOverlay';
 import { useEscapeStack } from './hooks/useEscapeStack';
@@ -476,7 +477,7 @@ function App() {
     setProductColumns(savedColumns && savedColumns.length > 0 ? savedColumns : getDefaultProductColumns());
     setGstMode('inclusive');
     setShipTo({ name: '', address: '', mobile: '', gstNumber: '' });
-    setQuotation({ notes: '', signature: '', paymentQr: '', terms: '' });
+    setQuotation({ notes: '', signature: '', paymentQr: '', terms: getDefaultTerms() });
   };
 
   // Start new quotation - go to template selection first
@@ -525,27 +526,27 @@ function App() {
   // Save quotation
   const saveQuotation = () => {
     if (!customer.name) {
-      alert('Please enter customer name');
+      invalidField('customerName', 'Please enter the customer name');
       return;
     }
     if (customer.mobile && !isValidMobile(customer.mobile)) {
-      alert('Please enter a valid 10-digit mobile number or leave it blank');
+      invalidField('customerMobile', 'Please enter a valid 10-digit mobile number or leave it blank');
       return;
     }
     if (customer.gstNumber && !isValidGstin(customer.gstNumber)) {
-      alert('Please enter a valid 15-character GSTIN or leave it blank');
+      invalidField('customerGstin', 'Please enter a valid 15-character GSTIN or leave it blank');
       return;
     }
     if (shipTo?.mobile && !isValidMobile(shipTo.mobile)) {
-      alert('Please enter a valid 10-digit ship-to mobile number or leave it blank');
+      invalidField('shipMobile', 'Please enter a valid 10-digit ship-to mobile number or leave it blank');
       return;
     }
     if (shipTo?.gstNumber && !isValidGstin(shipTo.gstNumber)) {
-      alert('Please enter a valid 15-character ship-to GSTIN or leave it blank');
+      invalidField('shipGstin', 'Please enter a valid 15-character ship-to GSTIN or leave it blank');
       return;
     }
     if (products.length === 0) {
-      alert('Please add at least one product');
+      invalidField(null, 'Add at least one product to continue');
       return;
     }
 
@@ -608,7 +609,7 @@ function App() {
     newQuotation.products.forEach(p => storage.recordProductUsage(p.name));
     if (isNew) incrementQuotationNumber();
     setQuotations(storage.getQuotations());
-    alert(isNew ? 'Quotation saved successfully!' : 'Quotation updated successfully!');
+    notify(isNew ? 'Quotation saved successfully!' : 'Quotation updated successfully!');
     resetForm();
     setView('list');
   };
@@ -633,7 +634,7 @@ function App() {
     const newQuotation = storage.duplicateQuotation(id);
     if (newQuotation) {
       setQuotations(storage.getQuotations());
-      alert(`Quotation duplicated as ${newQuotation.quotationNumber}`);
+      notify(`Quotation duplicated as ${newQuotation.quotationNumber}`);
     }
   };
 
@@ -642,7 +643,7 @@ function App() {
     const invoice = convertQuotationToInvoice(quotation);
     storage.saveInvoice(invoice);
     setInvoices(storage.getInvoices());
-    alert(`Invoice ${invoice.invoiceNumber} created from ${quotation.quotationNumber}`);
+    notify(`Invoice ${invoice.invoiceNumber} created from ${quotation.quotationNumber}`);
     setEditingInvoice(invoice);
     setView('editInvoice');
   };
@@ -653,27 +654,27 @@ function App() {
   const saveInvoice = () => {
     if (!editingInvoice) return;
     if (!editingInvoice.customer.name) {
-      alert('Please enter customer name');
+      invalidField('customerName', 'Please enter the customer name');
       return;
     }
     if (editingInvoice.customer.mobile && !isValidMobile(editingInvoice.customer.mobile)) {
-      alert('Please enter a valid 10-digit mobile number or leave it blank');
+      invalidField('customerMobile', 'Please enter a valid 10-digit mobile number or leave it blank');
       return;
     }
     if (editingInvoice.customer.gstNumber && !isValidGstin(editingInvoice.customer.gstNumber)) {
-      alert('Please enter a valid 15-character GSTIN or leave it blank');
+      invalidField('customerGstin', 'Please enter a valid 15-character GSTIN or leave it blank');
       return;
     }
     if (editingInvoice.shipTo?.mobile && !isValidMobile(editingInvoice.shipTo.mobile)) {
-      alert('Please enter a valid 10-digit ship-to mobile number or leave it blank');
+      invalidField('shipMobile', 'Please enter a valid 10-digit ship-to mobile number or leave it blank');
       return;
     }
     if (editingInvoice.shipTo?.gstNumber && !isValidGstin(editingInvoice.shipTo.gstNumber)) {
-      alert('Please enter a valid 15-character ship-to GSTIN or leave it blank');
+      invalidField('shipGstin', 'Please enter a valid 15-character ship-to GSTIN or leave it blank');
       return;
     }
     if (editingInvoice.products.length === 0) {
-      alert('Please add at least one product');
+      invalidField(null, 'Add at least one product to continue');
       return;
     }
 
@@ -779,7 +780,7 @@ function App() {
       });
     } catch (e) {
       console.error(e);
-      alert('Could not save changes. Your edits are still on screen — please try again.');
+      notify('Could not save changes. Your edits are still on screen — please try again.');
     } finally {
       savingRef.current = false;
     }
@@ -792,11 +793,11 @@ function App() {
   const openPrintCenterQuotation = () => {
     const currentQuotation = buildCurrentQuotation();
     if (!currentQuotation.customer.name) {
-      alert('Please enter customer name before printing');
+      invalidField('customerName', 'Please enter the customer name before printing');
       return;
     }
     if (currentQuotation.products.length === 0) {
-      alert('Please add at least one product before printing');
+      invalidField(null, 'Add at least one product before printing');
       return;
     }
 
@@ -821,7 +822,7 @@ function App() {
       storage.saveQuotation(toSave);
       setQuotations(storage.getQuotations());
     } catch (e) {
-      alert('Failed to save quotation before printing. Please try saving manually.');
+      notify('Failed to save quotation before printing. Please try saving manually.');
       return;
     }
 
@@ -832,11 +833,11 @@ function App() {
   const openPrintCenterInvoice = () => {
     if (!editingInvoice) return;
     if (!editingInvoice.customer.name) {
-      alert('Please enter customer name before printing');
+      invalidField('customerName', 'Please enter the customer name before printing');
       return;
     }
     if (editingInvoice.products.length === 0) {
-      alert('Please add at least one product before printing');
+      invalidField(null, 'Add at least one product before printing');
       return;
     }
 
@@ -861,7 +862,7 @@ function App() {
     // Block if duplicate invoice number
     const dupInv = invoices.find(i => i.invoiceNumber === toSave.invoiceNumber && i.id !== toSave.id);
     if (dupInv) {
-      alert(`Invoice number "${toSave.invoiceNumber}" already exists. Please use a different number.`);
+      notify(`Invoice number "${toSave.invoiceNumber}" already exists. Please use a different number.`);
       return;
     }
 
@@ -870,7 +871,7 @@ function App() {
       setInvoices(storage.getInvoices());
       setEditingInvoice(toSave);
     } catch (e) {
-      alert('Failed to save invoice before printing. Please try saving manually.');
+      notify('Failed to save invoice before printing. Please try saving manually.');
       return;
     }
 
@@ -1013,7 +1014,7 @@ function App() {
     } catch (e) {
       console.error(e);
       if (pending) setEditingInvoice(pending);
-      alert('Could not save the invoice. Your details are still on screen — please try again.');
+      notify('Could not save the invoice. Your details are still on screen — please try again.');
     } finally {
       savingRef.current = false;
     }
@@ -1077,7 +1078,7 @@ function App() {
     const newInvoice = storage.duplicateInvoice(id);
     if (newInvoice) {
       setInvoices(storage.getInvoices());
-      alert(`Invoice duplicated as ${newInvoice.invoiceNumber}`);
+      notify(`Invoice duplicated as ${newInvoice.invoiceNumber}`);
     }
   };
 
@@ -1102,7 +1103,7 @@ function App() {
   const exportInvoicePDF = () => {
     if (!editingInvoice) return;
     if (editingInvoice.products.length === 0) {
-      alert('Please add products before exporting');
+      notify('Please add products before exporting');
       return;
     }
 
@@ -1110,7 +1111,7 @@ function App() {
       ? storage.getTemplateById(editingInvoice.selectedTemplateId)
       : storage.getDefaultTemplate();
     if (!template) {
-      alert('No template available');
+      notify('No template available');
       return;
     }
 
@@ -1182,6 +1183,7 @@ function App() {
       selectedTemplateId: selectedTemplateId || template?.id,
       productColumns: schemaColumns,
       gstMode: template?.schema?.defaultGstMode || 'inclusive',
+      terms: getDefaultTerms(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -1282,13 +1284,13 @@ function App() {
   // Export PDF - always uses selected template
   const exportPDF = () => {
     if (products.length === 0) {
-      alert('Please add products before exporting');
+      notify('Please add products before exporting');
       return;
     }
 
     const template = getCurrentTemplate();
     if (!template) {
-      alert('No template selected. Please select a template first.');
+      notify('No template selected. Please select a template first.');
       return;
     }
 
@@ -1332,7 +1334,7 @@ function App() {
     setTemplates(storage.getTemplates());
     setShowTemplateBuilder(false);
     setEditingTemplate(null);
-    alert('Template saved successfully!');
+    notify('Template saved successfully!');
   };
 
   const handleDeleteTemplate = (id: string) => {
@@ -1351,7 +1353,7 @@ function App() {
     const newTemplate = storage.duplicateTemplate(id);
     if (newTemplate) {
       setTemplates(storage.getTemplates());
-      alert('Template duplicated successfully!');
+      notify('Template duplicated successfully!');
     }
   };
 
@@ -1409,7 +1411,7 @@ function App() {
   const handleSaveCustomer = (customerData: CustomerData) => {
     const existingCustomer = storage.getCustomerByMobile(customerData.mobile);
     if (existingCustomer && existingCustomer.id !== customerData.id) {
-      alert('A customer with this mobile number already exists.');
+      notify('A customer with this mobile number already exists.');
       return;
     }
     const now = new Date().toISOString();
@@ -1424,7 +1426,7 @@ function App() {
     setShowCustomerForm(false);
     setEditingCustomer(null);
     setIsExistingCustomer(false);
-    alert('Customer saved successfully!');
+    notify('Customer saved successfully!');
   };
 
   const handleDeleteCustomer = (id: string) => {
@@ -1585,9 +1587,9 @@ function App() {
         }`}
       >
         <div className={`p-6 border-b border-slate-700 ${desktopSidebarCollapsed ? 'lg:px-0 lg:flex lg:justify-center' : ''}`}>
-          {desktopSidebarCollapsed && <Sun aria-label="Hisaaboo" className="hidden lg:block w-8 h-8 text-emerald-500" />}
+          {desktopSidebarCollapsed && <Sun aria-label="Hisaaboo" className="hb-logo-sun hidden lg:block w-8 h-8 text-emerald-500" />}
           <div className={desktopSidebarCollapsed ? 'lg:hidden' : ''}>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Hisaaboo</h1>
+            <h1 className="hb-wordmark text-2xl font-bold text-white tracking-tight">Hisaaboo</h1>
             <p className="text-slate-400 text-sm mt-1">Hisaab rakho. Business chalao.</p>
           </div>
         </div>
@@ -1656,8 +1658,8 @@ function App() {
                 <Menu className="w-6 h-6" />
               </Button>
               <div className="flex min-w-0 items-center gap-2 lg:hidden">
-                <Sun className="w-6 h-6 shrink-0 text-emerald-500" />
-                <span className="truncate font-bold text-slate-800">Hisaaboo</span>
+                <Sun className="hb-logo-sun w-6 h-6 shrink-0 text-emerald-500" />
+                <span className="hb-wordmark truncate font-bold text-slate-800">Hisaaboo</span>
               </div>
             <div className="hidden lg:flex min-w-0 items-center gap-2 text-sm text-slate-500">
               <a
@@ -1916,13 +1918,7 @@ function App() {
                     {selectedTemplate.settings.showTermsConditions && (
                       <div className="lg:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Terms & Conditions</label>
-                        <textarea
-                          value={quotation.terms || ''}
-                          onChange={(e) => setQuotation(prev => ({ ...prev, terms: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          rows={3}
-                          placeholder="1. Goods once sold will not be taken back or exchanged.&#10;2. All disputes are subject to local jurisdiction only."
-                        />
+                        <TermsEditor value={quotation.terms || ''} onChange={(v) => setQuotation(prev => ({ ...prev, terms: v }))} />
                       </div>
                     )}
                   </div>

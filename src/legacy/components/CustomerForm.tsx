@@ -1,5 +1,6 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { CustomerData } from '../types';
+import { notify } from '../utils/notify';
 import { X, Save } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { sanitizeMobile, sanitizeGstin, isValidMobile, isValidGstin } from '../utils/validation';
@@ -65,15 +66,15 @@ export function CustomerForm({ customer, onSave, onCancel, isExistingCustomer }:
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.mobile) {
-      alert('Name and Mobile are required');
+      notify('Name and Mobile are required');
       return;
     }
     if (!isValidMobile(formData.mobile)) {
-      alert('Please enter a valid 10-digit mobile number');
+      notify('Please enter a valid 10-digit mobile number');
       return;
     }
     if (formData.gstNumber && !isValidGstin(formData.gstNumber)) {
-      alert('Please enter a valid 15-character GSTIN or leave it blank');
+      notify('Please enter a valid 15-character GSTIN or leave it blank');
       return;
     }
     const now = new Date().toISOString();
