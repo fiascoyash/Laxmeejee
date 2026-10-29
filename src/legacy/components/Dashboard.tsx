@@ -1,10 +1,11 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { DashboardCustomizer, loadCardPrefs, saveCardPrefs } from './DashboardCustomizer';
 import {
   TrendingUp, Receipt, FileText, Users, Truck, Package,
   Clock, Award, ArrowUpRight, PlusCircle, List, ChevronRight,
   Activity, Zap, AlertCircle, BarChart2, Star, ShoppingBag,
-  CalendarDays, UserPlus, PackagePlus
+  CalendarDays, UserPlus, PackagePlus, LayoutGrid
 } from 'lucide-react';
 import { Invoice, Quotation, CustomerData, SupplierData, ProductCatalogItem, CompanyProfile } from '../types';
 
@@ -239,6 +240,11 @@ export function Dashboard({
     amber: 'bg-amber-100 text-amber-600',
   };
 
+  const [cardPrefs, setCardPrefs] = useState(() => loadCardPrefs(kpiCards.map(c => c.title)));
+  const [showCustomize, setShowCustomize] = useState(false);
+  const updatePrefs = (p) => { setCardPrefs(p); saveCardPrefs(p); };
+  const visibleCards = cardPrefs.filter(p => p.visible).map(p => kpiCards.find(c => c.title === p.id)).filter(Boolean);
+
   const greetingHour = today.getHours();
   const greeting =
     greetingHour >= 5 && greetingHour < 12 ? 'Good Morning' :
@@ -259,6 +265,15 @@ export function Dashboard({
             {today.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <button
+          onClick={() => setShowCustomize(true)}
+          title="Customize Dashboard"
+          aria-label="Customize Dashboard"
+          className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-emerald-700 transition-all shadow-sm"
+        >
+          <LayoutGrid className="w-4 h-4" />
+        </button>
         {!companyProfile.companyName && (
           <button
             onClick={onShowCompanyProfile}
@@ -268,12 +283,19 @@ export function Dashboard({
             Setup Company Profile
           </button>
         )}
+        </div>
       </div>
 
       {/* KPI Cards */}
       <section>
+        {visibleCards.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+            All summary cards are hidden.{' '}
+            <button onClick={() => setShowCustomize(true)} className="text-emerald-700 font-medium hover:underline">Customize Dashboard</button>
+          </div>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {kpiCards.map(card => (
+          {visibleCards.map(card => (
             <div
               key={card.title}
               className={`${card.bg} rounded-2xl p-5 border border-white shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group`}
@@ -291,6 +313,15 @@ export function Dashboard({
           ))}
         </div>
       </section>
+
+      {showCustomize && (
+        <DashboardCustomizer
+          prefs={cardPrefs}
+          labels={Object.fromEntries(kpiCards.map(c => [c.title, c.title]))}
+          onChange={updatePrefs}
+          onClose={() => setShowCustomize(false)}
+        />
+      )}
 
       {/* Business Overview + Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

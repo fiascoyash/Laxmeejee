@@ -38,6 +38,7 @@ import { PrintCenter } from './components/PrintCenter';
 import { Printer } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { LandingPage } from './components/LandingPage';
+import { TermsEditor, getDefaultTerms } from './components/TermsEditor';
 
 type View = 'landing' | 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports';
 

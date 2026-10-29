@@ -86,7 +86,8 @@ export const exportTemplatePDF = async (
   documentType: DocumentType = 'quotation',
   invoice?: Invoice,
   gstMode: GstMode = 'inclusive',
-) => {
+  opts?: { returnBlob?: boolean },
+): Promise<Blob | void> => {
   const themeId = (template as any).themeId as ThemeId | undefined;
   const settings = template.settings ?? DEFAULT_TEMPLATE_SETTINGS;
   const schema = template.schema;
@@ -111,12 +112,14 @@ export const exportTemplatePDF = async (
     // Real render — single pass into correctly-sized doc
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [POS_WIDTH, calculatedHeight], compress: true });
     await generateVectorPDF(doc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+    if (opts?.returnBlob) return doc.output('blob');
     doc.save(`${fileName}.pdf`);
   } else {
     // A4/A5: single pass with fixed page size
     const pdfFormat = paperSize === 'a5' ? 'a5' as const : 'a4' as const;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: pdfFormat, compress: true });
     await generateVectorPDF(doc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
+    if (opts?.returnBlob) return doc.output('blob');
     doc.save(`${fileName}.pdf`);
   }
 };
