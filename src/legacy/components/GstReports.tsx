@@ -40,6 +40,7 @@ import { HsnSacSummary } from './gst/HsnSacSummary';
 import { SalesRegister } from './gst/SalesRegister';
 import { PurchaseRegister } from './gst/PurchaseRegister';
 import { Gstr1Report } from './gst/Gstr1Report';
+import { Gstr1Exports } from './gst/Gstr1Exports';
 import { Gstr2bAnalyzer } from './gst/Gstr2bAnalyzer';
 import { DateFilter } from './gst/DateFilter';
 import { ExportButtons } from './gst/ExportButtons';
@@ -62,13 +63,15 @@ type GstReportView =
 interface GstReportsProps {
   invoices: Invoice[];
   companyProfile: CompanyProfile;
+  initialView?: GstReportView;
 }
 
 export const GstReports: React.FC<GstReportsProps> = ({
   invoices,
   companyProfile,
+  initialView = 'dashboard',
 }) => {
-  const [activeView, setActiveView] = useState<GstReportView>('dashboard');
+  const [activeView, setActiveView] = useState<GstReportView>(initialView);
   // GSTR-2B analyzer stays mounted once opened so results survive tab switches
   const [gstr2bMounted, setGstr2bMounted] = useState(false);
   const [uploadRequest, setUploadRequest] = useState(0);
@@ -444,7 +447,7 @@ export const GstReports: React.FC<GstReportsProps> = ({
         {activeView === 'hsn_sac_summary' && <HsnSacSummary data={reportData.hsnSacSummary} />}
         {activeView === 'sales_register' && <SalesRegister data={reportData.salesRegister} />}
         {activeView === 'purchase_register' && <PurchaseRegister data={reportData.purchaseRegister} />}
-        {activeView === 'gstr1' && <Gstr1Report data={reportData.gstr1} />}
+        {activeView === 'gstr1' && (<div className="space-y-4"><Gstr1Exports invoices={invoices} companyProfile={companyProfile} /><Gstr1Report data={reportData.gstr1} /></div>)}
         {gstr2bMounted && (
           <div hidden={activeView !== 'gstr2b'}>
             <Gstr2bAnalyzer uploadRequest={uploadRequest} onResultChange={setHas2bResult} />

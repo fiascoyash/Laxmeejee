@@ -31,7 +31,7 @@ import { PaymentModal } from './components/PaymentModal';
 import { PaymentDecisionModal, PaymentDecision } from './components/PaymentDecisionModal';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { isValidMobile, isValidGstin } from './utils/validation';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck } from 'lucide-react';
 import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog';
 import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
 import { PrintCenter } from './components/PrintCenter';
@@ -40,9 +40,9 @@ import { createClient } from '@supabase/supabase-js';
 import { LandingPage } from './components/LandingPage';
 import { TermsEditor, getDefaultTerms } from './components/TermsEditor';
 
-type View = 'landing' | 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports';
+type View = 'landing' | 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports' | 'gstr1';
 
-const VALID_VIEWS: View[] = ['landing', 'home', 'selectTemplate', 'new', 'list', 'catalog', 'settings', 'templates', 'newInvoice', 'invoiceList', 'editInvoice', 'customers', 'suppliers', 'smartImport', 'gstReports'];
+const VALID_VIEWS: View[] = ['landing', 'home', 'selectTemplate', 'new', 'list', 'catalog', 'settings', 'templates', 'newInvoice', 'invoiceList', 'editInvoice', 'customers', 'suppliers', 'smartImport', 'gstReports', 'gstr1'];
 
 function getViewFromHash(): View {
   const hash = window.location.hash.replace('#', '');
@@ -1358,6 +1358,14 @@ function App() {
     }
   };
 
+  const handleRenameTemplate = (id: string, name: string) => {
+    const template = storage.getTemplateById(id);
+    if (!template) return;
+    storage.saveTemplate({ ...template, name, updatedAt: new Date().toISOString() });
+    setTemplates(storage.getTemplates());
+    notify('Template renamed successfully!');
+  };
+
   const handleSetDefaultTemplate = (id: string) => {
     const updatedTemplates = templates.map(t => ({
       ...t,
@@ -1623,6 +1631,7 @@ function App() {
             <p className={`px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide ${desktopSidebarCollapsed ? 'lg:hidden' : ''}`}>GST Reports</p>
             <ul className="space-y-1">
               <li><NavItem icon={BarChart3} label="GST Reports" currentView={view} targetView="gstReports" /></li>
+              <li><NavItem icon={FileCheck} label="GSTR-1 Returns" currentView={view} targetView="gstr1" /></li>
             </ul>
           </div>
         </nav>
@@ -1678,7 +1687,7 @@ function App() {
                 <>
                   <ChevronRight className="w-4 h-4" />
                   <span className="text-slate-800 font-medium capitalize">
-                    {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view === 'smartImport' ? 'Smart Bill Import' : view}
+                    {view === 'selectTemplate' ? 'Select Template' : view === 'newInvoice' ? 'New Invoice' : view === 'invoiceList' ? 'Invoice History' : view === 'editInvoice' ? 'Edit Invoice' : view === 'smartImport' ? 'Smart Bill Import' : view === 'gstr1' ? 'GSTR-1 Returns' : view}
                   </span>
                 </>
               )}
@@ -2091,6 +2100,7 @@ function App() {
                 onSetDefault={handleSetDefaultTemplate}
                 onPreview={handlePreviewTemplate}
                 onCreateNew={handleCreateNewTemplate}
+                onRename={handleRenameTemplate}
               />
             </div>
           )}
@@ -2160,8 +2170,10 @@ function App() {
           )}
 
           {/* GST Reports */}
-          {view === 'gstReports' && (
+          {(view === 'gstReports' || view === 'gstr1') && (
             <GstReports
+              key={view}
+              initialView={view === 'gstr1' ? 'gstr1' : 'dashboard'}
               invoices={invoices}
               companyProfile={companyProfile}
             />
