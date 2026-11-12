@@ -6,6 +6,17 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { buildGstr3bReport, reconcilePurchases, USER_FIELDS, TAX_HEADS } from '../../utils/gstr3b';
 import { storage } from '../../utils/storage';
+import { loadNotes, outwardNet } from '../../utils/creditDebitNotes';
+import { MONTHS } from '../../utils/gstr1Json';
+
+function periodYm(m) {
+  const t = String(m?.taxPeriod || '');
+  const idx = MONTHS.findIndex(x => new RegExp(x.slice(0, 3), 'i').test(t));
+  const fy = String(m?.financialYear || '').match(/(\d{4})/);
+  if (idx < 0 || !fy) return new Date().toISOString().slice(0, 7);
+  const start = parseInt(fy[1], 10);
+  return `${idx >= 3 ? start : start + 1}-${String(idx + 1).padStart(2, '0')}`;
+}
 
 const HEAD_LABEL = { taxable: 'Taxable', igst: 'IGST', cgst: 'CGST', sgst: 'SGST/UTGST', cess: 'Cess' };
 const ALL_HEADS = ['taxable', 'igst', 'cgst', 'sgst', 'cess'];
@@ -21,6 +32,9 @@ export const Gstr3bPrep: React.FC<{ result: any; onBack: () => void }> = ({ resu
   const [recon, setRecon] = useState(null);
   const report = useMemo(() => buildGstr3bReport(result, inputs), [result, inputs]);
   const m = result.meta;
+  const [ym, setYm] = useState(() => periodYm(result.meta));
+  const books = useMemo(() => outwardNet(storage.getInvoices() || [], loadNotes(), storage.getCompanyProfile()?.gstNumber || '', ym), [ym]);
+  const useBooks = () => setInputs((prev) => ({ ...prev, o_a: { taxable: books.net.taxable, igst: books.net.igst, cgst: books.net.cgst, sgst: books.net.sgst, cess: 0 } }));
 
   const setVal = (key, head, raw) => {
     setInputs((prev) => {
@@ -120,6 +134,17 @@ export const Gstr3bPrep: React.FC<{ result: any; onBack: () => void }> = ({ resu
                     </label>
                   ))}
                 </div>
+                {f.key === 'o_a' && (
+                  <div className="text-xs bg-emerald-50 border border-emerald-200 rounded p-2 space-y-1" data-testid="books-3-1a">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-emerald-800">From your books for</span>
+                      <input type="month" value={ym} onChange={(e) => setYm(e.target.value)} className="border border-emerald-200 rounded px-1 py-0.5" aria-label="Books month" />
+                      <button onClick={useBooks} className="ml-auto px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700">Use these figures</button>
+                    </div>
+                    <p className="text-emerald-900">Gross Sales: ₹{money(books.gross.taxable)} – Credit Notes: ₹{money(books.credit.taxable)} + Debit Notes: ₹{money(books.debit.taxable)} = <b>Net: ₹{money(books.net.taxable)}</b></p>
+                    <p className="text-emerald-800">Net tax — IGST {money(books.net.igst)} · CGST {money(books.net.cgst)} · SGST {money(books.net.sgst)}</p>
+                  </div>
+                )}
                 {ref && <p className="text-xs text-blue-700 bg-blue-50 rounded p-2"><Info className="w-3.5 h-3.5 inline mr-1" />Reference — {ref.label}: {TAX_HEADS.map((h) => `${HEAD_LABEL[h]} ${money(ref.values[h] || 0)}`).join(' · ')}</p>}
               </div>
             );

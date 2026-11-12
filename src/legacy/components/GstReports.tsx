@@ -41,6 +41,8 @@ import { SalesRegister } from './gst/SalesRegister';
 import { PurchaseRegister } from './gst/PurchaseRegister';
 import { Gstr1Report } from './gst/Gstr1Report';
 import { Gstr1Exports } from './gst/Gstr1Exports';
+import { CreditDebitNotesGuide } from './notes/CreditDebitNotesGuide';
+import { useNotes, notesInRange, gstr1NoteEntries } from '../utils/creditDebitNotes';
 import { Gstr2bAnalyzer } from './gst/Gstr2bAnalyzer';
 import { DateFilter } from './gst/DateFilter';
 import { ExportButtons } from './gst/ExportButtons';
@@ -87,6 +89,7 @@ export const GstReports: React.FC<GstReportsProps> = ({
     return getDateRange(filterType, customRange);
   }, [filterType, customRange]);
 
+  const allNotes = useNotes();
   // Filter invoices by date range
   const filteredInvoices = useMemo(() => {
     return filterInvoicesByDateRange(invoices, dateRange);
@@ -102,10 +105,10 @@ export const GstReports: React.FC<GstReportsProps> = ({
       hsnSacSummary: calculateHsnSacSummary(filteredInvoices, companyGstin),
       salesRegister: generateSalesRegister(filteredInvoices, companyGstin),
       purchaseRegister: generatePurchaseRegister([]),
-      gstr1: generateGstr1Report(filteredInvoices, companyGstin),
+      gstr1: { ...generateGstr1Report(filteredInvoices, companyGstin), ...gstr1NoteEntries(notesInRange(allNotes, dateRange.startDate, dateRange.endDate), invoices) },
       validation: validateInvoices(filteredInvoices, companyGstin),
     };
-  }, [filteredInvoices, companyProfile]);
+  }, [filteredInvoices, companyProfile, allNotes, dateRange, invoices]);
 
   // Modal state for viewing affected invoices
   const [selectedIssue, setSelectedIssue] = useState<ValidationIssue | null>(null);
@@ -259,6 +262,8 @@ export const GstReports: React.FC<GstReportsProps> = ({
         onFilterChange={setFilterType}
         onCustomRangeChange={setCustomRange}
       />
+
+      <CreditDebitNotesGuide />
 
       {/* Educational GSTR-1 Card - Only show if not hidden */}
       {!isGuideHidden && (

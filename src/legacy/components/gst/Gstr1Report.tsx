@@ -217,9 +217,16 @@ export const Gstr1Report: React.FC<Gstr1ReportProps> = ({ data }) => {
                 No credit notes found for the selected period.
               </div>
             ) : (
-              <div className="p-4">
-                <p className="text-sm text-slate-600">Credit notes data will be displayed here.</p>
-              </div>
+              <div className="overflow-x-auto"><table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-600"><tr>{['Table', 'Type', 'Note No.', 'Note Date', 'Orig. Invoice', 'Orig. Date', 'Customer / GSTIN', 'Reason', 'Taxable', 'IGST', 'CGST', 'SGST'].map(h => <th key={h} className="px-3 py-2 text-left">{h}</th>)}</tr></thead>
+                <tbody>{data.creditNotes.map(n => (<tr key={n.noteNo} className="border-t border-slate-100">
+                  <td className="px-3 py-2"><span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100">{n.category === 'B2CS' ? 'B2CS adj.' : `9B ${n.category}`}</span></td>
+                  <td className="px-3 py-2">{n.noteType}</td><td className="px-3 py-2 font-mono">{n.noteNo}</td><td className="px-3 py-2">{formatDate(n.noteDate)}</td>
+                  <td className="px-3 py-2">{n.originalInvoiceNo}</td><td className="px-3 py-2">{formatDate(n.originalInvoiceDate)}</td>
+                  <td className="px-3 py-2">{n.customerName}<div className="text-xs text-slate-400 font-mono">{n.customerGstin || 'Unregistered'}</div></td>
+                  <td className="px-3 py-2 text-xs">{n.reason}</td><td className="px-3 py-2">{formatCurrency(n.taxableValue)}</td><td className="px-3 py-2">{formatCurrency(n.igst)}</td><td className="px-3 py-2">{formatCurrency(n.cgst)}</td><td className="px-3 py-2">{formatCurrency(n.sgst)}</td>
+                </tr>))}</tbody>
+              </table></div>
             )}
           </>
         )}
@@ -240,9 +247,16 @@ export const Gstr1Report: React.FC<Gstr1ReportProps> = ({ data }) => {
                 No debit notes found for the selected period.
               </div>
             ) : (
-              <div className="p-4">
-                <p className="text-sm text-slate-600">Debit notes data will be displayed here.</p>
-              </div>
+              <div className="overflow-x-auto"><table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-600"><tr>{['Table', 'Type', 'Note No.', 'Note Date', 'Orig. Invoice', 'Orig. Date', 'Customer / GSTIN', 'Reason', 'Taxable', 'IGST', 'CGST', 'SGST'].map(h => <th key={h} className="px-3 py-2 text-left">{h}</th>)}</tr></thead>
+                <tbody>{data.debitNotes.map(n => (<tr key={n.noteNo} className="border-t border-slate-100">
+                  <td className="px-3 py-2"><span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100">{n.category === 'B2CS' ? 'B2CS adj.' : `9B ${n.category}`}</span></td>
+                  <td className="px-3 py-2">{n.noteType}</td><td className="px-3 py-2 font-mono">{n.noteNo}</td><td className="px-3 py-2">{formatDate(n.noteDate)}</td>
+                  <td className="px-3 py-2">{n.originalInvoiceNo}</td><td className="px-3 py-2">{formatDate(n.originalInvoiceDate)}</td>
+                  <td className="px-3 py-2">{n.customerName}<div className="text-xs text-slate-400 font-mono">{n.customerGstin || 'Unregistered'}</div></td>
+                  <td className="px-3 py-2 text-xs">{n.reason}</td><td className="px-3 py-2">{formatCurrency(n.taxableValue)}</td><td className="px-3 py-2">{formatCurrency(n.igst)}</td><td className="px-3 py-2">{formatCurrency(n.cgst)}</td><td className="px-3 py-2">{formatCurrency(n.sgst)}</td>
+                </tr>))}</tbody>
+              </table></div>
             )}
           </>
         )}

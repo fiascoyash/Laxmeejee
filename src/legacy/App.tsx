@@ -26,12 +26,15 @@ import { SupplierForm } from './components/SupplierForm';
 import { SupplierLedger } from './components/SupplierLedger';
 import { SmartBillImport } from './features/smart-bill-import';
 import { GstReports } from './components/GstReports';
+import { NotesRegister } from './components/notes/NotesRegister';
+import { NoteEditor } from './components/notes/NoteEditor';
+import { loadNotes, notesForCustomer } from './utils/creditDebitNotes';
 import { Dashboard } from './components/Dashboard';
 import { PaymentModal } from './components/PaymentModal';
 import { PaymentDecisionModal, PaymentDecision } from './components/PaymentDecisionModal';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { isValidMobile, isValidGstin } from './utils/validation';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck, FileMinus } from 'lucide-react';
 import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog';
 import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
 import { PrintCenter } from './components/PrintCenter';
@@ -40,9 +43,9 @@ import { createClient } from '@supabase/supabase-js';
 import { LandingPage } from './components/LandingPage';
 import { TermsEditor, getDefaultTerms } from './components/TermsEditor';
 
-type View = 'landing' | 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports' | 'gstr1';
+type View = 'landing' | 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports' | 'gstr1' | 'notes';
 
-const VALID_VIEWS: View[] = ['landing', 'home', 'selectTemplate', 'new', 'list', 'catalog', 'settings', 'templates', 'newInvoice', 'invoiceList', 'editInvoice', 'customers', 'suppliers', 'smartImport', 'gstReports', 'gstr1'];
+const VALID_VIEWS: View[] = ['landing', 'home', 'selectTemplate', 'new', 'list', 'catalog', 'settings', 'templates', 'newInvoice', 'invoiceList', 'editInvoice', 'customers', 'suppliers', 'smartImport', 'gstReports', 'gstr1', 'notes'];
 
 function getViewFromHash(): View {
   const hash = window.location.hash.replace('#', '');
@@ -128,6 +131,7 @@ function App() {
   const [editingCustomer, setEditingCustomer] = useState<CustomerData | null>(null);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [viewingCustomer, setViewingCustomer] = useState<CustomerData | null>(null);
+  const [noteDraft, setNoteDraft] = useState<{ invoice: Invoice; noteType: string } | null>(null);
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   // Invoice that passed validation and is awaiting a save decision (Draft /
@@ -1101,7 +1105,7 @@ function App() {
   };
 
   // Export invoice PDF
-  const exportInvoicePDF = () => {
+  const exportInvoicePDF = (copies?: ('original' | 'transporter' | 'supplier')[]) => {
     if (!editingInvoice) return;
     if (editingInvoice.products.length === 0) {
       notify('Please add products before exporting');
@@ -1140,7 +1144,7 @@ function App() {
       terms: editingInvoice.terms,
     } as Quotation;
 
-    exportTemplatePDF(templateWithColumns, companyProfile, editingInvoice.customer, quotationProxy, editingInvoice.products, 'invoice', editingInvoice, editingInvoice.gstMode || 'inclusive');
+    exportTemplatePDF(templateWithColumns, companyProfile, editingInvoice.customer, quotationProxy, editingInvoice.products, 'invoice', editingInvoice, editingInvoice.gstMode || 'inclusive', { copies });
   };
 
   // Preview invoice
@@ -1614,6 +1618,7 @@ function App() {
             <ul className="space-y-1">
               <li><NavItem icon={Receipt} label="New Invoice" currentView={view} targetView="newInvoice" /></li>
               <li><NavItem icon={Receipt} label="Invoice History" currentView={view} targetView="invoiceList" /></li>
+              <li><NavItem icon={FileMinus} label="Credit / Debit Notes" currentView={view} targetView="notes" /></li>
             </ul>
           </div>
           <div className="mt-4 px-3">
@@ -2081,6 +2086,7 @@ function App() {
                 onRecordPayment={handleRecordPayment}
                 onBulkDelete={handleBulkDeleteInvoices}
                 onBulkMarkPaid={handleBulkMarkPaid}
+                onIssueNote={(inv, noteType) => setNoteDraft({ invoice: inv, noteType })}
               />
             </div>
           )}
@@ -2168,6 +2174,9 @@ function App() {
                 suppliers={suppliers}
               />
           )}
+
+          {/* Credit / Debit Notes */}
+          {view === 'notes' && <NotesRegister invoices={invoices} companyProfile={companyProfile} />}
 
           {/* GST Reports */}
           {(view === 'gstReports' || view === 'gstr1') && (
@@ -2451,6 +2460,18 @@ function App() {
         />
       )}
 
+      {noteDraft && (
+        <NoteEditor
+          key={noteDraft.invoice.id + noteDraft.noteType}
+          invoices={invoices}
+          companyProfile={companyProfile}
+          initialInvoice={noteDraft.invoice}
+          noteType={noteDraft.noteType}
+          onClose={() => setNoteDraft(null)}
+          onSaved={() => setNoteDraft(null)}
+        />
+      )}
+
       {/* Customer History / Khata Book Modal */}
       {viewingCustomer && (() => {
         const history = getCustomerHistory(viewingCustomer);
@@ -2460,6 +2481,7 @@ function App() {
           quotations={history.customerQuotations}
           invoices={history.customerInvoices}
           payments={history.customerPayments}
+          notes={notesForCustomer(loadNotes(), history.customerInvoices)}
           onClose={() => setViewingCustomer(null)}
           onEditQuotation={(q) => {
             setViewingCustomer(null);

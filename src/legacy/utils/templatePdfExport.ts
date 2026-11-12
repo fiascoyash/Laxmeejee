@@ -75,6 +75,15 @@ const weightToStyle = (weight: number): 'normal' | 'bold' => {
 /** Convert CSS px to mm. */
 const pxToMm = (px: number) => px * PX_TO_MM;
 
+// ─── CGST Rule 48 copy labels ────────────────────────────────────────────────
+export const RULE48_COPIES = {
+  original: 'ORIGINAL FOR RECIPIENT',
+  transporter: 'DUPLICATE FOR TRANSPORTER',
+  supplier: 'TRIPLICATE FOR SUPPLIER',
+} as const;
+export type Rule48Copy = keyof typeof RULE48_COPIES;
+let COPY_LABEL: string = RULE48_COPIES.original;
+
 // ─── Main export entry point ─────────────────────────────────────────────────
 
 export const exportTemplatePDF = async (
@@ -86,8 +95,10 @@ export const exportTemplatePDF = async (
   documentType: DocumentType = 'quotation',
   invoice?: Invoice,
   gstMode: GstMode = 'inclusive',
-  opts?: { returnBlob?: boolean },
+  opts?: { returnBlob?: boolean; copies?: Rule48Copy[] },
 ): Promise<Blob | void> => {
+  const copies: Rule48Copy[] = documentType === 'invoice' && opts?.copies?.length ? opts.copies : ['original'];
+  try {
   const themeId = (template as any).themeId as ThemeId | undefined;
   const settings = template.settings ?? DEFAULT_TEMPLATE_SETTINGS;
   const schema = template.schema;
@@ -96,31 +107,36 @@ export const exportTemplatePDF = async (
   const theme = INVOICE_THEMES[resolvedThemeId] ?? INVOICE_THEMES['professional_corporate'];
   const paperSize = theme.paperSize ?? 'a4';
 
-  const fileName = documentType === 'invoice' && invoice ? invoice.invoiceNumber : quotation.quotationNumber;
+  const baseName = documentType === 'invoice' && invoice ? invoice.invoiceNumber : quotation.quotationNumber;
+  const suffix = copies.length > 1 ? '_All-Copies' : copies[0] === 'transporter' ? '_Transporter-Copy' : copies[0] === 'supplier' ? '_Supplier-Copy' : '';
+  const fileName = `${baseName}${suffix}`;
+  const render = (doc) => generateVectorPDF(doc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
 
+  let doc;
   if (paperSize === 'pos') {
-    // POS: measure content height first, then create doc with exact height
-    const posFontScale = 0.5;
-    const posMargin = pxToMm(16) * posFontScale;
-
-    // Measurement pass — never saved, just calculates finalY
-    const measureDoc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [POS_WIDTH, 297], compress: true });
-    const finalY = await generateVectorPDF(measureDoc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
-
-    const calculatedHeight = Math.max(finalY + posMargin, posMargin * 2);
-
-    // Real render — single pass into correctly-sized doc
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [POS_WIDTH, calculatedHeight], compress: true });
-    await generateVectorPDF(doc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
-    if (opts?.returnBlob) return doc.output('blob');
-    doc.save(`${fileName}.pdf`);
+    const posMargin = pxToMm(16) * 0.5;
+    for (let i = 0; i < copies.length; i++) {
+      COPY_LABEL = RULE48_COPIES[copies[i]];
+      const measureDoc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [POS_WIDTH, 297], compress: true });
+      const finalY = await render(measureDoc);
+      const h = Math.max(finalY + posMargin, posMargin * 2);
+      if (!doc) doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [POS_WIDTH, h], compress: true });
+      else doc.addPage([POS_WIDTH, h], 'portrait');
+      await render(doc);
+    }
   } else {
-    // A4/A5: single pass with fixed page size
     const pdfFormat = paperSize === 'a5' ? 'a5' as const : 'a4' as const;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: pdfFormat, compress: true });
-    await generateVectorPDF(doc, resolvedThemeId, settings, company, customer, quotation, products, documentType, invoice, gstMode, schema);
-    if (opts?.returnBlob) return doc.output('blob');
-    doc.save(`${fileName}.pdf`);
+    for (let i = 0; i < copies.length; i++) {
+      COPY_LABEL = RULE48_COPIES[copies[i]];
+      if (!doc) doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: pdfFormat, compress: true });
+      else doc.addPage(pdfFormat, 'portrait');
+      await render(doc);
+    }
+  }
+  if (opts?.returnBlob) return doc.output('blob');
+  doc.save(`${fileName}.pdf`);
+  } finally {
+    COPY_LABEL = RULE48_COPIES.original;
   }
 };
 
@@ -271,7 +287,7 @@ const generatePosReceipt = (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(FS_SMALL);
   doc.setTextColor(0, 0, 0);
-  const origText = 'ORIGINAL FOR RECIPIENT';
+  const origText = COPY_LABEL;
   const origW = doc.getTextWidth(origText) + 4;
   const origH = lh(FS_SMALL) + 1.5;
   doc.setDrawColor(...secBorderColor);
@@ -861,7 +877,7 @@ const generateVectorPDF = async (
     // Original for recipient — top right
     setFont(origForRecTypo);
     doc.setTextColor(...docTitleColor);
-    const origText = 'ORIGINAL FOR RECIPIENT';
+    const origText = COPY_LABEL;
     const origW = doc.getTextWidth(origText) + pxToMm(14) * fontScale;
     const origH = lineHeightMm(origForRecTypo.fontSizePt) + pxToMm(2) * fontScale;
     doc.rect(rightX - origW, y + headerPadTop, origW, origH, 'S');
@@ -876,7 +892,7 @@ const generateVectorPDF = async (
     leftY += lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(3) * fontScale;
 
     setFont(origForRecTypo);
-    const origText = 'ORIGINAL FOR RECIPIENT';
+    const origText = COPY_LABEL;
     const origW = doc.getTextWidth(origText) + pxToMm(14) * fontScale;
     const origH = lineHeightMm(origForRecTypo.fontSizePt) + pxToMm(2) * fontScale;
     doc.rect(margin + headerPadSide, leftY, origW, origH, 'S');
@@ -947,7 +963,7 @@ const generateVectorPDF = async (
     doc.text(docLabel, rightX, y + headerPadTop + lineHeightMm(docTitleTypo.fontSizePt) * 0.8, { align: 'right' });
 
     setFont(origForRecTypo);
-    const origText = 'ORIGINAL FOR RECIPIENT';
+    const origText = COPY_LABEL;
     const origW = doc.getTextWidth(origText) + pxToMm(14) * fontScale;
     const origH = lineHeightMm(origForRecTypo.fontSizePt) + pxToMm(2) * fontScale;
     doc.rect(rightX - origW, y + headerPadTop + lineHeightMm(docTitleTypo.fontSizePt) + pxToMm(3) * fontScale, origW, origH, 'S');

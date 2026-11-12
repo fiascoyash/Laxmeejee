@@ -24,7 +24,7 @@ export function periodFromFy(fy: string, monthIdx: number) {
 
 export interface Gstr1Issue { invoiceNo: string; date: string; message: string; blocking: boolean }
 
-export function buildGstr1Json(invoices, companyGstin: string, year: number, month: number) {
+export function buildGstr1Json(invoices, companyGstin: string, year: number, month: number, notes = []) {
   const fp = String(month).padStart(2, '0') + year;
   const ym = `${year}-${String(month).padStart(2, '0')}`;
   const gstin = String(companyGstin || '').trim().toUpperCase();
@@ -114,11 +114,56 @@ export function buildGstr1Json(invoices, companyGstin: string, year: number, mon
       hsnMap.set(k, h);
     }
   }
+  // Credit / Debit notes (Table 9B): CDNR for registered, CDNUR for unregistered inter-state B2CL, others net into B2CS/HSN.
+  const cdnrMap = new Map();
+  const cdnur = [];
+  for (const n of notes.filter(x => ymOf(x.date) === ym)) {
+    const no = String(n.noteNumber || '').trim();
+    if (!INUM_RE.test(no)) { issues.push({ invoiceNo: no || '(blank)', date: n.date, message: 'Note number must be up to 16 characters using only letters, numbers, "/" or "-".', blocking: true }); continue; }
+    const ctin = String(n.customerGstin || '').trim().toUpperCase();
+    const inter = !!n.isInterState;
+    const byRate = new Map();
+    for (const i of n.items || []) {
+      const rt = Number(i.gstPercent) || 0;
+      const a = byRate.get(rt) || { txval: 0, iamt: 0, camt: 0, samt: 0 };
+      a.txval += i.taxableAmount; a.iamt += i.igstAmount; a.camt += i.cgstAmount; a.samt += i.sgstAmount;
+      byRate.set(rt, a);
+      const sign = n.noteType === 'Credit Note' ? -1 : 1;
+      const hsn = String(i.hsn || '').trim();
+      const uqc = UQC[i.unit] || 'OTH';
+      const isB2B = !!ctin;
+      const k = `${hsn}|${rt}|${uqc}|${isB2B ? 'b2b' : 'b2c'}`;
+      const h = hsnMap.get(k) || { hsn_sc: hsn, uqc, qty: 0, rt, txval: 0, iamt: 0, camt: 0, samt: 0, csamt: 0, b2b: isB2B };
+      h.qty += sign * (uqc === 'NA' ? 0 : Number(i.quantity) || 0);
+      h.txval += sign * i.taxableAmount; h.iamt += sign * i.igstAmount; h.camt += sign * i.cgstAmount; h.samt += sign * i.sgstAmount;
+      hsnMap.set(k, h);
+    }
+    const itms = [...byRate.entries()].map(([rt, a], k) => ({ num: k + 1, itm_det: inter ? { txval: r2(a.txval), rt, iamt: r2(a.iamt), csamt: 0 } : { txval: r2(a.txval), rt, camt: r2(a.camt), samt: r2(a.samt), csamt: 0 } }));
+    const base = { ntty: n.noteType === 'Credit Note' ? 'C' : 'D', nt_num: no, nt_dt: ddmmyyyy(n.date), val: r2(n.grandTotal), pos: n.placeOfSupply, itms };
+    if (ctin && GSTIN_RE.test(ctin)) {
+      if (!cdnrMap.has(ctin)) cdnrMap.set(ctin, []);
+      cdnrMap.get(ctin).push({ ...base, rchrg: 'N', inv_typ: 'R' });
+    } else {
+      const orig = invoices.find(i => i.id === n.originalInvoiceId);
+      if (inter && (orig?.grandTotal || 0) > 250000) cdnur.push({ ...base, typ: 'B2CL' });
+      else for (const [rt, a] of byRate) {
+        if (!rt) continue;
+        const sign = n.noteType === 'Credit Note' ? -1 : 1;
+        const pos = n.placeOfSupply || compState;
+        const k = `${pos}|${rt}`;
+        const b = b2csMap.get(k) || { sply_ty: inter ? 'INTER' : 'INTRA', pos, typ: 'OE', rt, txval: 0, camt: 0, samt: 0, csamt: 0 };
+        b.txval += sign * a.txval; b.camt += sign * a.camt; b.samt += sign * a.samt;
+        b2csMap.set(k, b);
+      }
+    }
+  }
   drafts.forEach(d => issues.push({ invoiceNo: d.invoiceNumber, date: d.date, message: 'Draft invoice — not included.', blocking: false }));
 
   const json: any = { gstin, fp, version: GSTR1_SCHEMA_VERSION, hash: 'hash' };
   if (b2bMap.size) json.b2b = [...b2bMap.entries()].map(([ctin, inv]) => ({ ctin, inv }));
   if (b2csMap.size) json.b2cs = [...b2csMap.values()].map(b => ({ ...b, txval: r2(b.txval), camt: r2(b.camt), samt: r2(b.samt) }));
+  if (cdnrMap.size) json.cdnr = [...cdnrMap.entries()].map(([ctin, nt]) => ({ ctin, nt }));
+  if (cdnur.length) json.cdnur = cdnur;
   const nilInv = Object.entries(nil).filter(([, v]) => v.some(n => n)).map(([sply_ty, v]) => ({ sply_ty, expt_amt: r2(v[0]), nil_amt: r2(v[1]), ngsup_amt: r2(v[2]) }));
   if (nilInv.length) json.nil = { inv: nilInv };
   const hsnRows = [...hsnMap.values()].filter(h => h.hsn_sc);

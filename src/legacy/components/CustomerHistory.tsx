@@ -5,6 +5,7 @@ import {
   CheckCircle, Clock, AlertCircle, BookOpen, ChevronRight, TrendingUp,
   User, Calendar,
 } from 'lucide-react';
+import { noteLedgerEntries } from '../utils/creditDebitNotes';
 import { CustomerData, Quotation, Invoice, InvoicePayment, PAYMENT_MODE_LABELS } from '../types';
 
 interface Props {
@@ -34,7 +35,7 @@ const statusColors: Record<string, string> = {
 type Tab = 'summary' | 'ledger' | 'invoices';
 
 export function CustomerHistory({
-  customer, quotations, invoices, payments,
+  customer, quotations, invoices, payments, notes = [],
   onClose, onEditQuotation, onEditInvoice, onRecordPayment,
 }: Props) {
   const [tab, setTab] = useState<Tab>('summary');
@@ -42,7 +43,8 @@ export function CustomerHistory({
   const stats = useMemo(() => {
     const totalBilled = invoices.reduce((s, i) => s + i.grandTotal, 0);
     const totalReceived = invoices.reduce((s, i) => s + (i.amountPaid || 0), 0);
-    const totalOutstanding = Math.max(0, totalBilled - totalReceived);
+    const noteAdj = notes.reduce((s, n) => s + (n.noteType === 'Debit Note' ? n.grandTotal : -n.grandTotal), 0);
+    const totalOutstanding = Math.max(0, totalBilled + noteAdj - totalReceived);
 
     const paidCount = invoices.filter(i => i.status === 'Paid').length;
     const partialCount = invoices.filter(i => i.status === 'Partial Payment').length;
@@ -57,7 +59,7 @@ export function CustomerHistory({
       : null;
 
     return { totalBilled, totalReceived, totalOutstanding, paidCount, partialCount, unpaidCount, draftCount, lastInvoiceDate, lastPaymentDate };
-  }, [invoices, payments]);
+  }, [invoices, payments, notes]);
 
   // Ledger entries: invoices (debits) + payments (credits) combined chronologically
   const ledgerEntries = useMemo(() => {
@@ -80,6 +82,7 @@ export function CustomerHistory({
         credit: 0,
         type: 'invoice' as const,
       })),
+      ...noteLedgerEntries(notes),
       ...payments.map(p => {
         const inv = invoices.find(i => i.id === p.invoiceId);
         return {
@@ -103,7 +106,7 @@ export function CustomerHistory({
       return { ...e, balance };
     });
     return withBalance.reverse();
-  }, [invoices, payments, customer.name]);
+  }, [invoices, payments, notes, customer.name]);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

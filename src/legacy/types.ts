@@ -1722,3 +1722,58 @@ export const A5_MARGIN = 8;
 export const POS_WIDTH = 80;  // Thermal printer width (mm)
 export const POS_HEIGHT = 297; // Variable length, use A4 height as base
 export const POS_MARGIN = 4;
+
+// ─── Credit / Debit Notes (Section 34 CGST Act, Rule 53) ─────────────────────
+export type NoteType = 'Credit Note' | 'Debit Note';
+
+export type NoteReason =
+  | '01-Sales Return'
+  | '02-Post Sale Discount'
+  | '03-Deficiency in Services'
+  | '04-Correction in Invoice'
+  | '05-Change in POS'
+  | '06-Finalization of Provisional Assessment'
+  | '07-Others';
+
+export interface CreditDebitNoteItem {
+  id: string;
+  sourceItemId?: string;      // product id on the original invoice (absent for extra charges)
+  description: string;
+  hsn: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;          // taxable value per unit (before GST)
+  gstPercent: number;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalAmount: number;
+}
+
+export interface CreditDebitNote {
+  id: string;
+  noteNumber: string;         // e.g., CN-2026-001 or DN-2026-001
+  noteType: NoteType;
+  date: string;               // YYYY-MM-DD
+  originalInvoiceId: string;
+  originalInvoiceNumber: string;
+  originalInvoiceDate: string;
+  reason: NoteReason;
+  customerId: string;
+  customerName: string;
+  customerGstin?: string;
+  customerAddress?: string;
+  customerState?: string;
+  placeOfSupply: string;
+  isInterState: boolean;
+  items: CreditDebitNoteItem[];
+  subtotal: number;
+  totalGst: number;
+  cgstTotal: number;
+  sgstTotal: number;
+  igstTotal: number;
+  grandTotal: number;
+  remarks?: string;
+  createdAt: string;
+}

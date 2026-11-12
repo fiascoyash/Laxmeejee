@@ -3,6 +3,7 @@ import { Invoice, InvoiceStatus, Customer, Product, ProductCatalogItem, CompanyP
 import { CustomerDetails } from './CustomerDetails';
 import { ProductTable } from './ProductTable';
 import { TermsEditor } from './TermsEditor';
+import { useState } from 'react';
 import { Save, FileDown, Eye, Calendar, AlertCircle, Package, Trash2, PenTool, FileText, IndianRupee, Printer } from 'lucide-react';
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
   selectedTemplate: QuotationTemplate | undefined;
   onChange: (invoice: Invoice) => void;
   onSave: () => void;
-  onExportPDF: () => void;
+  onExportPDF: (copies?: ('original' | 'transporter' | 'supplier')[]) => void;
   onPreview: () => void;
   onPrint: () => void;
   onCancel: () => void;
@@ -46,6 +47,7 @@ export function InvoiceForm({
   isExisting = false,
   onFinalizeDraft,
 }: Props) {
+  const [copyMenu, setCopyMenu] = useState(false);
   const amountPaid = invoice.amountPaid || 0;
   const outstanding = Math.max(0, invoice.grandTotal - amountPaid);
   const update = (patch: Partial<Invoice>) => onChange({ ...invoice, ...patch });
@@ -340,14 +342,36 @@ export function InvoiceForm({
           <Printer className="w-4 h-4" />
           Print
         </button>
-        <button
-          onClick={onExportPDF}
-          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2 order-1 sm:order-3"
-          title="Export PDF (Ctrl+E)"
-        >
-          <FileDown className="w-4 h-4" />
-          Export PDF
-        </button>
+<div className="relative order-1 sm:order-3 flex">
+          <button
+            onClick={() => onExportPDF(['original'])}
+            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-l-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+            title="Export PDF – Original for Recipient (Ctrl+E)"
+          >
+            <FileDown className="w-4 h-4" />
+            Export PDF
+          </button>
+          <button
+            onClick={() => setCopyMenu(v => !v)}
+            className="px-2 py-2 bg-green-700 text-white rounded-r-md hover:bg-green-800 border-l border-green-500"
+            aria-label="More PDF copy options"
+            title="Choose copy (CGST Rule 48)"
+          >▾</button>
+          {copyMenu && (
+            <div className="absolute bottom-full right-0 mb-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1 text-sm">
+              <div className="px-3 py-1.5 text-xs text-slate-500">Download copy (CGST Rule 48) — 1 file</div>
+              {[
+                [['original'], 'Original for Recipient'],
+                [['transporter'], 'Duplicate for Transporter'],
+                [['supplier'], 'Triplicate for Supplier'],
+                [['original', 'transporter', 'supplier'], 'All 3 copies (one PDF)'],
+              ].map(([c, label]) => (
+                <button key={label} onClick={() => { setCopyMenu(false); onExportPDF(c); }}
+                  className={`w-full text-left px-3 py-2 hover:bg-green-50 ${c.length > 1 ? 'font-semibold border-t border-slate-100' : ''}`}>{label}</button>
+              ))}
+            </div>
+          )}
+        </div>
         {isExisting && invoice.status === 'Draft' && onFinalizeDraft && (
           <button
             onClick={onFinalizeDraft}

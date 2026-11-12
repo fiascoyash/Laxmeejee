@@ -1,7 +1,7 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { Invoice, InvoiceStatus } from '../types';
 import {
-  FileText, Trash2, Copy, CreditCard as Edit, Eye, X, Calendar, User,
+  FileText, Trash2, Copy, Undo2, PlusCircle, CreditCard as Edit, Eye, X, Calendar, User,
   Search, XCircle, IndianRupee, LayoutList, LayoutGrid, Table2, Kanban,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, Printer, CheckCircle2,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckSquare2, Square,
@@ -34,12 +34,13 @@ interface Props {
   onRecordPayment: (invoice: Invoice) => void;
   onBulkDelete?: (ids: string[]) => void;
   onBulkMarkPaid?: (ids: string[]) => void;
+  onIssueNote?: (invoice: Invoice, noteType: 'Credit Note' | 'Debit Note') => void;
 }
 
 const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 const fmtShort = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate, onRecordPayment, onBulkDelete, onBulkMarkPaid }: Props) {
+export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate, onRecordPayment, onBulkDelete, onBulkMarkPaid, onIssueNote }: Props) {
   const [prefs, setPrefs] = useState<ListPrefs>(() => {
     try { const s = localStorage.getItem(PREFS_KEY); return s ? { ...DEFAULT_PREFS, ...JSON.parse(s) } : DEFAULT_PREFS; }
     catch { return DEFAULT_PREFS; }
@@ -308,6 +309,10 @@ export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate, onRecordP
                           )}
                           <button onClick={() => setPreview(inv)} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="Preview"><Eye className="w-3.5 h-3.5" /></button>
                           <button onClick={() => onEdit(inv)} className="p-1.5 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
+                          {onIssueNote && inv.status !== 'Draft' && (<>
+                            <button onClick={() => onIssueNote(inv, 'Credit Note')} className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Issue Credit Note" aria-label="Issue Credit Note"><Undo2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => onIssueNote(inv, 'Debit Note')} className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded" title="Issue Debit Note" aria-label="Issue Debit Note"><PlusCircle className="w-3.5 h-3.5" /></button>
+                          </>)}
                           <button onClick={() => onDuplicate(inv.id)} className="p-1.5 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded" title="Duplicate"><Copy className="w-3.5 h-3.5" /></button>
                           <button onClick={() => onDelete(inv.id)} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
@@ -356,6 +361,10 @@ export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate, onRecordP
                         )}
                         <button onClick={() => setPreview(inv)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Preview"><Eye className="w-4 h-4" /></button>
                         <button onClick={() => onEdit(inv)} className="p-2 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Edit"><Edit className="w-4 h-4" /></button>
+                        {onIssueNote && inv.status !== 'Draft' && (<>
+                          <button onClick={() => onIssueNote(inv, 'Credit Note')} className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Issue Credit Note" aria-label="Issue Credit Note"><Undo2 className="w-4 h-4" /></button>
+                          <button onClick={() => onIssueNote(inv, 'Debit Note')} className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded" title="Issue Debit Note" aria-label="Issue Debit Note"><PlusCircle className="w-4 h-4" /></button>
+                        </>)}
                         <button onClick={() => onDuplicate(inv.id)} className="p-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Duplicate"><Copy className="w-4 h-4" /></button>
                         <button onClick={() => onDelete(inv.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                       </div>
@@ -411,6 +420,10 @@ export function InvoiceList({ invoices, onEdit, onDelete, onDuplicate, onRecordP
                               )}
                               <button onClick={() => setPreview(inv)} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="Preview"><Eye className="w-3.5 h-3.5" /></button>
                               <button onClick={() => onEdit(inv)} className="p-1.5 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded" title="Edit"><Edit className="w-3.5 h-3.5" /></button>
+                              {onIssueNote && inv.status !== 'Draft' && (<>
+                                <button onClick={() => onIssueNote(inv, 'Credit Note')} className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Issue Credit Note" aria-label="Issue Credit Note"><Undo2 className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => onIssueNote(inv, 'Debit Note')} className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded" title="Issue Debit Note" aria-label="Issue Debit Note"><PlusCircle className="w-3.5 h-3.5" /></button>
+                              </>)}
                               <button onClick={() => onDuplicate(inv.id)} className="p-1.5 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded" title="Duplicate"><Copy className="w-3.5 h-3.5" /></button>
                               <button onClick={() => onDelete(inv.id)} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>

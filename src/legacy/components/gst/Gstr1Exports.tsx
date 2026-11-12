@@ -2,6 +2,7 @@
 // "Export GSTR-1 JSON" and "Export Invoice PDFs" actions for the GSTR-1 report. Read-only on invoices.
 import React, { useMemo, useState } from 'react';
 import { FileJson, FileArchive, X, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { useNotes } from '../../utils/creditDebitNotes';
 import { buildGstr1Json, periodFromFy, MONTHS } from '../../utils/gstr1Json';
 import { storage } from '../../utils/storage';
 import { exportTemplatePDF } from '../../utils/templatePdfExport';
@@ -54,7 +55,8 @@ function JsonExport({ invoices, companyProfile, onClose }) {
   const [monthIdx, setMonthIdx] = useState(new Date().getMonth());
   const [done, setDone] = useState(false);
   const { year, month } = periodFromFy(fy, monthIdx);
-  const res = useMemo(() => buildGstr1Json(invoices, companyProfile?.gstNumber || '', year, month), [invoices, companyProfile, year, month]);
+  const notes = useNotes();
+  const res = useMemo(() => buildGstr1Json(invoices, companyProfile?.gstNumber || '', year, month, notes), [invoices, companyProfile, year, month, notes]);
   const fileName = `Hisaaboo_GSTR1_FY${fy}_${MONTHS[monthIdx]}.json`;
   const canExport = !res.companyBlocked && res.included.length > 0;
 
