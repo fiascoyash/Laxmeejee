@@ -43,6 +43,13 @@
       "when": 1794476948042,
       "tag": "0005_pickup_orders_realtime",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794657167420,
+      "tag": "0006_create_hisaaboo_schema",
+      "breakpoints": true
     }
   ]
 }

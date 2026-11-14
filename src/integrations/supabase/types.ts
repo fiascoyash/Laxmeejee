@@ -407,22 +407,16 @@ export type Database = {
     Functions: {
       create_business: {
         Args: {
-          _category?: string
-          _city?: string
-          _locality?: string
+          _category: string
+          _city: string
+          _locality: string
           _public_name: string
           _slug: string
         }
         Returns: string
       }
       current_business_id: { Args: never; Returns: string }
-      is_business_member: {
-        Args: {
-          _business_id: string
-          _roles?: Database["public"]["Enums"]["business_role"][]
-        }
-        Returns: boolean
-      }
+      is_business_member: { Args: { _business_id: string }; Returns: boolean }
       place_pickup_order: {
         Args: {
           _items: Json
