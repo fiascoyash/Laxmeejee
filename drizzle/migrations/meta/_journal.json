@@ -5,8 +5,43 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1794639491246,
-      "tag": "0000_import_hisaaboo_schema",
+      "when": 1792859917777,
+      "tag": "0000_hisaaboo_base_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792905091609,
+      "tag": "0001_add_stock_details_and_atomic_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794474994882,
+      "tag": "0002_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794475654062,
+      "tag": "0003_shop_products_and_profile",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794476659235,
+      "tag": "0004_pickup_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794476948042,
+      "tag": "0005_pickup_orders_realtime",
       "breakpoints": true
     }
   ]
