@@ -8,7 +8,9 @@ import { OnboardingForm } from "./OnboardingForm";
 import { ShopSettings, type Business } from "./ShopSettings";
 import { PickupOrders } from "./PickupOrders";
 import { playChime } from "./orderAlerts";
-import { MerchantStoreProvider, type ShopSettingsTab } from "./store-context";
+import { MerchantStoreProvider, StoreConnectionProvider, type ShopSettingsTab } from "./store-context";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 /** Mark a pickup order collected once its GST bill is saved (non-draft). */
 function useBilledOrders(enabled: boolean, onDone: () => void) {
@@ -40,7 +42,7 @@ function syncCompanyName(b: Business) {
   } catch { /* ignore */ }
 }
 
-/** Owner sign-in + business setup in front of the billing app. Data isolation itself is enforced by database policies. */
+/** Billing is always accessible; account connection gates only cloud store controls. */
 export function BusinessGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -56,17 +58,28 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   const [publishing, setPublishing] = useState(false);
   const [alert, setAlert] = useState<string | null>(null);
   const [ordersVersion, setOrdersVersion] = useState(0);
+  const [connectionOpen, setConnectionOpen] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  const openConnection = useCallback(() => setConnectionOpen(true), []);
 
   useEffect(() => {
+    if (sessionStorage.getItem("hisaaboo:connect-store") === "1") {
+      sessionStorage.removeItem("hisaaboo:connect-store");
+      setConnectionOpen(true);
+    }
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     return () => data.subscription.unsubscribe();
   }, []);
 
   const loadBusiness = useCallback(async () => {
-    const { data: m } = await supabase.from("business_members").select("business_id").order("created_at").limit(1).maybeSingle();
+    setConnectionError(null);
+    const { data: m, error: memberError } = await supabase.from("business_members").select("business_id").order("created_at").limit(1).maybeSingle();
+    if (memberError) { setConnectionError("Your online store could not be loaded. Please try again."); return; }
     if (!m) return setBusiness(null);
-    const { data: b } = await supabase.from("businesses").select("*").eq("id", m.business_id).maybeSingle();
+    const { data: b, error } = await supabase.from("businesses").select("*").eq("id", m.business_id).maybeSingle();
+    if (error) { setConnectionError("Your online store could not be loaded. Please try again."); return; }
     if (b) syncCompanyName(b as Business);
     setBusiness((b as Business) ?? null);
   }, []);
@@ -74,6 +87,10 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (session) { setBusiness(undefined); loadBusiness(); } else setBusiness(undefined);
   }, [session?.user.id, loadBusiness]);
+
+  useEffect(() => {
+    if (business) setConnectionOpen(false);
+  }, [business]);
 
   const businessId = business?.id;
   const bumpOrders = useCallback(() => setOrdersVersion((v) => v + 1), []);
@@ -126,6 +143,11 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await queryClient.cancelQueries();
     queryClient.clear();
+    setOrdersOpen(false);
+    setSettingsOpen(false);
+    setAlert(null);
+    setConnectionOpen(false);
+    setBusiness(undefined);
     await supabase.auth.signOut();
   }, [queryClient]);
 
@@ -164,15 +186,23 @@ export function BusinessGate({ children }: { children: ReactNode }) {
     refreshStore: loadStore,
   }) : null, [business, newOrders, activeOrders, publishedProducts, recentOrders, ordersVersion, storeError, publishing, openOrders, openShopSettings, togglePublish, signOut, loadStore]);
 
-  if (session === undefined) return <div className="min-h-screen" />;
-  if (!session) return <AuthScreen />;
-  if (business === undefined) return <div className="min-h-screen" />;
-  if (!business || !storeValue) return <OnboardingForm onCreated={loadBusiness} onSignOut={signOut} />;
-
   return (
+    <StoreConnectionProvider value={{ openConnection, connecting: session === undefined || (!!session && business === undefined && !connectionError) }}>
     <MerchantStoreProvider value={storeValue}>
       {children}
-      {ordersOpen && <PickupOrders businessId={business.id} version={ordersVersion} onClose={() => setOrdersOpen(false)} />}
+      <Dialog open={connectionOpen && !business} onOpenChange={setConnectionOpen}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
+          <DialogTitle>Connect online store</DialogTitle>
+          <DialogDescription>Store account</DialogDescription>
+          {session === undefined ? <p role="status">Checking account…</p>
+            : !session ? <AuthScreen embedded />
+            : connectionError ? <div role="alert"><p>{connectionError}</p><Button onClick={() => void loadBusiness()}>Retry</Button></div>
+            : business === undefined ? <p role="status">Loading store…</p>
+            : <OnboardingForm embedded onCreated={loadBusiness} onSignOut={signOut} />}
+          <Button variant="ghost" onClick={() => setConnectionOpen(false)}>Continue billing</Button>
+        </DialogContent>
+      </Dialog>
+      {ordersOpen && business && <PickupOrders businessId={business.id} version={ordersVersion} onClose={() => setOrdersOpen(false)} />}
       {alert && (
         <div role="alert" className="fixed right-3 top-3 z-[80] max-w-sm rounded-lg border border-primary bg-card p-4 text-sm text-card-foreground shadow-xl">
           <p className="font-semibold">🔔 {alert}</p>
@@ -182,7 +212,7 @@ export function BusinessGate({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
-      {settingsOpen && (
+      {settingsOpen && business && (
         <ShopSettings
           business={business}
           initialTab={settingsTab}
@@ -192,5 +222,6 @@ export function BusinessGate({ children }: { children: ReactNode }) {
         />
       )}
     </MerchantStoreProvider>
+    </StoreConnectionProvider>
   );
 }

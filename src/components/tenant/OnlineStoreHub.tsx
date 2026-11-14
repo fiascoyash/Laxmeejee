@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Tables } from "@/integrations/supabase/types";
-import { useMerchantStore } from "./store-context";
+import { useMerchantStore, useStoreConnection } from "./store-context";
 
 const STATUS_LABEL: Record<string, string> = {
   new: "New",
@@ -47,8 +47,14 @@ function billFromOrder(order: Tables<"pickup_orders">) {
 
 export function OnlineStoreHub() {
   const store = useMerchantStore();
+  const connection = useStoreConnection();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
-  if (!store) return null;
+  if (!store) return connection ? (
+    <section aria-labelledby="online-store-heading" className="flex flex-wrap items-center justify-between gap-4 border-y py-5">
+      <div className="flex items-center gap-3"><Store className="h-6 w-6 text-primary" aria-hidden="true" /><h2 id="online-store-heading" className="text-lg font-bold">Your online store</h2></div>
+      <Button onClick={connection.openConnection}><Store aria-hidden="true" />Connect online store</Button>
+    </section>
+  ) : null;
 
   const {
     business,

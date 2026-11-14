@@ -31,3 +31,8 @@
 - [x] Add a dashboard store hub with live catalogue/order counts, sharing, QR, and quick GST billing.
 - [x] Verify live updates, compact layouts, and pickup recovery through GST invoice prefill; restore the checked order to Collected without saving an invoice.
 - [x] Run all 64 behavior checks and confirm the signed-in desktop/compact views, QR, and catalogue controls have no page errors.
+
+# Optional store connection
+- [ ] Open billing immediately without an account; keep local records and navigation unchanged.
+- [ ] Offer optional store sign-in/setup inside billing while preserving connected store controls.
+- [ ] Verify direct entry, dismissible sign-in, local billing and existing store behavior checks.

@@ -27,3 +27,13 @@ export const MerchantStoreProvider = MerchantStoreContext.Provider;
 export function useMerchantStore() {
   return useContext(MerchantStoreContext);
 }
+
+type StoreConnectionValue = {
+  openConnection: () => void;
+  connecting: boolean;
+};
+const StoreConnectionContext = createContext<StoreConnectionValue | null>(null);
+export const StoreConnectionProvider = StoreConnectionContext.Provider;
+export function useStoreConnection() {
+  return useContext(StoreConnectionContext);
+}

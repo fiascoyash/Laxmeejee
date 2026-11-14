@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from '@tanstack/react-router';
 import { normalizeDiscovery } from '@/lib/discovery';
 import { getBillingView, type BillingView } from '@/lib/billing-navigation';
-import { useMerchantStore } from '@/components/tenant/store-context';
+import { useMerchantStore, useStoreConnection } from '@/components/tenant/store-context';
 import { SaveSuccessOverlay, SaveSuccessInfo } from './components/SaveSuccessOverlay';
 import { useEscapeStack } from './hooks/useEscapeStack';
 import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment, DEFAULT_TEMPLATE_SETTINGS } from './types';
@@ -54,6 +54,7 @@ function getViewFromHash(): View {
 
 function App() {
   const merchantStore = useMerchantStore();
+  const storeConnection = useStoreConnection();
   const [view, setView] = useState<View>(getViewFromHash);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
@@ -1664,13 +1665,15 @@ function App() {
             <li><NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" /></li>
             <li><NavItem icon={List} label="Quotation History" currentView={view} targetView="list" /></li>
           </ul>
-          {merchantStore && (
+          {(merchantStore || storeConnection) && (
             <div className="mt-4 px-3">
               <p className={`px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground/50 ${desktopSidebarCollapsed ? 'lg:hidden' : ''}`}>Online store</p>
               <ul className="space-y-1">
+                {merchantStore ? <>
                 <li><StoreAction icon={Store} label="View shop page" href={`/shop/${merchantStore.business.slug}`} live={merchantStore.business.is_published} onClick={() => setSidebarOpen(false)} /></li>
                 <li><StoreAction icon={BellRing} label="Pickup orders" badge={merchantStore.newOrders} onClick={() => { setSidebarOpen(false); merchantStore.openOrders(); }} /></li>
                 <li><StoreAction icon={QrCode} label="Catalogue & QR" onClick={() => { setSidebarOpen(false); merchantStore.openShopSettings('catalogue'); }} /></li>
+                </> : <li><Button variant="ghost" className={`w-full justify-start text-primary-foreground hover:bg-primary/20 hover:text-primary-foreground ${desktopSidebarCollapsed ? 'lg:justify-center' : ''}`} aria-label="Connect online store" title="Connect online store" onClick={() => { setSidebarOpen(false); storeConnection?.openConnection(); }}><Store aria-hidden="true" /><span className={desktopSidebarCollapsed ? 'lg:hidden' : ''}>Connect online store</span></Button></li>}
               </ul>
             </div>
           )}

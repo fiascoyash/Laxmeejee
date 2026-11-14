@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function OnboardingForm({ onCreated, onSignOut }: { onCreated: () => void; onSignOut: () => void }) {
+export function OnboardingForm({ onCreated, onSignOut, embedded = false }: { onCreated: () => void; onSignOut: () => void; embedded?: boolean }) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -36,8 +36,8 @@ export function OnboardingForm({ onCreated, onSignOut }: { onCreated: () => void
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted px-4 py-8">
-      <form onSubmit={submit} className="w-full max-w-md space-y-3 rounded-xl border bg-card p-6 shadow-sm">
+    <div className={embedded ? "flex justify-center" : "flex min-h-screen items-center justify-center bg-muted px-4 py-8"}>
+      <form onSubmit={submit} className={embedded ? "w-full max-w-md space-y-3" : "w-full max-w-md space-y-3 rounded-xl border bg-card p-6 shadow-sm"}>
         <h1 className="text-xl font-bold text-foreground">Set up your business</h1>
         <p className="text-sm text-muted-foreground">You can change these details later.</p>
         <div className="space-y-1">
