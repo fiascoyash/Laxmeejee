@@ -31,3 +31,4 @@
 - [x] Add a dashboard store hub with live catalogue/order counts, sharing, QR, and quick GST billing.
 - [x] Verify live updates, compact layouts, and pickup recovery through GST invoice prefill; restore the checked order to Collected without saving an invoice.
 - [x] Run all 64 behavior checks and confirm the signed-in desktop/compact views, QR, and catalogue controls have no page errors.
+- [ ] Apply user's upcoming update prompt
