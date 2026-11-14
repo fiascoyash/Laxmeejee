@@ -1,13 +1,19 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import heroShop from '@/assets/hero-local-shop.jpg';
 import {
   Sun, FileText, Receipt, Users, Truck, BarChart3, Package, Calculator,
   ArrowRight, CheckCircle2, IndianRupee, TrendingUp, Zap, ShieldCheck,
   Smartphone, Printer, FileDown, Sparkles, BookOpen, Clock,
+  Store, QrCode, ShoppingBag, BellRing, Cloud, Search,
 } from 'lucide-react';
 
 interface Props {
   onEnterApp: () => void;
+  /** Customer shop search shown inside the hero. */
+  heroSearch?: ReactNode;
+  /** Live local shop directory shown right after the hero. */
+  directory?: ReactNode;
 }
 
 const BRAND_SCRIPTS = [
@@ -95,185 +101,6 @@ function FloatingBadge({
   );
 }
 
-function VyapariIllustration() {
-  return (
-    <div className="relative w-full max-w-lg mx-auto">
-      {/* Soft gradient backdrop */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-100/50 via-teal-50/40 to-sky-50/30 rounded-[2.5rem] blur-2xl landing-pulse-glow" />
-      <div className="absolute top-1/4 right-1/4 w-40 h-40 bg-emerald-200/30 rounded-full blur-3xl landing-pulse-glow" style={{ animationDelay: '1s' }} />
-
-      {/* Main illustration card */}
-      <div className="relative aspect-square flex items-end justify-center">
-        <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-xl">
-          <defs>
-            <linearGradient id="deskGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f8fafc" />
-              <stop offset="100%" stopColor="#e2e8f0" />
-            </linearGradient>
-            <linearGradient id="shirtGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0f766e" />
-              <stop offset="100%" stopColor="#0d5d57" />
-            </linearGradient>
-            <linearGradient id="laptopScreen" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0f172a" />
-              <stop offset="100%" stopColor="#1e293b" />
-            </linearGradient>
-            <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f1f5f9" />
-              <stop offset="100%" stopColor="#e2e8f0" />
-            </linearGradient>
-            <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
-              <feOffset dx="0" dy="2" result="offsetblur" />
-              <feComponentTransfer><feFuncA type="linear" slope="0.15" /></feComponentTransfer>
-              <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </defs>
-
-          {/* Floor shadow */}
-          <ellipse cx="200" cy="372" rx="155" ry="14" fill="#cbd5e1" opacity="0.4" />
-
-          {/* Desk */}
-          <rect x="48" y="335" width="304" height="38" rx="8" fill="url(#deskGrad)" stroke="#cbd5e1" strokeWidth="1.5" filter="url(#softShadow)" />
-          <line x1="48" y1="355" x2="352" y2="355" stroke="#cbd5e1" strokeWidth="1" opacity="0.5" />
-
-          {/* Chair back */}
-          <rect x="168" y="195" width="64" height="150" rx="14" fill="#334155" filter="url(#softShadow)" />
-          <rect x="172" y="200" width="56" height="140" rx="10" fill="#3f4d63" />
-          <line x1="200" y1="205" x2="200" y2="335" stroke="#2c3a4f" strokeWidth="1" opacity="0.3" />
-
-          {/* Character — shoulders/torso */}
-          <g filter="url(#softShadow)">
-            {/* Torso/shirt */}
-            <path d="M 158 215 Q 200 200 242 215 L 252 320 Q 200 332 148 320 Z" fill="url(#shirtGrad)" />
-            {/* Neck */}
-            <rect x="193" y="192" width="14" height="24" rx="6" fill="#d4a373" />
-            {/* Collar V-shape */}
-            <path d="M 180 210 Q 200 222 220 210 L 214 232 L 200 240 L 186 232 Z" fill="#0d9488" />
-            <path d="M 186 232 L 200 240 L 214 232 L 210 246 L 190 246 Z" fill="#0c7d72" />
-          </g>
-
-          {/* Head */}
-          <g filter="url(#softShadow)">
-            {/* Face */}
-            <ellipse cx="200" cy="165" rx="34" ry="36" fill="#e8b88f" />
-            {/* Ears */}
-            <ellipse cx="167" cy="168" rx="5" ry="7" fill="#d4a373" />
-            <ellipse cx="233" cy="168" rx="5" ry="7" fill="#d4a373" />
-            {/* Hair — modern combed style */}
-            <path d="M 168 148 Q 175 128 200 124 Q 225 128 232 148 Q 235 155 230 152 Q 220 138 200 136 Q 180 138 170 152 Q 165 155 168 148 Z" fill="#1a1a2e" />
-            <path d="M 170 152 Q 200 140 230 152 Q 232 156 228 154 Q 200 144 172 154 Q 168 156 170 152 Z" fill="#16213e" />
-            {/* Eyebrows */}
-            <path d="M 180 158 Q 186 155 192 158" stroke="#1a1a2e" strokeWidth="2" fill="none" strokeLinecap="round" />
-            <path d="M 208 158 Q 214 155 220 158" stroke="#1a1a2e" strokeWidth="2" fill="none" strokeLinecap="round" />
-            {/* Glasses */}
-            <rect x="178" y="160" width="16" height="12" rx="6" fill="none" stroke="#334155" strokeWidth="1.8" />
-            <rect x="206" y="160" width="16" height="12" rx="6" fill="none" stroke="#334155" strokeWidth="1.8" />
-            <line x1="194" y1="166" x2="206" y2="166" stroke="#334155" strokeWidth="1.8" />
-            {/* Eyes behind glasses */}
-            <circle cx="186" cy="166" r="2" fill="#1a1a2e" />
-            <circle cx="214" cy="166" r="2" fill="#1a1a2e" />
-            {/* Nose */}
-            <path d="M 200 172 Q 198 178 200 182 Q 202 178 200 172" stroke="#c4956a" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-            {/* Friendly smile */}
-            <path d="M 188 186 Q 200 196 212 186" stroke="#1a1a2e" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-            {/* Cheek hint */}
-            <ellipse cx="176" cy="178" rx="5" ry="3" fill="#f0a8a8" opacity="0.3" />
-            <ellipse cx="224" cy="178" rx="5" ry="3" fill="#f0a8a8" opacity="0.3" />
-          </g>
-
-          {/* Left arm — reaching toward laptop */}
-          <path d="M 158 218 Q 130 250 118 285" stroke="url(#shirtGrad)" strokeWidth="16" fill="none" strokeLinecap="round" filter="url(#softShadow)" />
-          <circle cx="118" cy="285" r="9" fill="#e8b88f" />
-
-          {/* Right arm — on calculator */}
-          <path d="M 242 218 Q 268 245 278 275" stroke="url(#shirtGrad)" strokeWidth="16" fill="none" strokeLinecap="round" filter="url(#softShadow)" />
-          <circle cx="278" cy="275" r="9" fill="#e8b88f" />
-
-          {/* Laptop showing Hisaaboo */}
-          <g filter="url(#softShadow)">
-            {/* Screen */}
-            <rect x="88" y="248" width="88" height="60" rx="6" fill="url(#laptopScreen)" />
-            <rect x="94" y="254" width="76" height="48" rx="3" fill="#0f766e" opacity="0.95" />
-            {/* Hisaaboo logo on screen */}
-            <circle cx="132" cy="266" r="4" fill="#34d399" />
-            <text x="132" y="280" textAnchor="middle" fill="#34d399" fontSize="7" fontWeight="bold" fontFamily="system-ui">Hisaaboo</text>
-            {/* Screen content lines */}
-            <rect x="100" y="286" width="24" height="2.5" rx="1" fill="#5eead4" opacity="0.6" />
-            <rect x="128" y="286" width="36" height="2.5" rx="1" fill="#5eead4" opacity="0.4" />
-            <rect x="100" y="293" width="44" height="2" rx="1" fill="#5eead4" opacity="0.3" />
-            {/* Laptop base */}
-            <path d="M 82 308 L 182 308 L 188 318 L 76 318 Z" fill="#475569" />
-            <rect x="78" y="316" width="108" height="5" rx="2.5" fill="#334155" />
-          </g>
-
-          {/* Calculator */}
-          <g filter="url(#softShadow)">
-            <rect x="238" y="248" width="56" height="72" rx="8" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
-            <rect x="244" y="254" width="44" height="16" rx="3" fill="#0f172a" />
-            <text x="284" y="265" textAnchor="end" fill="#34d399" fontSize="10" fontFamily="monospace" fontWeight="bold">₹12,450</text>
-            {/* Buttons grid */}
-            {[0, 1, 2].map(row =>
-              [0, 1, 2].map(col => (
-                <circle key={`${row}-${col}`} cx={252 + col * 12} cy={278 + row * 12} r="4" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="0.5" />
-              ))
-            )}
-            <circle cx="288" cy="278" r="4" fill="#f59e0b" />
-            <circle cx="288" cy="290" r="4" fill="#10b981" />
-            <circle cx="288" cy="302" r="4" fill="#ef4444" />
-          </g>
-
-          {/* Ledger book (khata) */}
-          <g filter="url(#softShadow)" transform="rotate(-12 170 300)">
-            <rect x="148" y="278" width="48" height="60" rx="3" fill="#b91c1c" />
-            <rect x="152" y="282" width="40" height="52" rx="1" fill="#fef3c7" />
-            <line x1="156" y1="290" x2="188" y2="290" stroke="#d4a373" strokeWidth="1" />
-            <line x1="156" y1="296" x2="184" y2="296" stroke="#d4a373" strokeWidth="1" />
-            <line x1="156" y1="302" x2="186" y2="302" stroke="#d4a373" strokeWidth="1" />
-            <line x1="156" y1="308" x2="180" y2="308" stroke="#d4a373" strokeWidth="1" />
-            <line x1="156" y1="314" x2="186" y2="314" stroke="#d4a373" strokeWidth="1" />
-            <line x1="156" y1="320" x2="182" y2="320" stroke="#d4a373" strokeWidth="1" />
-            <text x="172" y="274" textAnchor="middle" fill="#fbbf24" fontSize="6" fontWeight="bold">KHATA</text>
-          </g>
-
-          {/* Pen */}
-          <g transform="rotate(25 310 310)" filter="url(#softShadow)">
-            <rect x="298" y="306" width="30" height="5" rx="2.5" fill="#1e293b" />
-            <path d="M 328 308 L 334 308 L 328 304 L 328 312 Z" fill="#0f172a" />
-            <rect x="300" y="307" width="8" height="3" rx="1" fill="#3b82f6" />
-          </g>
-
-          {/* Mobile phone — Payment Received */}
-          <g filter="url(#softShadow)">
-            <rect x="306" y="226" width="34" height="58" rx="7" fill="#1e293b" />
-            <rect x="309" y="232" width="28" height="46" rx="4" fill="#f0fdf4" />
-            <circle cx="323" cy="280" r="2" fill="#64748b" />
-            {/* Notification card */}
-            <rect x="311" y="236" width="24" height="20" rx="3" fill="#dcfce7" />
-            <circle cx="316" cy="242" r="2.5" fill="#10b981" />
-            <text x="323" y="244" textAnchor="middle" fill="#065f46" fontSize="4" fontWeight="bold">Payment</text>
-            <text x="323" y="250" textAnchor="middle" fill="#065f46" fontSize="4" fontWeight="bold">Received</text>
-            <rect x="313" y="262" width="20" height="2" rx="1" fill="#86efac" />
-            <rect x="313" y="268" width="14" height="2" rx="1" fill="#86efac" />
-          </g>
-
-          {/* Small ₹ floating symbols */}
-          <text x="72" y="230" fill="#10b981" fontSize="14" fontWeight="bold" opacity="0.3">₹</text>
-          <text x="340" y="200" fill="#10b981" fontSize="11" fontWeight="bold" opacity="0.25">₹</text>
-          <text x="60" y="280" fill="#0f766e" fontSize="9" fontWeight="bold" opacity="0.2">₹</text>
-        </svg>
-
-        {/* Floating UI cards around character */}
-        <FloatingBadge icon={Receipt} label="Invoice" sublabel="INV-2026-0042" className="top-[6%] -left-2 sm:-left-8" delay="0s" color="emerald" />
-        <FloatingBadge icon={IndianRupee} label="Payment Received" sublabel="₹ 12,450" className="top-[22%] -right-2 sm:-right-10" delay="0.6s" color="emerald" />
-        <FloatingBadge icon={FileText} label="Quotation" sublabel="QT-2026-0018" className="bottom-[30%] -left-3 sm:-left-12" delay="1s" color="blue" />
-        <FloatingBadge icon={BarChart3} label="GST Report" sublabel="GSTR-1 Ready" className="bottom-[10%] -right-2 sm:-right-8" delay="0.3s" color="amber" />
-        <FloatingBadge icon={Users} label="Customers" sublabel="248 active" className="top-[48%] -right-4 sm:-right-14" delay="1.4s" color="violet" />
-      </div>
-    </div>
-  );
-}
-
 function CounterNumber({ value, suffix, label }: { value: number; suffix?: string; label: string }) {
   const [display, setDisplay] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
@@ -335,6 +162,17 @@ const STEPS = [
   { icon: BarChart3, title: 'File GST Reports', desc: 'Pull up sales registers, GSTR-1 summaries, and HSN reports whenever you need them.' },
 ];
 
+const NEW_FEATURES = [
+  { icon: Store, title: 'Your Own Shop Page', desc: 'Every shop gets a public web page with its products, prices, timings and address.' },
+  { icon: QrCode, title: 'Counter QR Standee', desc: 'Print a QR code for your counter — customers scan it to open your shop page.' },
+  { icon: ShoppingBag, title: 'Order for Pickup', desc: 'Customers order from their phone without any app and get a 6-digit pickup code.' },
+  { icon: BellRing, title: 'Live Order Chime', desc: 'A sound and alert plays on your billing screen the moment a new order arrives.' },
+  { icon: Zap, title: '1-Click GST Bill', desc: 'Turn any pickup order into a GST invoice with customer, items and rates already filled.' },
+  { icon: Search, title: 'Local Shop Search', desc: 'Customers find your shop and products by city, locality and category.' },
+  { icon: BarChart3, title: 'GSTR-1, 2B & 3B Tools', desc: 'GSTR-1 JSON export, GSTR-2B analyser and GSTR-3B preparation in one place.' },
+  { icon: Cloud, title: 'Secure Cloud Account', desc: 'Sign in from any device; each shop’s records stay private to that shop.' },
+];
+
 const WHY = [
   { icon: ShieldCheck, title: 'Built for Indian GST', desc: 'CGST/SGST, HSN codes, inclusive/exclusive GST modes — all handled correctly out of the box.' },
   { icon: Smartphone, title: 'Works on Any Device', desc: 'Desktop, laptop, tablet, or mobile — your billing desk travels with you.' },
@@ -342,7 +180,7 @@ const WHY = [
   { icon: Clock, title: 'Save Time Daily', desc: 'Auto-numbering, product autocomplete, and reusable templates cut billing time to minutes.' },
 ];
 
-export function LandingPage({ onEnterApp }: Props) {
+export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -365,6 +203,8 @@ export function LandingPage({ onEnterApp }: Props) {
             <span className={`text-xl font-bold tracking-tight ${scrolled ? 'text-slate-800' : 'text-slate-800'}`}>Hisaaboo</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+            {directory && <button onClick={() => document.getElementById('shops')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">Find Shops</button>}
+            <button onClick={() => document.getElementById('new')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">What's New</button>
             <button onClick={scrollToFeatures} className="hover:text-emerald-600 transition-colors">Features</button>
             <button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">How it works</button>
             <button onClick={() => document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">Why Hisaaboo</button>
@@ -406,30 +246,29 @@ export function LandingPage({ onEnterApp }: Props) {
               </span>
             </div>
 
+            <p className="landing-fade-up text-xs font-bold tracking-[0.2em] text-emerald-700 uppercase mb-3" style={{ animationDelay: '0.1s' }}>One platform for local commerce</p>
             <h1 className="landing-fade-up text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight mb-4" style={{ animationDelay: '0.15s' }}>
-              Hisaab rakho. <br className="sm:hidden" />Business chalao.
+              Your local market, connected.
             </h1>
+            <p className="landing-fade-up text-base text-slate-600 mb-8 max-w-lg mx-auto lg:mx-0" style={{ animationDelay: '0.25s' }}>
+              Discover nearby shops, explore products and order with ease. Run your business with digital storefronts, QR ordering, order management and GST billing — all in one place.
+            </p>
 
-            <p className="landing-fade-up text-lg text-slate-600 mb-2 max-w-lg mx-auto lg:mx-0" style={{ animationDelay: '0.25s' }}>
-              <span className="font-semibold text-slate-800">Smart Billing & Business Management</span>
-            </p>
-            <p className="landing-fade-up text-base text-slate-500 mb-8 max-w-lg mx-auto lg:mx-0" style={{ animationDelay: '0.3s' }}>
-              Manage invoices, quotations, payments, customers, suppliers, and GST reports — all in one simple platform built for Indian businesses.
-            </p>
+            {heroSearch && <div className="landing-fade-up mb-6 max-w-xl mx-auto lg:mx-0 text-left" style={{ animationDelay: '0.35s' }}>{heroSearch}</div>}
 
             <div className="landing-fade-up flex flex-col sm:flex-row gap-3 justify-center lg:justify-start" style={{ animationDelay: '0.4s' }}>
               <button
-                onClick={onEnterApp}
-                className="px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 transition-all hover:shadow-xl hover:shadow-emerald-600/30 flex items-center justify-center gap-2 group"
+                onClick={() => document.getElementById(directory ? 'shops' : 'features')?.scrollIntoView({ behavior: 'smooth' })}
+                className="px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 group"
               >
-                Start Free
+                Explore Local Shops
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </button>
               <button
-                onClick={onEnterApp}
+                onClick={() => document.getElementById('experiences')?.scrollIntoView({ behavior: 'smooth' })}
                 className="px-6 py-3 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
               >
-                Login
+                I'm a Business Owner
               </button>
             </div>
 
@@ -442,7 +281,12 @@ export function LandingPage({ onEnterApp }: Props) {
 
           {/* Right: Vyapari illustration */}
           <div className="landing-slide-right relative" style={{ animationDelay: '0.3s' }}>
-            <VyapariIllustration />
+            <div className="relative">
+              <img src={heroShop} alt="Customer confirming a pickup order with a shopkeeper at a neighbourhood store" width={1200} height={1008} className="w-full h-auto rounded-3xl shadow-2xl shadow-emerald-900/15" />
+              <div className="absolute -left-2 sm:-left-4 top-6 bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 landing-float">⚡ 1-Click Pickup · Ready in store</div>
+              <div className="absolute -right-2 sm:-right-4 top-1/2 bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 landing-float" style={{ animationDelay: '1s' }}>🔔 Live Order Chime</div>
+              <div className="absolute left-4 -bottom-4 bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 landing-float" style={{ animationDelay: '2s' }}>🧾 GST Invoices & Khata</div>
+            </div>
           </div>
         </div>
 
@@ -452,6 +296,70 @@ export function LandingPage({ onEnterApp }: Props) {
           <CounterNumber value={8} suffix="+" label="Core features" />
           <CounterNumber value={3} label="GST modes" />
           <CounterNumber value={100} suffix="%" label="Indian businesses" />
+        </div>
+      </section>
+
+      <section id="experiences" className="py-20 bg-white scroll-mt-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 text-center mb-12">One Hisaaboo. Two connected experiences.</h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-8">
+              <p className="text-xs font-bold tracking-widest text-emerald-700 uppercase mb-2">For customers</p>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Discover local. Shop with ease.</h3>
+              <ul className="space-y-2 text-slate-600 mb-6">
+                <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Find nearby shops and products with clear prices</li>
+                <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Order from the shop page or counter QR — no app needed</li>
+                <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Get a pickup code and collect in store</li>
+              </ul>
+              <button onClick={() => document.getElementById(directory ? 'shops' : 'features')?.scrollIntoView({ behavior: 'smooth' })} className="px-5 py-2.5 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700">Explore Local Shops</button>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8">
+              <p className="text-xs font-bold tracking-widest text-slate-500 uppercase mb-2">For businesses</p>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Bring your business online.</h3>
+              <ul className="space-y-2 text-slate-600 mb-6">
+                <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Publish a shop page with a shareable link and counter QR</li>
+                <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Receive live pickup orders with a sound alert</li>
+                <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Turn orders into GST bills in one click, plus khata and GST reports</li>
+              </ul>
+              <div className="flex gap-3">
+                <button onClick={onEnterApp} className="px-5 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800">Start Free</button>
+                <button onClick={onEnterApp} className="px-5 py-2.5 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-white">Merchant Login</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {directory && <section id="shops" className="py-16 bg-white scroll-mt-16">{directory}</section>}
+
+      {/* What's new */}
+      <section id="new" className="py-20 bg-emerald-50/50 scroll-mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700"><Sparkles className="w-3.5 h-3.5" /> New on Hisaaboo</span>
+            <h2 className="mt-4 text-3xl sm:text-4xl font-bold text-slate-900">Your shop, now online</h2>
+            <p className="mt-3 text-slate-500 max-w-2xl mx-auto">Customers find you, order for pickup, and you bill them in one click — all connected to your billing desk.</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {NEW_FEATURES.map(f => (
+              <div key={f.title} className="bg-white rounded-2xl border border-emerald-100 p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center mb-4"><f.icon className="w-5 h-5 text-emerald-600" /></div>
+                <h3 className="font-semibold text-slate-900 mb-1.5">{f.title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-12 grid md:grid-cols-2 gap-5">
+            {[
+              { who: 'For customers', steps: ['Search a shop or product near you', 'Check prices and stock', 'Order for pickup — no app needed', 'Show your pickup code and collect'] },
+              { who: 'For shopkeepers', steps: ['Add products and make bills', 'Put the QR standee on your counter', 'Hear the chime when an order comes', 'Make the GST bill in one click'] },
+            ].map(g => (
+              <div key={g.who} className="bg-white rounded-2xl border border-slate-100 p-6">
+                <h3 className="font-bold text-slate-900 mb-4">{g.who}</h3>
+                <ol className="space-y-3">{g.steps.map((t, i) => <li key={t} className="flex gap-3 text-sm text-slate-600"><span className="w-6 h-6 shrink-0 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">{i + 1}</span>{t}</li>)}</ol>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -656,7 +564,7 @@ export function LandingPage({ onEnterApp }: Props) {
         <div className="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
-          <h2 className="text-3xl sm:text-5xl font-bold mb-4">Hisaab rakho. Business chalao.</h2>
+          <h2 className="text-3xl sm:text-5xl font-bold mb-4">Your local market, connected.</h2>
           <p className="text-lg text-emerald-50 mb-8 max-w-xl mx-auto">
             Start using Hisaaboo today — no setup, no cost to begin. Your invoices, quotations, and GST reports are a click away.
           </p>
@@ -688,7 +596,7 @@ export function LandingPage({ onEnterApp }: Props) {
                 <span className="text-lg font-bold text-white">Hisaaboo</span>
               </div>
               <p className="text-sm">Smart Billing & Business Management</p>
-              <p className="text-sm mt-2 text-slate-500">Hisaab rakho. Business chalao.</p>
+              <p className="text-sm mt-2 text-slate-500">Your local market, connected.</p>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-3 text-sm">Product</h4>

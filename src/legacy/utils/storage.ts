@@ -247,6 +247,10 @@ export const storage = {
       invoices.unshift(invoice);
     }
     localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    // Lets the shop layer mark a linked pickup order as collected once it is billed.
+    if (invoice.sourcePickupOrderId && invoice.status !== 'Draft') {
+      try { window.dispatchEvent(new CustomEvent('hisaaboo:invoice-saved', { detail: { orderId: invoice.sourcePickupOrderId, invoiceNumber: invoice.invoiceNumber } })); } catch { /* ignore */ }
+    }
   },
 
   deleteInvoice: (id: string): void => {

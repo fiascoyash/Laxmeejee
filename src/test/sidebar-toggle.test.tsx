@@ -2,6 +2,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Root from '@/legacy/Root';
 
+vi.mock('@tanstack/react-router', async orig => ({
+  ...(await orig<typeof import('@tanstack/react-router')>()),
+  Link: ({ children, onClick, className }: { children?: React.ReactNode; onClick?: () => void; className?: string }) => <a href="/" onClick={onClick} className={className}>{children}</a>,
+}));
+
 beforeEach(() => {
   localStorage.clear();
   window.history.replaceState(null, '', '/#home');

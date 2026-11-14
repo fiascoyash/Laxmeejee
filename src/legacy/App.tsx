@@ -2,6 +2,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { notify, invalidField } from './utils/notify';
 import { Button } from '@/components/ui/button';
+import { Link } from '@tanstack/react-router';
+import { normalizeDiscovery } from '@/lib/discovery';
+import { getBillingView, type BillingView } from '@/lib/billing-navigation';
+import { useMerchantStore } from '@/components/tenant/store-context';
 import { SaveSuccessOverlay, SaveSuccessInfo } from './components/SaveSuccessOverlay';
 import { useEscapeStack } from './hooks/useEscapeStack';
 import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment, DEFAULT_TEMPLATE_SETTINGS } from './types';
@@ -34,26 +38,22 @@ import { PaymentModal } from './components/PaymentModal';
 import { PaymentDecisionModal, PaymentDecision } from './components/PaymentDecisionModal';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { isValidMobile, isValidGstin } from './utils/validation';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck, FileMinus } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck, FileMinus, Store, BellRing, QrCode, LogOut } from 'lucide-react';
 import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog';
 import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
 import { PrintCenter } from './components/PrintCenter';
 import { Printer } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
-import { LandingPage } from './components/LandingPage';
 import { TermsEditor, getDefaultTerms } from './components/TermsEditor';
 
-type View = 'landing' | 'home' | 'selectTemplate' | 'new' | 'list' | 'catalog' | 'settings' | 'templates' | 'newInvoice' | 'invoiceList' | 'editInvoice' | 'customers' | 'suppliers' | 'smartImport' | 'gstReports' | 'gstr1' | 'notes';
-
-const VALID_VIEWS: View[] = ['landing', 'home', 'selectTemplate', 'new', 'list', 'catalog', 'settings', 'templates', 'newInvoice', 'invoiceList', 'editInvoice', 'customers', 'suppliers', 'smartImport', 'gstReports', 'gstr1', 'notes'];
+type View = BillingView;
 
 function getViewFromHash(): View {
-  const hash = window.location.hash.replace('#', '');
-  if (VALID_VIEWS.includes(hash as View)) return hash as View;
-  return 'landing';
+  return getBillingView(window.location.hash);
 }
 
 function App() {
+  const merchantStore = useMerchantStore();
   const [view, setView] = useState<View>(getViewFromHash);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
@@ -1196,6 +1196,44 @@ function App() {
     setView('editInvoice');
   };
 
+  // Stage 5: build a pre-filled invoice from a pickup order (sent by the shop layer).
+  useEffect(() => {
+    const onBill = (e: Event) => {
+      const o = (e as CustomEvent).detail;
+      if (!o) return;
+      const template = selectedTemplateId ? storage.getTemplateById(selectedTemplateId) : storage.getDefaultTemplate();
+      const savedColumns = storage.getLastUsedInvoiceColumns();
+      const cat = storage.getProductCatalog();
+      const products = (o.items || []).map((i) => {
+        const c = cat.find((p) => p.id === i.product_id) || cat.find((p) => p.name?.toLowerCase() === String(i.name).toLowerCase());
+        return { id: generateId(), name: i.name, description: c?.description || '', hsnSacCode: c?.hsnSacCode || '', gstPercent: c?.gstPercent ?? 18, quantity: Number(i.qty) || 1, unit: i.unit || c?.unit, unitPrice: Number(i.price) || 0, attributes: c?.attributes };
+      });
+      const phone = String(o.customer_phone || '').replace(/\D/g, '').slice(-10);
+      const now = new Date().toISOString();
+      setEditingInvoice({
+        id: generateId(),
+        invoiceNumber: generateInvoiceNumber(),
+        date: now.split('T')[0],
+        dueDate: now.split('T')[0],
+        customer: { name: o.customer_name || '', billingAddress: '', mobile: phone, district: '', village: '', gstNumber: '' },
+        shipTo: { name: '', address: '', mobile: '', gstNumber: '' },
+        products,
+        totalAmount: 0, totalCgst: 0, totalSgst: 0, roundOff: 0, grandTotal: 0,
+        status: 'Draft',
+        notes: `Pickup order #${o.order_code}${o.note ? ` — ${o.note}` : ''}`,
+        sourcePickupOrderId: o.id,
+        selectedTemplateId: selectedTemplateId || template?.id,
+        productColumns: savedColumns && savedColumns.length > 0 ? savedColumns : template?.schema?.productColumns || getDefaultProductColumns(),
+        gstMode: 'inclusive',
+        terms: getDefaultTerms(),
+        createdAt: now, updatedAt: now,
+      });
+      setView('editInvoice');
+    };
+    window.addEventListener('hisaaboo:bill-from-order', onBill);
+    return () => window.removeEventListener('hisaaboo:bill-from-order', onBill);
+  }, [selectedTemplateId]);
+
   // Get sample data for template preview (only used for TemplateBuilder preview, not form preview)
   const getSampleData = () => ({
     customer: {
@@ -1568,18 +1606,31 @@ function App() {
     </a>
   );
 
+  const StoreAction = ({ icon: Icon, label, onClick, href, badge = 0, live = false }: {
+    icon: LucideIcon;
+    label: string;
+    onClick: () => void;
+    href?: string;
+    badge?: number;
+    live?: boolean;
+  }) => {
+    const className = `relative w-full flex items-center gap-3 px-4 py-3 rounded-lg text-primary-foreground/80 hover:bg-primary/20 hover:text-primary-foreground transition-all duration-200 ${
+      desktopSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''
+    }`;
+    const content = <>
+      <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+      <span className={`font-medium ${desktopSidebarCollapsed ? 'lg:hidden' : ''}`}>{label}</span>
+      {live && <span className={`ml-auto h-2 w-2 rounded-full bg-stock-action ${desktopSidebarCollapsed ? 'lg:absolute lg:right-2 lg:top-2' : ''}`} aria-label="Shop page live" />}
+      {badge > 0 && <span className={`ml-auto rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground ${desktopSidebarCollapsed ? 'lg:absolute lg:-right-1 lg:top-1 lg:px-1.5' : ''}`}>{badge}</span>}
+    </>;
+    if (href) return <a href={href} target="_blank" rel="noreferrer" aria-label={label} title={desktopSidebarCollapsed ? label : undefined} onClick={onClick} className={className}>{content}</a>;
+    return <button type="button" aria-label={label} title={desktopSidebarCollapsed ? label : undefined} onClick={onClick} className={className}>{content}</button>;
+  };
+
   const selectedTemplate = getCurrentTemplate();
   const invoiceTemplate = editingInvoice?.selectedTemplateId
     ? storage.getTemplateById(editingInvoice.selectedTemplateId)
     : storage.getDefaultTemplate();
-
-  const enterApp = () => {
-    navigateTo('home');
-  };
-
-  if (view === 'landing') {
-    return <LandingPage onEnterApp={enterApp} />;
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1613,6 +1664,16 @@ function App() {
             <li><NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" /></li>
             <li><NavItem icon={List} label="Quotation History" currentView={view} targetView="list" /></li>
           </ul>
+          {merchantStore && (
+            <div className="mt-4 px-3">
+              <p className={`px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground/50 ${desktopSidebarCollapsed ? 'lg:hidden' : ''}`}>Online store</p>
+              <ul className="space-y-1">
+                <li><StoreAction icon={Store} label="View shop page" href={`/shop/${merchantStore.business.slug}`} live={merchantStore.business.is_published} onClick={() => setSidebarOpen(false)} /></li>
+                <li><StoreAction icon={BellRing} label="Pickup orders" badge={merchantStore.newOrders} onClick={() => { setSidebarOpen(false); merchantStore.openOrders(); }} /></li>
+                <li><StoreAction icon={QrCode} label="Catalogue & QR" onClick={() => { setSidebarOpen(false); merchantStore.openShopSettings('catalogue'); }} /></li>
+              </ul>
+            </div>
+          )}
           <div className="mt-4 px-3">
             <p className={`px-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wide ${desktopSidebarCollapsed ? 'lg:hidden' : ''}`}>Invoices</p>
             <ul className="space-y-1">
@@ -1642,6 +1703,18 @@ function App() {
         </nav>
 
         <div className="p-4 border-t border-slate-700">
+          {merchantStore && (
+            <button
+              type="button"
+              onClick={() => { setSidebarOpen(false); void merchantStore.signOut(); }}
+              aria-label="Sign out"
+              title={desktopSidebarCollapsed ? 'Sign out' : undefined}
+              className={`mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-primary-foreground/70 transition-colors hover:bg-primary/20 hover:text-primary-foreground ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}`}
+            >
+              <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className={desktopSidebarCollapsed ? 'lg:hidden' : ''}>Sign out</span>
+            </button>
+          )}
           <button
             onClick={() => setShowShortcutsModal(true)}
             aria-label="Keyboard Shortcuts"
@@ -1698,7 +1771,39 @@ function App() {
               )}
             </div>
             </div>
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {merchantStore && (
+                <>
+                  <Button asChild variant="ghost" size="sm" className="px-2">
+                    <a href={`/shop/${merchantStore.business.slug}`} target="_blank" rel="noreferrer" aria-label="Open your public shop page">
+                      <Store aria-hidden="true" />
+                      <span className="hidden md:inline">{merchantStore.business.is_published ? 'Store live' : 'Store offline'}</span>
+                      <span className={`h-2 w-2 rounded-full ${merchantStore.business.is_published ? 'bg-stock-action' : 'bg-muted-foreground'}`} aria-hidden="true" />
+                    </a>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="relative"
+                    aria-label={`Pickup orders${merchantStore.newOrders > 0 ? `, ${merchantStore.newOrders} new` : ''}`}
+                    title="Pickup orders"
+                    onClick={merchantStore.openOrders}
+                  >
+                    <BellRing aria-hidden="true" />
+                    {merchantStore.newOrders > 0 && (
+                      <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-destructive px-1 py-0.5 text-[10px] font-bold leading-4 text-destructive-foreground">
+                        {merchantStore.newOrders}
+                      </span>
+                    )}
+                  </Button>
+                </>
+              )}
+              <Button asChild variant="outline" size="sm" className="px-2 sm:px-3">
+                <Link to="/" search={normalizeDiscovery({})} onClick={() => setSidebarOpen(false)} aria-label="Find local shops">
+                  <Home aria-hidden="true" /><span className="hidden sm:inline">Find local shops</span>
+                </Link>
+              </Button>
               <button
                 onClick={() => setShowCompanyProfile(true)}
                 className="lg:hidden p-2 rounded-lg hover:bg-slate-100"

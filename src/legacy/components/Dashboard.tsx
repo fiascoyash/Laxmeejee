@@ -1,6 +1,7 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { useMemo, useState } from 'react';
 import { DashboardCustomizer, loadCardPrefs, saveCardPrefs } from './DashboardCustomizer';
+import { OnlineStoreHub } from '@/components/tenant/OnlineStoreHub';
 import {
   TrendingUp, Receipt, FileText, Users, Truck, Package,
   Clock, Award, ArrowUpRight, PlusCircle, List, ChevronRight,
@@ -285,6 +286,9 @@ export function Dashboard({
         )}
         </div>
       </div>
+
+      {/* Online store: live catalogue, sharing and pickup fulfilment. */}
+      <OnlineStoreHub />
 
       {/* KPI Cards */}
       <section>

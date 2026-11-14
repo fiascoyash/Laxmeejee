@@ -612,6 +612,7 @@ export interface Invoice {
   terms?: string;           // Custom terms & conditions
   sourceQuotationId?: string;
   sourceQuotationNumber?: string;
+  sourcePickupOrderId?: string; // Pickup order this bill was generated from
   selectedTemplateId?: string;
   createdAt: string;
   updatedAt: string;
