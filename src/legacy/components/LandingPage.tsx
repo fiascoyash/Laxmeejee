@@ -1,6 +1,78 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import heroShop from '@/assets/hero-local-shop.jpg';
+
+/** Self-contained hero illustration (inline SVG, no external asset needed). */
+function HeroShopIllustration() {
+  return (
+    <svg viewBox="0 0 600 504" role="img" aria-label="Customer confirming a pickup order with a shopkeeper at a neighbourhood store" className="w-full h-auto rounded-3xl shadow-2xl shadow-emerald-900/15">
+      <defs>
+        <linearGradient id="hsSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ecfdf5" />
+          <stop offset="1" stopColor="#d1fae5" />
+        </linearGradient>
+        <linearGradient id="hsAwning" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#059669" />
+          <stop offset="1" stopColor="#10b981" />
+        </linearGradient>
+      </defs>
+      <rect width="600" height="504" fill="url(#hsSky)" rx="24" />
+      <circle cx="510" cy="80" r="44" fill="#fde68a" opacity="0.9" />
+      {/* ground */}
+      <rect x="0" y="400" width="600" height="104" fill="#a7f3d0" opacity="0.6" />
+      {/* shop building */}
+      <rect x="90" y="150" width="300" height="260" rx="8" fill="#ffffff" stroke="#d1d5db" strokeWidth="2" />
+      {/* awning */}
+      <path d="M80 150 h320 l16 46 h-352 z" fill="url(#hsAwning)" />
+      <g fill="#ffffff" opacity="0.85">
+        <path d="M116 150 l14 46 h-28 z" />
+        <path d="M172 150 l10 46 h-28 z" />
+        <path d="M226 150 l6 46 h-28 z" />
+        <path d="M280 150 l2 46 h-28 z" />
+        <path d="M334 150 l-2 46 h-28 z" />
+      </g>
+      {/* sign board */}
+      <rect x="150" y="110" width="180" height="34" rx="8" fill="#064e3b" />
+      <text x="240" y="133" textAnchor="middle" fontFamily="system-ui, sans-serif" fontSize="18" fontWeight="700" fill="#a7f3d0">Local Store</text>
+      {/* door */}
+      <rect x="236" y="270" width="72" height="140" rx="6" fill="#047857" />
+      <circle cx="296" cy="344" r="4" fill="#fde68a" />
+      {/* window with goods */}
+      <rect x="116" y="230" width="96" height="110" rx="6" fill="#f0fdfa" stroke="#99f6e4" strokeWidth="3" />
+      <rect x="128" y="292" width="72" height="8" rx="3" fill="#99f6e4" />
+      <rect x="132" y="262" width="18" height="28" rx="3" fill="#f59e0b" />
+      <rect x="156" y="254" width="18" height="36" rx="3" fill="#34d399" />
+      <rect x="180" y="268" width="18" height="22" rx="3" fill="#f87171" />
+      {/* shopkeeper */}
+      <circle cx="272" cy="238" r="14" fill="#fcd9b6" />
+      <path d="M258 236 a14 14 0 0 1 28 0 l-4 -10 h-20 z" fill="#1f2937" />
+      <rect x="252" y="252" width="40" height="34" rx="8" fill="#059669" />
+      {/* customer with phone */}
+      <circle cx="452" cy="300" r="16" fill="#fcd9b6" />
+      <path d="M436 298 a16 16 0 0 1 32 0 l-5 -12 h-22 z" fill="#111827" />
+      <rect x="428" y="316" width="48" height="60" rx="10" fill="#0f766e" />
+      <rect x="470" y="292" width="18" height="30" rx="4" fill="#1f2937" transform="rotate(18 479 307)" />
+      <rect x="473" y="296" width="12" height="20" rx="2" fill="#6ee7b7" transform="rotate(18 479 307)" />
+      {/* order card floating from phone */}
+      <g>
+        <rect x="380" y="190" width="130" height="74" rx="10" fill="#ffffff" stroke="#a7f3d0" strokeWidth="2" />
+        <circle cx="398" cy="212" r="9" fill="#10b981" />
+        <path d="M394 212 l3 3 l6 -6" stroke="#ffffff" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        <rect x="414" y="206" width="80" height="8" rx="4" fill="#d1fae5" />
+        <rect x="392" y="230" width="102" height="8" rx="4" fill="#e5e7eb" />
+        <rect x="392" y="244" width="66" height="8" rx="4" fill="#e5e7eb" />
+      </g>
+      {/* plants */}
+      <g>
+        <rect x="52" y="368" width="26" height="42" rx="4" fill="#b45309" />
+        <circle cx="65" cy="356" r="20" fill="#059669" />
+        <circle cx="52" cy="366" r="12" fill="#10b981" />
+        <rect x="524" y="368" width="26" height="42" rx="4" fill="#b45309" />
+        <circle cx="537" cy="356" r="20" fill="#059669" />
+        <circle cx="550" cy="366" r="12" fill="#10b981" />
+      </g>
+    </svg>
+  );
+}
 import {
   Sun, FileText, Receipt, Users, Truck, BarChart3, Package, Calculator,
   ArrowRight, CheckCircle2, IndianRupee, TrendingUp, Zap, ShieldCheck,
@@ -282,7 +354,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
           {/* Right: Vyapari illustration */}
           <div className="landing-slide-right relative" style={{ animationDelay: '0.3s' }}>
             <div className="relative">
-              <img src={heroShop} alt="Customer confirming a pickup order with a shopkeeper at a neighbourhood store" width={1200} height={1008} className="w-full h-auto rounded-3xl shadow-2xl shadow-emerald-900/15" />
+              <HeroShopIllustration />
               <div className="absolute -left-2 sm:-left-4 top-6 bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 landing-float">⚡ 1-Click Pickup · Ready in store</div>
               <div className="absolute -right-2 sm:-right-4 top-1/2 bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 landing-float" style={{ animationDelay: '1s' }}>🔔 Live Order Chime</div>
               <div className="absolute left-4 -bottom-4 bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800 landing-float" style={{ animationDelay: '2s' }}>🧾 GST Invoices & Khata</div>
