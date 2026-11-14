@@ -6,8 +6,8 @@ import { directoryOptions, filterDirectory, normalizeDiscovery, type DirectorySh
 export const searchDirectory = createServerFn({ method: 'GET' })
   .inputValidator((input: Record<string, unknown>) => normalizeDiscovery(input))
   .handler(async ({ data: filters }) => {
-    const key = process.env['SUPABASE_PUBLISHABLE_KEY'];
-    const url = process.env['SUPABASE_URL'];
+    const key = process.env['SUPABASE_PUBLISHABLE_KEY'] || import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+    const url = process.env['SUPABASE_URL'] || import.meta.env["VITE_SUPABASE_URL"];
     if (!key || !url) throw new Error('Shop search is unavailable. Please try again.');
     const client = createClient<Database>(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
