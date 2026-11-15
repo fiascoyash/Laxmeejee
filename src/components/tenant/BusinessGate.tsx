@@ -10,6 +10,7 @@ import { PickupOrders } from "./PickupOrders";
 import { playChime } from "./orderAlerts";
 import { MerchantStoreProvider, StoreConnectionProvider, type ShopSettingsTab } from "./store-context";
 import { Button } from "@/components/ui/button";
+import { startSync, stopSync } from "@/lib/cloud-sync";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 /** Mark a pickup order collected once its GST bill is saved (non-draft). */
@@ -60,6 +61,8 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   const [ordersVersion, setOrdersVersion] = useState(0);
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [synced, setSynced] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState(false);
 
   const openConnection = useCallback(() => setConnectionOpen(true), []);
 
@@ -87,6 +90,14 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (session) { setBusiness(undefined); loadBusiness(); } else setBusiness(undefined);
   }, [session?.user.id, loadBusiness]);
+
+  const userId = session?.user.id;
+  const runSync = useCallback(() => {
+    if (!userId) return;
+    setSyncError(false);
+    startSync(userId).then(() => setSynced(userId)).catch(() => setSyncError(true));
+  }, [userId]);
+  useEffect(() => { setSynced(null); runSync(); }, [runSync]);
 
   useEffect(() => {
     if (business) setConnectionOpen(false);
@@ -148,6 +159,8 @@ export function BusinessGate({ children }: { children: ReactNode }) {
     setAlert(null);
     setConnectionOpen(false);
     setBusiness(undefined);
+    await stopSync();
+    setSynced(null);
     await supabase.auth.signOut();
   }, [queryClient]);
 
@@ -183,8 +196,9 @@ export function BusinessGate({ children }: { children: ReactNode }) {
     openShopSettings,
     togglePublish,
     signOut,
+    userEmail: session?.user.email ?? "",
     refreshStore: loadStore,
-  }) : null, [business, newOrders, activeOrders, publishedProducts, recentOrders, ordersVersion, storeError, publishing, openOrders, openShopSettings, togglePublish, signOut, loadStore]);
+  }) : null, [business, newOrders, activeOrders, publishedProducts, recentOrders, ordersVersion, storeError, publishing, openOrders, openShopSettings, togglePublish, signOut, loadStore, session?.user.email]);
 
   if (session === undefined) return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Checking account…</div>;
   if (!session) return <AuthScreen />;
@@ -195,6 +209,13 @@ export function BusinessGate({ children }: { children: ReactNode }) {
     </div>
   );
   if (business === undefined) return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Loading your shop…</div>;
+  if (syncError) return (
+    <div role="alert" className="flex min-h-screen flex-col items-center justify-center gap-3 px-4 text-center">
+      <p>Your saved bills could not be loaded. Please check your internet and try again.</p>
+      <div className="flex gap-2"><Button onClick={runSync}>Retry</Button><Button variant="ghost" onClick={() => void signOut()}>Sign out</Button></div>
+    </div>
+  );
+  if (synced !== session.user.id) return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Loading your saved bills…</div>;
   if (business === null) return <OnboardingForm onCreated={loadBusiness} onSignOut={signOut} />;
 
   return (

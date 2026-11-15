@@ -17,6 +17,7 @@ export type MerchantStoreContextValue = {
   openShopSettings: (tab?: ShopSettingsTab) => void;
   togglePublish: () => Promise<void>;
   signOut: () => Promise<void>;
+  userEmail: string;
   refreshStore: () => Promise<void>;
 };
 

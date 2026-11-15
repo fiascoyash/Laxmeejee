@@ -28,3 +28,4 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+- Billing data (keys prefixed solar_/laxmeejee_/hisaaboo_) stays in localStorage but is mirrored per merchant to `user_settings.settings.store` via `src/lib/cloud-sync.ts`; BusinessGate hydrates before rendering billing. Why: multi-device access without rewriting the legacy storage layer.

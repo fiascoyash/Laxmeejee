@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      business_members: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_members_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      businesses: {
+        Row: {
+          address: string | null
+          category: string | null
+          city: string | null
+          created_at: string
+          hours: string | null
+          id: string
+          is_published: boolean
+          locality: string | null
+          phone: string | null
+          public_name: string
+          slug: string
+          tagline: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          category?: string | null
+          city?: string | null
+          created_at?: string
+          hours?: string | null
+          id?: string
+          is_published?: boolean
+          locality?: string | null
+          phone?: string | null
+          public_name: string
+          slug: string
+          tagline?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          category?: string | null
+          city?: string | null
+          created_at?: string
+          hours?: string | null
+          id?: string
+          is_published?: boolean
+          locality?: string | null
+          phone?: string | null
+          public_name?: string
+          slug?: string
+          tagline?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
           address: string | null
@@ -225,6 +305,56 @@ export type Database = {
           },
         ]
       }
+      pickup_orders: {
+        Row: {
+          business_id: string
+          created_at: string
+          customer_name: string
+          customer_phone: string
+          id: string
+          items: Json
+          note: string | null
+          order_code: string
+          status: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          customer_name: string
+          customer_phone: string
+          id?: string
+          items?: Json
+          note?: string | null
+          order_code: string
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          customer_name?: string
+          customer_phone?: string
+          id?: string
+          items?: Json
+          note?: string | null
+          order_code?: string
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickup_orders_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           created_at: string
@@ -392,6 +522,53 @@ export type Database = {
           },
         ]
       }
+      shop_products: {
+        Row: {
+          business_id: string
+          category: string | null
+          description: string | null
+          id: string
+          in_stock: boolean
+          name: string
+          price: number
+          product_id: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_id?: string
+          category?: string | null
+          description?: string | null
+          id?: string
+          in_stock?: boolean
+          name: string
+          price?: number
+          product_id: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          category?: string | null
+          description?: string | null
+          id?: string
+          in_stock?: boolean
+          name?: string
+          price?: number
+          product_id?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_products_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_transactions: {
         Row: {
           amount: number
@@ -528,12 +705,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_business: {
+        Args: {
+          _category: string
+          _city: string
+          _locality: string
+          _phone?: string
+          _public_name: string
+          _slug: string
+        }
+        Returns: string
+      }
+      current_business_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      is_business_member: { Args: { _business_id: string }; Returns: boolean }
+      place_pickup_order: {
+        Args: {
+          _items: Json
+          _name: string
+          _note: string
+          _phone: string
+          _slug: string
+        }
+        Returns: string
       }
     }
     Enums: {

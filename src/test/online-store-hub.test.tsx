@@ -35,6 +35,7 @@ function setup(overrides: Partial<MerchantStoreContextValue> = {}) {
     openShopSettings: vi.fn(),
     togglePublish: vi.fn(async () => {}),
     signOut: vi.fn(async () => {}),
+    userEmail: "owner@example.com",
     refreshStore: vi.fn(async () => {}),
     ...overrides,
   };

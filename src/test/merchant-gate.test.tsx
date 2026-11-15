@@ -18,6 +18,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {
   channel: () => { const ch: any = { on: () => ch, subscribe: () => ch }; return ch; },
   removeChannel: vi.fn(),
 } }));
+vi.mock('@/lib/cloud-sync', () => ({ startSync: vi.fn(async () => {}), stopSync: vi.fn(async () => {}) }));
 vi.mock('@/components/tenant/AuthScreen', () => ({ AuthScreen: () => <div data-testid="account-form" /> }));
 vi.mock('@/components/tenant/OnboardingForm', () => ({ OnboardingForm: () => <div data-testid="store-setup" /> }));
 vi.mock('@/components/tenant/ShopSettings', () => ({ ShopSettings: () => null }));

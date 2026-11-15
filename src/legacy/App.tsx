@@ -1706,6 +1706,15 @@ function App() {
         </nav>
 
         <div className="p-4 border-t border-slate-700">
+          {merchantStore?.userEmail && (
+            <div className={`mb-2 flex items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-2 ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}`} title={merchantStore.userEmail}>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold uppercase text-primary-foreground" aria-hidden="true">{merchantStore.userEmail[0]}</span>
+              <span className={`min-w-0 ${desktopSidebarCollapsed ? 'lg:hidden' : ''}`}>
+                <span className="block text-[10px] uppercase tracking-wide text-slate-400">Signed in as</span>
+                <span className="block truncate text-xs text-slate-100">{merchantStore.userEmail}</span>
+              </span>
+            </div>
+          )}
           {merchantStore && (
             <button
               type="button"
