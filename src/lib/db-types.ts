@@ -410,6 +410,7 @@ export type Database = {
           _category: string
           _city: string
           _locality: string
+          _phone?: string
           _public_name: string
           _slug: string
         }

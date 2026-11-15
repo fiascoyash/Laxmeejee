@@ -75,7 +75,7 @@ function Index() {
         {data.pages > 1 && <nav aria-label="Results pages" className="mt-8 flex items-center justify-center gap-4"><Button variant="outline" size="icon" aria-label="Previous page" disabled={data.page === 1} onClick={() => navigate({ search: { ...filters, page: data.page - 1 } })}><ChevronLeft /></Button><span className="text-sm">{data.page} / {data.pages}</span><Button variant="outline" size="icon" aria-label="Next page" disabled={data.page === data.pages} onClick={() => navigate({ search: { ...filters, page: data.page + 1 } })}><ChevronRight /></Button></nav>}
       </div>
   );
-  return <LandingPage onEnterApp={() => void navigate({ to: '/billing' })} heroSearch={search} directory={directory} />;
+  return <LandingPage onEnterApp={(mode = 'signin') => { sessionStorage.setItem('hisaaboo:auth-mode', mode); void navigate({ to: '/billing' }); }} heroSearch={search} directory={directory} />;
 }
 
 function DirectoryError() {

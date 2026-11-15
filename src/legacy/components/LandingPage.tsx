@@ -81,7 +81,7 @@ import {
 } from 'lucide-react';
 
 interface Props {
-  onEnterApp: () => void;
+  onEnterApp: (mode?: 'signin' | 'signup') => void;
   /** Customer shop search shown inside the hero. */
   heroSearch?: ReactNode;
   /** Live local shop directory shown right after the hero. */
@@ -283,13 +283,13 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={onEnterApp}
+              onClick={() => onEnterApp('signin')}
               className="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-emerald-600 transition-colors"
             >
               Login
             </button>
             <button
-              onClick={onEnterApp}
+              onClick={() => onEnterApp('signup')}
               className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
             >
               Start Free
@@ -394,8 +394,8 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
                 <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Turn orders into GST bills in one click, plus khata and GST reports</li>
               </ul>
               <div className="flex gap-3">
-                <button onClick={onEnterApp} className="px-5 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800">Start Free</button>
-                <button onClick={onEnterApp} className="px-5 py-2.5 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-white">Merchant Login</button>
+                <button onClick={() => onEnterApp('signup')} className="px-5 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800">Start Free</button>
+                <button onClick={() => onEnterApp('signin')} className="px-5 py-2.5 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-white">Merchant Login</button>
               </div>
             </div>
           </div>
@@ -642,14 +642,14 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={onEnterApp}
+              onClick={() => onEnterApp('signup')}
               className="px-8 py-3.5 bg-white text-emerald-700 font-bold rounded-xl hover:bg-emerald-50 shadow-xl transition-all flex items-center justify-center gap-2 group"
             >
               Start Free
               <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
             </button>
             <button
-              onClick={onEnterApp}
+              onClick={() => onEnterApp('signin')}
               className="px-8 py-3.5 border-2 border-white/40 text-white font-bold rounded-xl hover:bg-white/10 transition-colors"
             >
               Login
@@ -690,8 +690,8 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
             <div>
               <h4 className="font-semibold text-white mb-3 text-sm">Get Started</h4>
               <ul className="space-y-2 text-sm">
-                <li><button onClick={onEnterApp} className="hover:text-emerald-400 transition-colors">Start Free</button></li>
-                <li><button onClick={onEnterApp} className="hover:text-emerald-400 transition-colors">Login</button></li>
+                <li><button onClick={() => onEnterApp('signup')} className="hover:text-emerald-400 transition-colors">Start Free</button></li>
+                <li><button onClick={() => onEnterApp('signin')} className="hover:text-emerald-400 transition-colors">Login</button></li>
               </ul>
             </div>
           </div>

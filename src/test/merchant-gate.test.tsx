@@ -15,6 +15,8 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {
     signOut: mocks.signOut,
   },
   from: mocks.from,
+  channel: () => { const ch: any = { on: () => ch, subscribe: () => ch }; return ch; },
+  removeChannel: vi.fn(),
 } }));
 vi.mock('@/components/tenant/AuthScreen', () => ({ AuthScreen: () => <div data-testid="account-form" /> }));
 vi.mock('@/components/tenant/OnboardingForm', () => ({ OnboardingForm: () => <div data-testid="store-setup" /> }));
@@ -31,41 +33,39 @@ function mount() {
 }
 afterEach(() => { cleanup(); vi.clearAllMocks(); sessionStorage.clear(); localStorage.clear(); });
 
-describe('Optional store connection', () => {
-  it('allows billing while account lookup is pending without any cloud store access', () => {
+describe('Merchant sign-in gate', () => {
+  it('hides the billing desk while the account check is pending', () => {
     mocks.getSession.mockReturnValue(new Promise(() => {}));
     mount();
-    fireEvent.change(screen.getByLabelText('Local bill'), { target: { value: 'INV-43' } });
-    expect(screen.getByLabelText('Local bill')).toHaveValue('INV-43');
-    expect(screen.getByTestId('store-access')).toHaveTextContent('local-only');
+    expect(screen.queryByLabelText('Local bill')).not.toBeInTheDocument();
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
-  it('requires explicit store connection when signed out and preserves billing when dismissed', async () => {
+  it('shows only the sign-in screen when signed out', async () => {
     mocks.getSession.mockResolvedValue({ data: { session: null } });
-    localStorage.setItem('solar_invoices', '[{"invoiceNumber":"INV-42"}]');
     mount();
     await act(async () => {});
-    expect(screen.queryByTestId('account-form')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Connect'));
     expect(screen.getByTestId('account-form')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Continue billing' }));
-    expect(screen.queryByTestId('account-form')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Local bill')).toHaveValue('INV-42');
-    expect(localStorage.getItem('solar_invoices')).toBe('[{"invoiceNumber":"INV-42"}]');
-    expect(mocks.from).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Local bill')).not.toBeInTheDocument();
   });
 
-  it('keeps billing accessible for a signed-in owner who has not created a store', async () => {
+  it('shows shop setup instead of billing for a signed-in merchant without a shop', async () => {
     mocks.getSession.mockResolvedValue({ data: { session: { user: { id: 'owner-1' } } } });
     const query = { select: vi.fn(() => query), order: vi.fn(() => query), limit: vi.fn(() => query), maybeSingle: vi.fn(async () => ({ data: null, error: null })) };
     mocks.from.mockReturnValue(query);
     mount();
-    await waitFor(() => expect(query.maybeSingle).toHaveBeenCalledTimes(1));
-    expect(screen.queryByTestId('store-setup')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Connect'));
-    expect(screen.getByTestId('store-setup')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Continue billing' }));
-    expect(screen.getByLabelText('Local bill')).toHaveValue('INV-42');
+    await waitFor(() => expect(screen.getByTestId('store-setup')).toBeInTheDocument());
+    expect(screen.queryByLabelText('Local bill')).not.toBeInTheDocument();
+  });
+
+  it('opens billing with the store connected once the merchant has a shop', async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: { user: { id: 'owner-1' } } } });
+    const shop = { id: 'b1', public_name: 'Sharma Hardware', slug: 'sharma', is_published: true };
+    const query: any = { select: vi.fn(() => query), order: vi.fn(() => query), limit: vi.fn(() => query), eq: vi.fn(() => query), in: vi.fn(() => query),
+      maybeSingle: vi.fn().mockResolvedValueOnce({ data: { business_id: 'b1' }, error: null }).mockResolvedValueOnce({ data: shop, error: null }),
+      then: (r: (v: unknown) => void) => r({ data: [], count: 0, error: null }) };
+    mocks.from.mockReturnValue(query);
+    mount();
+    await waitFor(() => expect(screen.getByTestId('store-access')).toHaveTextContent('connected'));
   });
 });

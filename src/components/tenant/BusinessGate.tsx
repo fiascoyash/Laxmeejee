@@ -42,7 +42,7 @@ function syncCompanyName(b: Business) {
   } catch { /* ignore */ }
 }
 
-/** Billing is always accessible; account connection gates only cloud store controls. */
+/** Billing requires a signed-in merchant with a shop; first sign-in shows shop setup. */
 export function BusinessGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -185,6 +185,17 @@ export function BusinessGate({ children }: { children: ReactNode }) {
     signOut,
     refreshStore: loadStore,
   }) : null, [business, newOrders, activeOrders, publishedProducts, recentOrders, ordersVersion, storeError, publishing, openOrders, openShopSettings, togglePublish, signOut, loadStore]);
+
+  if (session === undefined) return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Checking account…</div>;
+  if (!session) return <AuthScreen />;
+  if (connectionError) return (
+    <div role="alert" className="flex min-h-screen flex-col items-center justify-center gap-3 px-4 text-center">
+      <p>{connectionError}</p>
+      <div className="flex gap-2"><Button onClick={() => void loadBusiness()}>Retry</Button><Button variant="ghost" onClick={() => void signOut()}>Sign out</Button></div>
+    </div>
+  );
+  if (business === undefined) return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Loading your shop…</div>;
+  if (business === null) return <OnboardingForm onCreated={loadBusiness} onSignOut={signOut} />;
 
   return (
     <StoreConnectionProvider value={{ openConnection, connecting: session === undefined || (!!session && business === undefined && !connectionError) }}>
