@@ -2313,7 +2313,7 @@ function App() {
                 <div className="p-6 space-y-4">
                   <button
                     onClick={() => setShowCompanyProfile(true)}
-                    className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
                   >
                     <div className="flex items-center gap-3">
                       <Building2 className="w-5 h-5 text-blue-600" />
@@ -2369,11 +2369,10 @@ function App() {
                 />
               </div>
 
-              <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h3 className="font-medium text-amber-800 mb-2">Data Storage</h3>
-                <p className="text-sm text-amber-700">
-                  All your data is stored locally in your browser. Clearing browser data will remove all quotations and settings.
-                  Consider exporting important quotations to PDF for backup.
+              <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                <h3 className="font-medium text-emerald-800 mb-2">Cloud Sync &amp; Backup Active</h3>
+                <p className="text-sm text-emerald-700">
+                  Your quotations, invoices, customers, products and settings are saved to your signed-in account and available on every device you sign in from.
                 </p>
               </div>
             </div>

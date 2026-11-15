@@ -36,3 +36,9 @@
 - [ ] Open billing immediately without an account; keep local records and navigation unchanged.
 - [ ] Offer optional store sign-in/setup inside billing while preserving connected store controls.
 - [ ] Verify direct entry, dismissible sign-in, local billing and existing store behavior checks.
+
+# Store catalogue, photos and navigation
+- [ ] Connect shop publishing to the billing catalogue and update existing online products.
+- [ ] Add optional photo uploads and store photos (blocked: database migration permission).
+- [ ] Save Google Maps locations (blocked: database migration permission); show address-based directions now.
+- [ ] Add storefront categories and product search; verify behavior and compact layouts.

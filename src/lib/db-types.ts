@@ -45,6 +45,7 @@ export type Database = {
       }
       businesses: {
         Row: {
+          maps_url: string | null
           address: string | null
           category: string | null
           city: string | null
@@ -61,6 +62,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          maps_url?: string | null
           category?: string | null
           city?: string | null
           created_at?: string
@@ -76,6 +78,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          maps_url?: string | null
           category?: string | null
           city?: string | null
           created_at?: string
@@ -358,6 +361,7 @@ export type Database = {
       }
       shop_products: {
         Row: {
+          image_path: string | null
           business_id: string
           category: string | null
           description: string | null
@@ -370,6 +374,7 @@ export type Database = {
         }
         Insert: {
           business_id?: string
+          image_path?: string | null
           category?: string | null
           description?: string | null
           in_stock?: boolean
@@ -381,6 +386,7 @@ export type Database = {
         }
         Update: {
           business_id?: string
+          image_path?: string | null
           category?: string | null
           description?: string | null
           in_stock?: boolean
