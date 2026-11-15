@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/integrations/supabase/types';
+import type { Database } from '@/lib/db-types';
 import { directoryOptions, filterDirectory, normalizeDiscovery, type DirectoryShop, type DirectoryProduct } from './discovery';
 
 export const searchDirectory = createServerFn({ method: 'GET' })
@@ -23,6 +23,8 @@ export const searchDirectory = createServerFn({ method: 'GET' })
       const { data, error } = await client.from('businesses')
         .select('id, slug, public_name, category, city, locality, address, hours, tagline')
         .eq('is_published', true).order('public_name').order('id').range(offset, offset + 499);
+      // PGRST205 / 42P01: shop tables not created yet — show an empty directory.
+      if (error && (error.code === 'PGRST205' || error.code === '42P01')) break;
       if (error) throw new Error('Could not load shops. Please try again.');
       shops.push(...(data ?? []).map(shop => ({ ...shop, products: [] })));
       if (!data || data.length < 500) break;
@@ -33,6 +35,7 @@ export const searchDirectory = createServerFn({ method: 'GET' })
       const { data, error } = await client.from('shop_products')
         .select('business_id, name, category, price, unit, in_stock')
         .order('business_id').order('product_id').range(offset, offset + 499);
+      if (error && (error.code === 'PGRST205' || error.code === '42P01')) break;
       if (error) throw new Error('Could not load products. Please try again.');
       for (const { business_id, ...product } of data ?? []) byId.get(business_id)?.products.push(product as DirectoryProduct);
       if (!data || data.length < 500) break;

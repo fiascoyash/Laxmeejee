@@ -13,7 +13,7 @@ import {
   Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Tables } from "@/lib/db-types";
 import { useMerchantStore, useStoreConnection } from "./store-context";
 
 const STATUS_LABEL: Record<string, string> = {

@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Tables } from "@/lib/db-types";
 import type { Business } from "./ShopSettings";
 
 export type ShopSettingsTab = "profile" | "catalogue" | "qr";

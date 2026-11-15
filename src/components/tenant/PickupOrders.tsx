@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import { db as supabase } from "@/lib/db";
+import type { Tables } from "@/lib/db-types";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 

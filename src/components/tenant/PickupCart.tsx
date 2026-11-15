@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db as supabase } from "@/lib/db";
 
 type P = { product_id: string; name: string; unit: string | null; price: number; in_stock: boolean };
 

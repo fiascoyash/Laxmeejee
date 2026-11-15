@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import { db as supabase } from "@/lib/db";
+import type { Tables } from "@/lib/db-types";
 import { AuthScreen } from "./AuthScreen";
 import { OnboardingForm } from "./OnboardingForm";
 import { ShopSettings, type Business } from "./ShopSettings";

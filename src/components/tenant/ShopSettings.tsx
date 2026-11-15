@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { supabase } from "@/integrations/supabase/client";
+import { db as supabase } from "@/lib/db";
 
 export type Business = {
   id: string; slug: string; public_name: string; is_published: boolean;

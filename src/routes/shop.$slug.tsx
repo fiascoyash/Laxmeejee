@@ -1,7 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "@/lib/db-types";
 import { useCart, QtyControl, PickupCheckout } from "@/components/tenant/PickupCart";
 
 type PublicShop = {
