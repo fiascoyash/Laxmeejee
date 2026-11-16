@@ -38,6 +38,7 @@
 - [ ] Verify direct entry, dismissible sign-in, local billing and existing store behavior checks.
 
 # Store catalogue, photos and navigation
+- [x] Fix reported photo and catalogue type errors; all 80 tests pass and the real public shop loads on desktop/mobile with working search.
 - [ ] Connect shop publishing to the billing catalogue and update existing online products.
 - [ ] Add optional photo uploads and store photos (blocked: database migration permission).
 - [ ] Save Google Maps locations (blocked: database migration permission); show address-based directions now.

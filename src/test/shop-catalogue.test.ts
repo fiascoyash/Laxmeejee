@@ -12,7 +12,9 @@ describe('Shop catalogue', () => {
     expect(rows[0]?.price).toBe(products[0]?.sellingPrice);
   });
   it('publishes selected products and includes optional photo references only when supported', () => {
-    const product = { ...storage.getProductCatalog()[0], id: 'panel', imagePath: 'owner/panel.jpg', stockQuantity: 3, sellingPrice: 1250 };
+    const defaultProduct = storage.getProductCatalog()[0];
+    if (!defaultProduct) throw new Error('Expected the billing default catalogue to include a product');
+    const product = { ...defaultProduct, id: 'panel', imagePath: 'owner/panel.jpg', stockQuantity: 3, sellingPrice: 1250 };
     expect(catalogueRows('shop-1', [product], new Set())).toEqual([]);
     const row = catalogueRows('shop-1', [product], new Set(['panel']), true)[0];
     expect(row).toMatchObject({ business_id: 'shop-1', product_id: 'panel', price: 1250, in_stock: true, image_path: 'owner/panel.jpg' });
