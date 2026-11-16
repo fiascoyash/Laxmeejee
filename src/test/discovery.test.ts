@@ -19,3 +19,18 @@ describe('Local discovery', () => {
     expect(normalizeDiscovery({ page: Infinity }).page).toBe(10000);
   });
 });
+import { buildSuggestions, listedShops, matchingProducts } from '@/lib/discovery';
+describe('Product-first discovery', () => {
+  const empty: DirectoryShop = { ...shops[0]!, id: 'c', slug: 'new', public_name: 'Kumar New Shop', products: [] };
+  const rival: DirectoryShop = { ...shops[0]!, id: 'd', slug: 'abc', public_name: 'ABC Electricals', products: [{ name: 'LED Bulb', category: null, price: 90, unit: 'pcs', in_stock: true }] };
+  it('hides newly registered shops that list no products', () => expect(listedShops([...shops, empty]).map(s => s.id)).toEqual(['a', 'b']));
+  it('suggests a product with its shop count and lowest price', () => {
+    expect(buildSuggestions([...shops, rival], 'led')).toContainEqual({ kind: 'product', label: 'LED Bulb', shops: 2, minPrice: 90 });
+  });
+  it('suggests shops by name but never empty ones', () => {
+    const s = buildSuggestions([...shops, empty], 'kumar');
+    expect(s.filter(x => x.kind === 'shop').map(x => x.label)).toEqual(['Kumar Lights']);
+  });
+  it('needs at least 2 characters before suggesting', () => expect(buildSuggestions(shops, 'l')).toEqual([]));
+  it('finds the matching product inside a shop', () => expect(matchingProducts(shops[0]!, 'led')[0]?.name).toBe('LED Bulb'));
+});

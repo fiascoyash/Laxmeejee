@@ -13,7 +13,7 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: (table: s
     range: async () => ({ data: table === 'businesses' ? [
       { id: 'public', slug: 'public-shop', public_name: 'Published Shop', category: null, city: 'Bijnor', locality: null, address: null, hours: null, tagline: null },
       ...(!publishedOnly ? [{ id: 'private', slug: 'private-shop', public_name: 'Unpublished Shop', category: null, city: 'Delhi', locality: null, address: null, hours: null, tagline: null }] : []),
-    ] : [], error: null }),
+    ] : [{ business_id: 'public', product_id: 'p1', name: 'LED Bulb', category: null, price: 100, unit: 'pcs', in_stock: true }, { business_id: 'private', product_id: 'p2', name: 'Hidden', category: null, price: 1, unit: null, in_stock: true }], error: null }),
   };
   return chain;
 } }) }));
@@ -34,5 +34,5 @@ it('excludes unpublished shops and reads no customer, invoice or purchase detail
   expect(result.cities).toEqual(['Bijnor']);
   expect(query.eq).toHaveBeenCalledWith('businesses', 'is_published', true);
   expect(query.select.mock.calls.map(call => call[0])).toEqual(['businesses', 'shop_products']);
-  expect(query.select.mock.calls[0]?.[1]).toBe('id, slug, public_name, category, city, locality, address, hours, tagline');
+  expect(query.select.mock.calls[0]?.[1]).toBe('id, slug, public_name, category, city, locality, address, hours, tagline, phone');
 });

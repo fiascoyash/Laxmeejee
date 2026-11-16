@@ -2,8 +2,8 @@
 
 # North star
 
-Shop owners get paid in full for what they sell.
+Local customers get the products they need from a nearby shop.
 
 ## Metric
 
-Invoices marked paid each week
+Pickup orders placed with shops each week

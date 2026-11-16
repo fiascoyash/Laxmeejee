@@ -31,3 +31,4 @@ use the editor.
 - Billing data (keys prefixed solar_/laxmeejee_/hisaaboo_) stays in localStorage but is mirrored per merchant to `user_settings.settings.store` via `src/lib/cloud-sync.ts`; BusinessGate hydrates before rendering billing. Why: multi-device access without rewriting the legacy storage layer.
 - Shop publishing reads the legacy storage catalogue and upserts by business/product identity before removing deselected rows; this preserves billing defaults and avoids duplicate online products.
 - Product photos use private Storage paths and short-lived signed URLs; optional photo/map columns are probed so blocked schema updates never break existing shops.
+- Customer discovery shows only published shops with at least one listed product; search logic lives in src/lib/discovery.ts so it stays testable.

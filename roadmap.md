@@ -43,3 +43,7 @@
 - [ ] Add optional photo uploads and store photos (blocked: database migration permission).
 - [ ] Save Google Maps locations (blocked: database migration permission); show address-based directions now.
 - [ ] Add storefront categories and product search; verify behavior and compact layouts.
+
+# Product-first search
+- [x] Hide shops with no listed products; rank shops by matching product and price.
+- [x] Live suggestions (products, shops, services) with keyboard navigation; comparison cards with View Store / Contact Shop.
