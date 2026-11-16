@@ -32,18 +32,7 @@
 - [x] Verify live updates, compact layouts, and pickup recovery through GST invoice prefill; restore the checked order to Collected without saving an invoice.
 - [x] Run all 64 behavior checks and confirm the signed-in desktop/compact views, QR, and catalogue controls have no page errors.
 
-# Optional store connection
-- [ ] Open billing immediately without an account; keep local records and navigation unchanged.
-- [ ] Offer optional store sign-in/setup inside billing while preserving connected store controls.
-- [ ] Verify direct entry, dismissible sign-in, local billing and existing store behavior checks.
-
-# Store catalogue, photos and navigation
-- [x] Fix reported photo and catalogue type errors; all 80 tests pass and the real public shop loads on desktop/mobile with working search.
-- [ ] Connect shop publishing to the billing catalogue and update existing online products.
-- [ ] Add optional photo uploads and store photos (blocked: database migration permission).
-- [ ] Save Google Maps locations (blocked: database migration permission); show address-based directions now.
-- [ ] Add storefront categories and product search; verify behavior and compact layouts.
-
-# Product-first search
-- [x] Hide shops with no listed products; rank shops by matching product and price.
-- [x] Live suggestions (products, shops, services) with keyboard navigation; comparison cards with View Store / Contact Shop.
+## Customer ordering & shop response (done)
+- [x] Add products and place pickup orders straight from homepage search results
+- [x] Customer order tracking page (/track) with accepted / ready / collected steps
+- [x] 15-minute reply window for shops, reply timer in order queue, public response rating

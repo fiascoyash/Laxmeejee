@@ -2,8 +2,8 @@
 
 # North star
 
-Local customers get the products they need from a nearby shop.
+Small Indian businesses get paid for their sales and file GST correctly
 
 ## Metric
 
-Pickup orders placed with shops each week
+Invoices saved as final (non-draft) each week

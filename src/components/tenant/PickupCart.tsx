@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { db as supabase } from "@/lib/db";
+import { Link } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
 
 type P = { product_id: string; name: string; unit: string | null; price: number; in_stock: boolean };
 
@@ -22,9 +23,9 @@ export function QtyControl({ p, cart }: { p: P; cart: ReturnType<typeof useCart>
   );
 }
 
-export function PickupCheckout({ slug, products, cart }: { slug: string; products: P[]; cart: ReturnType<typeof useCart> }) {
+export function PickupCheckout({ slug, products, cart, compact = false }: { slug: string; products: P[]; cart: ReturnType<typeof useCart>; compact?: boolean }) {
   const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false); const [err, setErr] = useState(""); const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState(""); const [code, setCode] = useState(""); const [placedPhone, setPlacedPhone] = useState("");
   const lines = products.filter((p) => (cart.qty[p.product_id] ?? 0));
   const total = lines.reduce((s, p) => s + Number(p.price) * (cart.qty[p.product_id] ?? 0), 0);
 
@@ -32,7 +33,8 @@ export function PickupCheckout({ slug, products, cart }: { slug: string; product
     <div className="mt-6 rounded-lg border border-primary bg-primary/5 p-4 text-sm">
       <p className="font-semibold text-foreground">Order placed! Your pickup code is <span className="text-lg tracking-widest">{code}</span></p>
       <p className="mt-1 text-muted-foreground">Show this code at the shop counter. Payment is made at the shop when you collect.</p>
-      <button type="button" className="mt-3 text-primary hover:underline" onClick={() => setCode("")}>Place another order</button>
+      <Link to="/track" search={{ code, phone: placedPhone }} className="mt-3 inline-block rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground">Track order status</Link>
+      <button type="button" className="mt-3 ml-3 text-primary hover:underline" onClick={() => setCode("")}>Place another order</button>
     </div>
   );
   if (!lines.length) return null;
@@ -45,12 +47,12 @@ export function PickupCheckout({ slug, products, cart }: { slug: string; product
     });
     setBusy(false);
     if (error) return setErr(error.message);
-    setCode(data as string); cart.clear(); setName(""); setPhone(""); setNote("");
+    setCode(data as string); setPlacedPhone(phone); cart.clear(); setName(""); setPhone(""); setNote("");
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 space-y-3 rounded-lg border p-4">
-      <h2 className="text-lg font-semibold text-foreground">Pick up at store</h2>
+    <form onSubmit={submit} className={`${compact ? "mt-4 p-3" : "mt-6 p-4"} space-y-3 rounded-lg border`}>
+      <h2 className={`${compact ? "text-base" : "text-lg"} font-semibold text-foreground`}>Pick up at store</h2>
       <ul className="text-sm">
         {lines.map((p) => <li key={p.product_id} className="flex justify-between"><span>{p.name} × {(cart.qty[p.product_id] ?? 0)}</span><span>₹{(Number(p.price) * (cart.qty[p.product_id] ?? 0)).toLocaleString("en-IN")}</span></li>)}
         <li className="mt-1 flex justify-between border-t pt-1 font-semibold"><span>Estimated total</span><span>₹{total.toLocaleString("en-IN")}</span></li>

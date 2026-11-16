@@ -18,22 +18,19 @@ export type Database = {
         Row: {
           business_id: string
           created_at: string
-          id: string
-          role: string
+          role: Database["public"]["Enums"]["business_role"]
           user_id: string
         }
         Insert: {
           business_id: string
           created_at?: string
-          id?: string
-          role?: string
+          role?: Database["public"]["Enums"]["business_role"]
           user_id: string
         }
         Update: {
           business_id?: string
           created_at?: string
-          id?: string
-          role?: string
+          role?: Database["public"]["Enums"]["business_role"]
           user_id?: string
         }
         Relationships: [
@@ -94,220 +91,55 @@ export type Database = {
         }
         Relationships: []
       }
-      company_settings: {
-        Row: {
-          address: string | null
-          bank_details: Json
-          business_name: string
-          created_at: string
-          email: string | null
-          extra: Json
-          gstin: string | null
-          id: string
-          invoice_prefix: string
-          logo_url: string | null
-          owner_id: string
-          phone: string | null
-          state: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          bank_details?: Json
-          business_name?: string
-          created_at?: string
-          email?: string | null
-          extra?: Json
-          gstin?: string | null
-          id?: string
-          invoice_prefix?: string
-          logo_url?: string | null
-          owner_id: string
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          bank_details?: Json
-          business_name?: string
-          created_at?: string
-          email?: string | null
-          extra?: Json
-          gstin?: string | null
-          id?: string
-          invoice_prefix?: string
-          logo_url?: string | null
-          owner_id?: string
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      customers: {
-        Row: {
-          address: string | null
-          balance: number
-          created_at: string
-          email: string | null
-          extra: Json
-          gstin: string | null
-          id: string
-          name: string
-          owner_id: string
-          phone: string | null
-          state: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          balance?: number
-          created_at?: string
-          email?: string | null
-          extra?: Json
-          gstin?: string | null
-          id?: string
-          name: string
-          owner_id: string
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          balance?: number
-          created_at?: string
-          email?: string | null
-          extra?: Json
-          gstin?: string | null
-          id?: string
-          name?: string
-          owner_id?: string
-          phone?: string | null
-          state?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       invoice_payments: {
         Row: {
           amount: number
-          created_at: string
+          business_id: string
+          created_at: string | null
+          date: string
           id: string
           invoice_id: string
-          method: string | null
+          mode: string
           notes: string | null
-          owner_id: string
-          paid_on: string
-          updated_at: string
+          reference: string | null
         }
         Insert: {
-          amount?: number
-          created_at?: string
-          id?: string
+          amount: number
+          business_id?: string
+          created_at?: string | null
+          date: string
+          id: string
           invoice_id: string
-          method?: string | null
+          mode?: string
           notes?: string | null
-          owner_id: string
-          paid_on?: string
-          updated_at?: string
+          reference?: string | null
         }
         Update: {
           amount?: number
-          created_at?: string
+          business_id?: string
+          created_at?: string | null
+          date?: string
           id?: string
           invoice_id?: string
-          method?: string | null
+          mode?: string
           notes?: string | null
-          owner_id?: string
-          paid_on?: string
-          updated_at?: string
+          reference?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "invoice_payments_invoice_id_fkey"
-            columns: ["invoice_id"]
+            foreignKeyName: "invoice_payments_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      invoices: {
-        Row: {
-          amount_paid: number
-          created_at: string
-          customer_id: string | null
-          customer_snapshot: Json
-          discount: number
-          due_date: string | null
-          extra: Json
-          id: string
-          invoice_date: string
-          invoice_number: string
-          items: Json
-          notes: string | null
-          owner_id: string
-          status: string
-          subtotal: number
-          tax_total: number
-          total: number
-          updated_at: string
-        }
-        Insert: {
-          amount_paid?: number
-          created_at?: string
-          customer_id?: string | null
-          customer_snapshot?: Json
-          discount?: number
-          due_date?: string | null
-          extra?: Json
-          id?: string
-          invoice_date?: string
-          invoice_number: string
-          items?: Json
-          notes?: string | null
-          owner_id: string
-          status?: string
-          subtotal?: number
-          tax_total?: number
-          total?: number
-          updated_at?: string
-        }
-        Update: {
-          amount_paid?: number
-          created_at?: string
-          customer_id?: string | null
-          customer_snapshot?: Json
-          discount?: number
-          due_date?: string | null
-          extra?: Json
-          id?: string
-          invoice_date?: string
-          invoice_number?: string
-          items?: Json
-          notes?: string | null
-          owner_id?: string
-          status?: string
-          subtotal?: number
-          tax_total?: number
-          total?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoices_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
+            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]
       }
       pickup_orders: {
         Row: {
+          accepted_at: string | null
           business_id: string
+          collected_at: string | null
           created_at: string
           customer_name: string
           customer_phone: string
@@ -315,12 +147,16 @@ export type Database = {
           items: Json
           note: string | null
           order_code: string
+          ready_at: string | null
+          responded_at: string | null
           status: string
           total: number
           updated_at: string
         }
         Insert: {
+          accepted_at?: string | null
           business_id: string
+          collected_at?: string | null
           created_at?: string
           customer_name: string
           customer_phone: string
@@ -328,12 +164,16 @@ export type Database = {
           items?: Json
           note?: string | null
           order_code: string
+          ready_at?: string | null
+          responded_at?: string | null
           status?: string
           total?: number
           updated_at?: string
         }
         Update: {
+          accepted_at?: string | null
           business_id?: string
+          collected_at?: string | null
           created_at?: string
           customer_name?: string
           customer_phone?: string
@@ -341,6 +181,8 @@ export type Database = {
           items?: Json
           note?: string | null
           order_code?: string
+          ready_at?: string | null
+          responded_at?: string | null
           status?: string
           total?: number
           updated_at?: string
@@ -355,169 +197,173 @@ export type Database = {
           },
         ]
       }
-      products: {
+      product_purchases: {
         Row: {
-          created_at: string
-          extra: Json
-          gst_rate: number
-          hsn: string | null
+          business_id: string
+          created_at: string | null
+          details: Json
           id: string
-          name: string
-          owner_id: string
-          price: number
-          purchase_price: number | null
-          sku: string | null
-          stock: number
-          unit: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          extra?: Json
-          gst_rate?: number
-          hsn?: string | null
-          id?: string
-          name: string
-          owner_id: string
-          price?: number
-          purchase_price?: number | null
-          sku?: string | null
-          stock?: number
-          unit?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          extra?: Json
-          gst_rate?: number
-          hsn?: string | null
-          id?: string
-          name?: string
-          owner_id?: string
-          price?: number
-          purchase_price?: number | null
-          sku?: string | null
-          stock?: number
-          unit?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          email: string | null
-          full_name: string | null
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          email?: string | null
-          full_name?: string | null
-          id: string
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          email?: string | null
-          full_name?: string | null
-          id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      quotation_templates: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          owner_id: string
-          template: Json
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          owner_id: string
-          template?: Json
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          owner_id?: string
-          template?: Json
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      quotations: {
-        Row: {
-          created_at: string
-          customer_id: string | null
-          customer_snapshot: Json
-          extra: Json
-          id: string
-          items: Json
           notes: string | null
-          owner_id: string
-          quotation_date: string
-          quotation_number: string
-          status: string
-          subtotal: number
-          tax_total: number
-          total: number
-          updated_at: string
-          valid_until: string | null
+          product_id: string
+          purchase_date: string
+          purchase_price: number
+          quantity: number
+          quantity_added: number | null
+          supplier_name: string | null
+          total_purchase_cost: number | null
+          total_value: number | null
         }
         Insert: {
-          created_at?: string
-          customer_id?: string | null
-          customer_snapshot?: Json
-          extra?: Json
+          business_id?: string
+          created_at?: string | null
+          details?: Json
           id?: string
-          items?: Json
           notes?: string | null
-          owner_id: string
-          quotation_date?: string
-          quotation_number: string
-          status?: string
-          subtotal?: number
-          tax_total?: number
-          total?: number
-          updated_at?: string
-          valid_until?: string | null
+          product_id: string
+          purchase_date?: string
+          purchase_price: number
+          quantity: number
+          quantity_added?: number | null
+          supplier_name?: string | null
+          total_purchase_cost?: number | null
+          total_value?: number | null
         }
         Update: {
-          created_at?: string
-          customer_id?: string | null
-          customer_snapshot?: Json
-          extra?: Json
+          business_id?: string
+          created_at?: string | null
+          details?: Json
           id?: string
-          items?: Json
           notes?: string | null
-          owner_id?: string
-          quotation_date?: string
-          quotation_number?: string
-          status?: string
-          subtotal?: number
-          tax_total?: number
-          total?: number
-          updated_at?: string
-          valid_until?: string | null
+          product_id?: string
+          purchase_date?: string
+          purchase_price?: number
+          quantity?: number
+          quantity_added?: number | null
+          supplier_name?: string | null
+          total_purchase_cost?: number | null
+          total_value?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "quotations_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "product_purchases_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: "customers"
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_stock_movements: {
+        Row: {
+          balance_after: number
+          business_id: string
+          created_at: string | null
+          id: string
+          movement_type: string
+          notes: string | null
+          product_id: string
+          quantity_change: number
+          quantity_delta: number | null
+          reference_id: string | null
+          reference_type: string | null
+          stock_balance: number | null
+        }
+        Insert: {
+          balance_after: number
+          business_id?: string
+          created_at?: string | null
+          id?: string
+          movement_type: string
+          notes?: string | null
+          product_id: string
+          quantity_change: number
+          quantity_delta?: number | null
+          reference_id?: string | null
+          reference_type?: string | null
+          stock_balance?: number | null
+        }
+        Update: {
+          balance_after?: number
+          business_id?: string
+          created_at?: string | null
+          id?: string
+          movement_type?: string
+          notes?: string | null
+          product_id?: string
+          quantity_change?: number
+          quantity_delta?: number | null
+          reference_id?: string | null
+          reference_type?: string | null
+          stock_balance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_stock_movements_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_import_logs: {
+        Row: {
+          business_id: string
+          created_at: string
+          errors: Json
+          file_name: string
+          format: string
+          id: string
+          import_date: string
+          imported_by: string | null
+          invoice_number: string | null
+          products_imported: number
+          rows: Json
+          status: string
+          supplier_id: string | null
+          supplier_name: string | null
+          total_value: number
+        }
+        Insert: {
+          business_id?: string
+          created_at?: string
+          errors?: Json
+          file_name: string
+          format: string
+          id?: string
+          import_date?: string
+          imported_by?: string | null
+          invoice_number?: string | null
+          products_imported?: number
+          rows?: Json
+          status?: string
+          supplier_id?: string | null
+          supplier_name?: string | null
+          total_value?: number
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          errors?: Json
+          file_name?: string
+          format?: string
+          id?: string
+          import_date?: string
+          imported_by?: string | null
+          invoice_number?: string | null
+          products_imported?: number
+          rows?: Json
+          status?: string
+          supplier_id?: string | null
+          supplier_name?: string | null
+          total_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_import_logs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]
@@ -527,7 +373,6 @@ export type Database = {
           business_id: string
           category: string | null
           description: string | null
-          id: string
           in_stock: boolean
           name: string
           price: number
@@ -539,7 +384,6 @@ export type Database = {
           business_id?: string
           category?: string | null
           description?: string | null
-          id?: string
           in_stock?: boolean
           name: string
           price?: number
@@ -551,7 +395,6 @@ export type Database = {
           business_id?: string
           category?: string | null
           description?: string | null
-          id?: string
           in_stock?: boolean
           name?: string
           price?: number
@@ -569,137 +412,6 @@ export type Database = {
           },
         ]
       }
-      supplier_transactions: {
-        Row: {
-          amount: number
-          created_at: string
-          extra: Json
-          id: string
-          notes: string | null
-          owner_id: string
-          supplier_id: string
-          txn_date: string
-          type: string
-          updated_at: string
-        }
-        Insert: {
-          amount?: number
-          created_at?: string
-          extra?: Json
-          id?: string
-          notes?: string | null
-          owner_id: string
-          supplier_id: string
-          txn_date?: string
-          type?: string
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          extra?: Json
-          id?: string
-          notes?: string | null
-          owner_id?: string
-          supplier_id?: string
-          txn_date?: string
-          type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supplier_transactions_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      suppliers: {
-        Row: {
-          address: string | null
-          balance: number
-          created_at: string
-          email: string | null
-          extra: Json
-          gstin: string | null
-          id: string
-          name: string
-          owner_id: string
-          phone: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          balance?: number
-          created_at?: string
-          email?: string | null
-          extra?: Json
-          gstin?: string | null
-          id?: string
-          name: string
-          owner_id: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          balance?: number
-          created_at?: string
-          email?: string | null
-          extra?: Json
-          gstin?: string | null
-          id?: string
-          name?: string
-          owner_id?: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_settings: {
-        Row: {
-          created_at: string
-          id: string
-          owner_id: string
-          settings: Json
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          owner_id: string
-          settings?: Json
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          owner_id?: string
-          settings?: Json
-          updated_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
@@ -707,24 +419,22 @@ export type Database = {
     Functions: {
       create_business: {
         Args: {
-          _category: string
-          _city: string
-          _locality: string
-          _phone?: string
+          _category?: string
+          _city?: string
+          _locality?: string
           _public_name: string
           _slug: string
         }
         Returns: string
       }
       current_business_id: { Args: never; Returns: string }
-      has_role: {
+      is_business_member: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
+          _business_id: string
+          _roles?: Database["public"]["Enums"]["business_role"][]
         }
         Returns: boolean
       }
-      is_business_member: { Args: { _business_id: string }; Returns: boolean }
       place_pickup_order: {
         Args: {
           _items: Json
@@ -735,9 +445,26 @@ export type Database = {
         }
         Returns: string
       }
+      record_product_stock_purchase: {
+        Args: { payload: Json }
+        Returns: undefined
+      }
+      shop_response_stats: {
+        Args: never
+        Returns: {
+          avg_minutes: number
+          business_id: string
+          quick_share: number
+          responded: number
+        }[]
+      }
+      track_pickup_order: {
+        Args: { _code: string; _phone: string }
+        Returns: Json
+      }
     }
     Enums: {
-      app_role: "admin" | "user"
+      business_role: "owner" | "manager" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -865,7 +592,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      business_role: ["owner", "manager", "staff"],
     },
   },
 } as const
