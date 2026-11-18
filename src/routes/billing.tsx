@@ -4,7 +4,20 @@ import { BusinessGate } from '@/components/tenant/BusinessGate';
 import { getBillingView, isPublicLandingHash } from '@/lib/billing-navigation';
 import { normalizeDiscovery } from '@/lib/discovery';
 
-const LegacyApp = lazy(() => import('@/legacy/Root'));
+const LegacyApp = lazy(() =>
+  import('@/legacy/Root').catch((err) => {
+    // A stale tab may reference an outdated module URL; reload once to fetch the fresh one.
+    if (typeof window !== 'undefined' && !sessionStorage.getItem('billing-reloaded')) {
+      sessionStorage.setItem('billing-reloaded', '1');
+      window.location.reload();
+      return new Promise<never>(() => {});
+    }
+    throw err;
+  }).then((m) => {
+    if (typeof window !== 'undefined') sessionStorage.removeItem('billing-reloaded');
+    return m;
+  }),
+);
 export const Route = createFileRoute('/billing')({
   head: () => ({ meta: [
     { title: 'Hisaaboo Billing — Your Business Desk' },
