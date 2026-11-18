@@ -41,3 +41,8 @@
 - [x] Playful nickname checkout with one Track Order button and saved active codes.
 - [x] Mobile + nickname recovery for active orders only, with limited guesses and no phone-only lookup.
 - [x] Verify checkout, reload recovery, privacy failures, and tracking on desktop/mobile; cancel the test order and verify saved-code cleanup. All 74 checks pass.
+
+# Homepage resilience
+- [x] Bundle the original hero illustration with the site instead of depending on a preview URL.
+- [x] Keep the shared homepage visible when directory loading fails; show and verify an inline retry in the results area.
+- [x] Verify desktop/mobile artwork, layout, forced-outage recovery, hydration, all 81 checks, and a clean preview build.
