@@ -1,6 +1,9 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import heroShop from '@/assets/hero-local-shop.jpg';
+import heroShopAsset from '@/assets/hero-local-shop.jpg.asset.json';
+
+// Absolute URL so the picture loads on any host (Cloudflare, Netlify, Lovable).
+const heroShop = `https://id-preview--9a7def33-2bb2-4743-a3c2-c948dc6a8dc0.lovable.app${heroShopAsset.url}`;
 import {
   Sun, FileText, Receipt, Users, Truck, BarChart3, Package, Calculator,
   ArrowRight, CheckCircle2, IndianRupee, TrendingUp, Zap, ShieldCheck,
