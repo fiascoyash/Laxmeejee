@@ -11,6 +11,7 @@ import { legacyBillingView } from '@/lib/billing-navigation';
 import type { DirectoryShop } from '@/lib/discovery';
 import { useCart, QtyControl, PickupCheckout } from '@/components/tenant/PickupCart';
 import { ResponseBadge } from '@/components/tenant/ResponseBadge';
+import { SavedPickupOrders } from '@/components/tenant/SavedPickupOrders';
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => normalizeDiscovery(search),
@@ -62,6 +63,7 @@ function Index() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <p className="mb-2 text-sm font-semibold text-stock-action">YOUR LOCAL MARKET</p>
         <h2 className="mb-6 text-3xl font-bold">Find local shops. Order for pickup.</h2>
+        <SavedPickupOrders />
         <div className="grid gap-3 sm:grid-cols-3">
           {([{ key: 'city', label: 'City', values: data.cities }, { key: 'locality', label: 'Locality', values: data.localities }, { key: 'category', label: 'Category', values: data.categories }] as const).map(({ key, label, values }) => <label key={key} className="text-sm font-medium">{label}<select aria-label={label} value={filters[key]} onChange={e => update(key === 'city' ? { city: e.target.value, locality: '' } : { [key]: e.target.value })} className="mt-1 block h-10 w-full rounded-md border bg-background px-3 text-sm"> <option value="">All {label.toLowerCase() === 'city' ? 'cities' : label.toLowerCase() === 'locality' ? 'localities' : 'categories'}</option>{filters[key] && !values.includes(filters[key]) && <option value={filters[key]}>{filters[key]}</option>}{values.map(v => <option key={v} value={v}>{v}</option>)}</select></label>)}
         </div>

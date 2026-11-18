@@ -4,6 +4,8 @@ import { CheckCircle2, Circle, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SavedPickupOrders } from "@/components/tenant/SavedPickupOrders";
+import { removeSavedPickup, savePickup } from "@/lib/saved-pickups";
 
 type Tracked = {
   order_code: string; status: string; total: number; items: { name: string; qty: number; price: number }[];
@@ -17,6 +19,7 @@ export const Route = createFileRoute("/track")({
   head: () => ({
     meta: [
       { title: "Track your pickup order — Hisaaboo" },
+      { name: "robots", content: "noindex, nofollow" },
       { name: "description", content: "See if the shop has accepted your pickup order and when it is ready to collect." },
       { property: "og:title", content: "Track your pickup order — Hisaaboo" },
       { property: "og:description", content: "Live status for your Hisaaboo pickup order." },
@@ -40,18 +43,49 @@ function TrackPage() {
   const [order, setOrder] = useState<Tracked | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'nickname' | 'code'>(search.code ? 'code' : 'nickname');
+  const [code, setCode] = useState(search.code);
+  const [phone, setPhone] = useState(search.phone);
+  const [nickname, setNickname] = useState('');
+  const [recovering, setRecovering] = useState(false);
+  const [matches, setMatches] = useState<{ order_code: string; shop_slug: string; shop_name: string }[]>([]);
+  useEffect(() => {
+    if (search.code) { setCode(search.code); setMode('code'); }
+    if (search.phone) setPhone(search.phone);
+  }, [search.code, search.phone]);
+
+  async function recover() {
+    setRecovering(true); setError(''); setMatches([]); setOrder(null);
+    void navigate({ search: { code: '', phone: '' }, replace: true });
+    try {
+      const { data, error } = await supabase.rpc('recover_active_pickups', { _phone: phone, _nickname: nickname });
+      if (error) { setError("Couldn't find your order. Please try again."); return; }
+      if (data && typeof data === 'object' && !Array.isArray(data) && data['limited']) { setError('Too many checks. Please try again in 15 minutes, or use your pickup code.'); return; }
+      const found = Array.isArray(data) ? data.filter((r): r is { order_code: string; shop_slug: string; shop_name: string } => !!r && typeof r === 'object' && !Array.isArray(r) && typeof r['order_code'] === 'string' && typeof r['shop_slug'] === 'string' && typeof r['shop_name'] === 'string') : [];
+      if (!found.length) { setError('No active order matches those details. Check your nickname and mobile number.'); return; }
+      found.forEach(r => savePickup({ code: r.order_code, phone: phone.replace(/\D/g, '').slice(-10), nickname: nickname.trim(), slug: r.shop_slug }));
+      setMatches(found);
+      if (found.length === 1) void navigate({ search: { code: found[0]?.order_code ?? '', phone }, replace: true });
+    } catch { setError("Couldn't find your order. Please try again."); }
+    finally { setRecovering(false); }
+  }
 
   useEffect(() => {
-    if (!search.code || !search.phone) return;
+    if (!search.code || !search.phone) { setLoading(false); return; }
+    setOrder(null); setError("");
     let alive = true;
     const load = async () => {
       setLoading(true);
+      try {
       const { data, error } = await supabase.rpc("track_pickup_order", { _code: search.code, _phone: search.phone });
       if (!alive) return;
       setLoading(false);
-      if (error) return setError("Couldn't check your order. Please try again.");
+      if (error) { setOrder(null); return setError("Couldn't check your order. Please try again."); }
       setError(data ? "" : "No order found for this code and mobile number.");
-      setOrder((data as Tracked) ?? null);
+      const tracked = (data as Tracked | null) ?? null;
+      setOrder(tracked);
+      if (tracked?.status === 'collected' || tracked?.status === 'cancelled') removeSavedPickup(search.code, search.phone.replace(/\D/g, '').slice(-10));
+      } catch { if (alive) { setLoading(false); setOrder(null); setError("Couldn't check your order. Please try again."); } }
     };
     load();
     const t = setInterval(load, 15000);
@@ -61,13 +95,20 @@ function TrackPage() {
   const cancelled = order?.status === "cancelled";
   return (
     <main className="min-h-screen bg-muted px-4 py-10">
-      <div className="mx-auto max-w-md rounded-xl border bg-card p-6 shadow-sm">
+      <div className="mx-auto max-w-md rounded-lg border bg-card p-6 shadow-sm">
         <h1 className="text-2xl font-bold">Track your order</h1>
-        <form className="mt-4 flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); void navigate({ search: { code: String(f.get("code") ?? "").toUpperCase(), phone: String(f.get("phone") ?? "") } }); }}>
-          <Input name="code" aria-label="Pickup code" placeholder="Pickup code" defaultValue={search.code} required maxLength={10} />
-          <Input name="phone" aria-label="Mobile number" placeholder="Mobile number used for the order" defaultValue={search.phone} inputMode="tel" required maxLength={14} />
-          <Button type="submit">Check status</Button>
+        <SavedPickupOrders />
+        <div className="mt-4 flex gap-2" role="group" aria-label="Find order with">
+          <Button variant={mode === 'nickname' ? 'default' : 'outline'} aria-pressed={mode === 'nickname'} onClick={() => { setMode('nickname'); setError(''); setMatches([]); }}>Mobile + nickname</Button>
+          <Button variant={mode === 'code' ? 'default' : 'outline'} aria-pressed={mode === 'code'} onClick={() => { setMode('code'); setError(''); setMatches([]); }}>Pickup code</Button>
+        </div>
+        <form className="mt-4 flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (mode === 'nickname') void recover(); else { setMatches([]); void navigate({ search: { code: code.trim().toUpperCase(), phone } }); } }}>
+          <label className="text-sm font-medium">Mobile number<Input aria-label="Mobile number" placeholder="Mobile number used for the order" value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" required maxLength={14} className="mt-1" /></label>
+          {mode === 'nickname' ? <label className="text-sm font-medium">Order nickname<Input aria-label="Order nickname" placeholder="The nickname you used at checkout" value={nickname} onChange={e => setNickname(e.target.value)} required minLength={2} maxLength={80} className="mt-1" /></label> : <label className="text-sm font-medium">Pickup code<Input aria-label="Pickup code" placeholder="Pickup code" value={code} onChange={e => setCode(e.target.value)} required maxLength={10} className="mt-1" /></label>}
+          <Button type="submit" disabled={recovering}>{recovering ? 'Finding orders…' : mode === 'nickname' ? 'Find active orders' : 'Check status'}</Button>
+          {mode === 'nickname' && <p className="text-xs text-muted-foreground">Both details must match. Nicknames ignore capital letters. Only active orders appear.</p>}
         </form>
+        {matches.length > 1 && <section className="mt-4 space-y-3" aria-label="Matching active orders">{matches.map(match => <div key={`${match.shop_slug}-${match.order_code}`} className="border-b pb-3"><p className="break-words text-sm font-medium">{match.shop_name} · #{match.order_code}</p><Button className="mt-2 w-full" onClick={() => void navigate({ search: { code: match.order_code, phone } })}>Track Order</Button></div>)}</section>}
         {loading && !order && <p className="mt-4 text-sm text-muted-foreground">Checking…</p>}
         {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
         {order && (

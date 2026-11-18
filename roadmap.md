@@ -36,3 +36,8 @@
 - [x] Add products and place pickup orders straight from homepage search results
 - [x] Customer order tracking page (/track) with accepted / ready / collected steps
 - [x] 15-minute reply window for shops, reply timer in order queue, public response rating
+
+## Nickname checkout & tracking
+- [x] Playful nickname checkout with one Track Order button and saved active codes.
+- [x] Mobile + nickname recovery for active orders only, with limited guesses and no phone-only lookup.
+- [x] Verify checkout, reload recovery, privacy failures, and tracking on desktop/mobile; cancel the test order and verify saved-code cleanup. All 74 checks pass.

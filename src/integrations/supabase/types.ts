@@ -197,6 +197,24 @@ export type Database = {
           },
         ]
       }
+      pickup_recovery_limits: {
+        Row: {
+          attempts: number
+          phone_hash: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          phone_hash: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          phone_hash?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       product_purchases: {
         Row: {
           business_id: string
@@ -448,6 +466,10 @@ export type Database = {
       record_product_stock_purchase: {
         Args: { payload: Json }
         Returns: undefined
+      }
+      recover_active_pickups: {
+        Args: { _nickname: string; _phone: string }
+        Returns: Json
       }
       shop_response_stats: {
         Args: never

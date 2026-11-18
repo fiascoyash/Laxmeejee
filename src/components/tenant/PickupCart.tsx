@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { savePickup, type SavedPickup } from "@/lib/saved-pickups";
 
 type P = { product_id: string; name: string; unit: string | null; price: number; in_stock: boolean };
 
@@ -13,41 +16,52 @@ export function useCart() {
 export function QtyControl({ p, cart }: { p: P; cart: ReturnType<typeof useCart> }) {
   if (!p.in_stock) return null;
   const n = cart.qty[p.product_id] ?? 0;
-  if (!n) return <button type="button" onClick={() => cart.set(p.product_id, 1)} className="mt-1 rounded-md border border-primary px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10">Add</button>;
+  if (!n) return <Button type="button" variant="outline" size="sm" onClick={() => cart.set(p.product_id, 1)} className="mt-1">Add</Button>;
   return (
     <div className="mt-1 inline-flex items-center rounded-md border">
-      <button type="button" aria-label="Less" className="px-2 py-1" onClick={() => cart.set(p.product_id, n - 1)}>−</button>
+      <Button type="button" variant="ghost" size="icon" aria-label="Less" onClick={() => cart.set(p.product_id, n - 1)}>−</Button>
       <span className="min-w-6 text-center text-sm">{n}</span>
-      <button type="button" aria-label="More" className="px-2 py-1" onClick={() => cart.set(p.product_id, n + 1)}>+</button>
+      <Button type="button" variant="ghost" size="icon" aria-label="More" onClick={() => cart.set(p.product_id, n + 1)}>+</Button>
     </div>
   );
 }
 
 export function PickupCheckout({ slug, products, cart, compact = false }: { slug: string; products: P[]; cart: ReturnType<typeof useCart>; compact?: boolean }) {
   const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false); const [err, setErr] = useState(""); const [code, setCode] = useState(""); const [placedPhone, setPlacedPhone] = useState("");
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
+  const [placed, setPlaced] = useState<SavedPickup | null>(null);
+  const [saved, setSaved] = useState(false);
+  const confirmation = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (placed) confirmation.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+  }, [placed]);
   const lines = products.filter((p) => (cart.qty[p.product_id] ?? 0));
   const total = lines.reduce((s, p) => s + Number(p.price) * (cart.qty[p.product_id] ?? 0), 0);
 
-  if (code) return (
-    <div className="mt-6 rounded-lg border border-primary bg-primary/5 p-4 text-sm">
-      <p className="font-semibold text-foreground">Order placed! Your pickup code is <span className="text-lg tracking-widest">{code}</span></p>
-      <p className="mt-1 text-muted-foreground">Show this code at the shop counter. Payment is made at the shop when you collect.</p>
-      <Link to="/track" search={{ code, phone: placedPhone }} className="mt-3 inline-block rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground">Track order status</Link>
-      <button type="button" className="mt-3 ml-3 text-primary hover:underline" onClick={() => setCode("")}>Place another order</button>
+  if (placed && !lines.length) return (
+    <div ref={confirmation} role="status" className="mt-4 rounded-lg border border-primary bg-primary/5 p-4 text-sm">
+      <p className="flex items-start gap-2 font-semibold text-foreground"><CheckCircle2 className="size-5 shrink-0 text-primary" />Order placed for {placed.nickname}!</p>
+      <p className="mt-3 text-xs text-muted-foreground">Pickup code</p>
+      <p className="mt-1 font-mono text-3xl font-bold">{placed.code}</p>
+      <Button asChild size="lg" className="mt-4 w-full"><Link to="/track" search={{ code: placed.code, phone: placed.phone }}>Track Order<ArrowRight /></Link></Button>
+      <p className="mt-3 text-xs text-muted-foreground">{saved ? 'Saved on this browser. ' : 'This browser could not save your code. '}Recover active orders with your mobile number and nickname: <strong className="break-words">{placed.nickname}</strong>.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Show your code at the counter and pay when you collect.</p>
     </div>
   );
   if (!lines.length) return null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
-    const { data, error } = await supabase.rpc("place_pickup_order", {
-      _slug: slug, _name: name, _phone: phone, _note: note,
-      _items: lines.map((p) => ({ product_id: p.product_id, qty: (cart.qty[p.product_id] ?? 0) })),
-    });
-    setBusy(false);
-    if (error) return setErr(error.message);
-    setCode(data as string); setPlacedPhone(phone); cart.clear(); setName(""); setPhone(""); setNote("");
+    try {
+      const { data, error } = await supabase.rpc("place_pickup_order", {
+        _slug: slug, _name: name.trim(), _phone: phone, _note: note,
+        _items: lines.map((p) => ({ product_id: p.product_id, qty: (cart.qty[p.product_id] ?? 0) })),
+      });
+      if (error || typeof data !== 'string' || !data) { setErr(error?.message ?? 'Could not place your order. Please try again.'); return; }
+      const order = { code: data, phone: phone.replace(/\D/g, '').slice(-10), nickname: name.trim(), slug };
+      setSaved(savePickup(order)); setPlaced(order); cart.clear(); setName(""); setPhone(""); setNote("");
+    } catch { setErr('Could not place your order. Please try again.'); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -57,11 +71,12 @@ export function PickupCheckout({ slug, products, cart, compact = false }: { slug
         {lines.map((p) => <li key={p.product_id} className="flex justify-between"><span>{p.name} × {(cart.qty[p.product_id] ?? 0)}</span><span>₹{(Number(p.price) * (cart.qty[p.product_id] ?? 0)).toLocaleString("en-IN")}</span></li>)}
         <li className="mt-1 flex justify-between border-t pt-1 font-semibold"><span>Estimated total</span><span>₹{total.toLocaleString("en-IN")}</span></li>
       </ul>
-      <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" maxLength={80} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
-      <input required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" inputMode="tel" maxLength={14} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+      <label className="block text-sm font-medium">Give this order a nickname<input required aria-label="Order nickname" value={name} onChange={(e) => setName(e.target.value)} placeholder="Batman, Chai Lover… who’s picking up?" minLength={2} maxLength={80} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" /></label>
+      <p className="text-xs text-muted-foreground">Your real name works too. Keep this nickname private — it helps recover your order.</p>
+      <input required aria-label="Mobile number" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" inputMode="tel" maxLength={14} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
       <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note for the shop (optional)" maxLength={500} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
       {err && <p className="text-sm text-destructive">{err}</p>}
-      <button disabled={busy} className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">{busy ? "Placing order…" : "Place pickup order"}</button>
+      <Button type="submit" disabled={busy} className="w-full">{busy ? "Placing order…" : "Place pickup order"}</Button>
       <p className="text-xs text-muted-foreground">No online payment — pay at the shop when you collect.</p>
     </form>
   );

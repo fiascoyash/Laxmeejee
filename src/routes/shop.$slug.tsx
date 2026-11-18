@@ -5,6 +5,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { useCart, QtyControl, PickupCheckout } from "@/components/tenant/PickupCart";
 import { ResponseBadge } from "@/components/tenant/ResponseBadge";
 import type { ResponseStats } from "@/lib/discovery";
+import { SavedPickupOrders } from '@/components/tenant/SavedPickupOrders';
 
 type PublicShop = {
   slug: string; public_name: string; category: string | null; city: string | null;
@@ -100,6 +101,7 @@ function ShopPage() {
           {shop.phone && (<div><dt className="font-medium text-foreground">Phone</dt><dd><a className="text-primary hover:underline" href={`tel:${shop.phone}`}>{shop.phone}</a></dd></div>)}
         </dl>
         <h2 className="mt-8 text-lg font-semibold text-foreground">Products</h2>
+        <SavedPickupOrders />
         {shop.products.length === 0 ? (
           <p className="mt-2 rounded-lg bg-muted p-3 text-sm text-muted-foreground">Products will appear here soon.</p>
         ) : (
