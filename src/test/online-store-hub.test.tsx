@@ -4,7 +4,6 @@ import { OnlineStoreHub } from '@/components/tenant/OnlineStoreHub';
 import { MerchantStoreProvider, type MerchantStoreContextValue } from '@/components/tenant/store-context';
 
 const order: MerchantStoreContextValue['recentOrders'][number] = {
-  accepted_at: null, ready_at: null, responded_at: null, collected_at: null,
   id: 'order-1',
   business_id: 'shop-1',
   order_code: 'PICK42',
@@ -36,6 +35,7 @@ function setup(overrides: Partial<MerchantStoreContextValue> = {}) {
     openShopSettings: vi.fn(),
     togglePublish: vi.fn(async () => {}),
     signOut: vi.fn(async () => {}),
+    userEmail: "owner@example.com",
     refreshStore: vi.fn(async () => {}),
     ...overrides,
   };

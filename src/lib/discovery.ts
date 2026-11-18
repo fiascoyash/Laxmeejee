@@ -1,10 +1,9 @@
 export type DiscoveryFilters = { q: string; city: string; locality: string; category: string; page: number };
-export type DirectoryProduct = { product_id: string; name: string; category: string | null; price: number; unit: string | null; in_stock: boolean };
+export type DirectoryProduct = { product_id?: string; image_path?: string | null; name: string; category: string | null; price: number; unit: string | null; in_stock: boolean };
 export type DirectoryShop = {
   id: string; slug: string; public_name: string; category: string | null; city: string | null;
-  locality: string | null; address: string | null; hours: string | null; tagline: string | null;
+  locality: string | null; address: string | null; hours: string | null; tagline: string | null; phone?: string | null;
   products: DirectoryProduct[];
-  response?: ResponseStats | null;
 };
 const text = (value: unknown) => typeof value === 'string' ? value.trim().slice(0, 100) : '';
 const normalized = (value: string | null) => (value ?? '').trim().toLocaleLowerCase('en-IN');
@@ -29,15 +28,55 @@ export function directoryOptions(values: (string | null)[]) {
   for (const value of values) if (value?.trim()) unique.set(normalized(value), value.trim());
   return [...unique.values()].sort((a, b) => a.localeCompare(b));
 }
-export type ResponseStats = { responded: number; avg_minutes: number; quick_share: number };
-/** Shops have 15 minutes to answer a new pickup order; faster, consistent replies earn a higher rating. */
-export const RESPONSE_WINDOW_MINUTES = 15;
-export function responseRating(stats?: ResponseStats | null) {
-  if (!stats || stats.responded < 3) return null;
-  const m = Number(stats.avg_minutes);
-  let score = m <= 5 ? 5 : m <= 10 ? 4.5 : m <= 15 ? 4 : m <= 30 ? 3.5 : m <= 60 ? 3 : 2.5;
-  if (Number(stats.quick_share) < 0.5) score -= 0.5;
-  score = Math.max(1, score);
-  const time = m < 1 ? 'under a minute' : m < 60 ? `~${Math.round(m)} min` : `~${Math.round(m / 60)} hr`;
-  return { score, label: score >= 4.5 ? 'Super quick' : score >= 4 ? 'Quick to respond' : score >= 3 ? 'Responds' : 'Slow to respond', time, orders: stats.responded };
+export type Suggestion =
+  | { kind: 'product'; label: string; shops: number; minPrice: number }
+  | { kind: 'shop'; label: string; slug: string; locality: string | null; city: string | null; category: string | null }
+  | { kind: 'category'; label: string; shops: number };
+
+/** Only shops with at least one listed product appear to customers. */
+export function listedShops(shops: DirectoryShop[]) {
+  return shops.filter(shop => shop.products.length > 0);
+}
+
+/** Products in a shop matching every search term, best (exact-name, in-stock, cheapest) first. */
+export function matchingProducts(shop: DirectoryShop, q: string) {
+  const terms = normalized(q).split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  const needle = normalized(q);
+  return shop.products
+    .filter(p => { const hay = normalized(`${p.name} ${p.category ?? ''}`); return terms.every(t => hay.includes(t)); })
+    .sort((a, b) => Number(normalized(b.name) === needle) - Number(normalized(a.name) === needle) || Number(b.in_stock) - Number(a.in_stock) || a.price - b.price);
+}
+
+export function buildSuggestions(shops: DirectoryShop[], q: string, limit = 5): Suggestion[] {
+  const needle = normalized(q);
+  if (needle.length < 2) return [];
+  const products = new Map<string, { label: string; shops: Set<string>; minPrice: number }>();
+  const categories = new Map<string, { label: string; shops: Set<string> }>();
+  const shopHits: Suggestion[] = [];
+  for (const shop of listedShops(shops)) {
+    if (normalized(shop.public_name).includes(needle)) shopHits.push({ kind: 'shop', label: shop.public_name, slug: shop.slug, locality: shop.locality, city: shop.city, category: shop.category });
+    for (const p of shop.products) {
+      if (normalized(p.name).includes(needle)) {
+        const key = normalized(p.name);
+        const entry = products.get(key) ?? { label: p.name.trim(), shops: new Set(), minPrice: Infinity };
+        entry.shops.add(shop.id); entry.minPrice = Math.min(entry.minPrice, Number(p.price));
+        products.set(key, entry);
+      }
+    }
+    for (const c of [shop.category, ...shop.products.map(p => p.category)]) {
+      if (c && normalized(c).includes(needle)) {
+        const entry = categories.get(normalized(c)) ?? { label: c.trim(), shops: new Set() };
+        entry.shops.add(shop.id); categories.set(normalized(c), entry);
+      }
+    }
+  }
+  const starts = (s: string) => Number(normalized(s).startsWith(needle));
+  return [
+    ...[...products.values()].sort((a, b) => starts(b.label) - starts(a.label) || b.shops.size - a.shops.size).slice(0, limit)
+      .map(p => ({ kind: 'product' as const, label: p.label, shops: p.shops.size, minPrice: p.minPrice })),
+    ...shopHits.sort((a, b) => starts(b.label) - starts(a.label)).slice(0, limit),
+    ...[...categories.values()].sort((a, b) => b.shops.size - a.shops.size).slice(0, limit)
+      .map(c => ({ kind: 'category' as const, label: c.label, shops: c.shops.size })),
+  ];
 }
