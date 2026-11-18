@@ -1,8 +1,8 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 
-// Bundled with every deployment; the homepage never depends on a preview host.
-const heroShop = '/hero-local-shop.jpg';
+// Embedded in code so the homepage picture survives every export and deployment.
+import { heroLocalShopImage as heroShop } from './heroLocalShopImage';
 import {
   Sun, FileText, Receipt, Users, Truck, BarChart3, Package, Calculator,
   ArrowRight, CheckCircle2, IndianRupee, TrendingUp, Zap, ShieldCheck,
