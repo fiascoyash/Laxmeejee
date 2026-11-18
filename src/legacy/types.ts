@@ -427,7 +427,6 @@ export interface ProductCatalogItem {
   minStockAlert?: number;          // Minimum Stock Alert Level
   brand?: string;                 // Brand (optional)
   description?: string;           // Notes/Description
-  imagePath?: string;             // Private Storage photo reference, mirrored with the catalogue
   // Expiry Tracking Fields (optional)
   batchNumber?: string;
   manufacturingDate?: string;      // Format: YYYY-MM-DD

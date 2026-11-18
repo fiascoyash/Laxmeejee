@@ -32,18 +32,18 @@
 - [x] Verify live updates, compact layouts, and pickup recovery through GST invoice prefill; restore the checked order to Collected without saving an invoice.
 - [x] Run all 64 behavior checks and confirm the signed-in desktop/compact views, QR, and catalogue controls have no page errors.
 
-# Optional store connection
-- [ ] Open billing immediately without an account; keep local records and navigation unchanged.
-- [ ] Offer optional store sign-in/setup inside billing while preserving connected store controls.
-- [ ] Verify direct entry, dismissible sign-in, local billing and existing store behavior checks.
+## Customer ordering & shop response (done)
+- [x] Add products and place pickup orders straight from homepage search results
+- [x] Customer order tracking page (/track) with accepted / ready / collected steps
+- [x] 15-minute reply window for shops, reply timer in order queue, public response rating
 
-# Store catalogue, photos and navigation
-- [x] Fix reported photo and catalogue type errors; all 80 tests pass and the real public shop loads on desktop/mobile with working search.
-- [ ] Connect shop publishing to the billing catalogue and update existing online products.
-- [ ] Add optional photo uploads and store photos (blocked: database migration permission).
-- [ ] Save Google Maps locations (blocked: database migration permission); show address-based directions now.
-- [ ] Add storefront categories and product search; verify behavior and compact layouts.
+## Nickname checkout & tracking
+- [x] Playful nickname checkout with one Track Order button and saved active codes.
+- [x] Mobile + nickname recovery for active orders only, with limited guesses and no phone-only lookup.
+- [x] Validate Indian mobile numbers in guest checkout/tracking and normalize an optional +91 country code.
+- [x] Verify checkout, reload recovery, privacy failures, and tracking on desktop/mobile; cancel the test order and verify saved-code cleanup. All 88 checks pass.
 
-# Product-first search
-- [x] Hide shops with no listed products; rank shops by matching product and price.
-- [x] Live suggestions (products, shops, services) with keyboard navigation; comparison cards with View Store / Contact Shop.
+# Homepage resilience
+- [x] Bundle the original hero illustration with the site instead of depending on a preview URL.
+- [x] Keep the shared homepage visible when directory loading fails; show and verify an inline retry in the results area.
+- [x] Verify desktop/mobile artwork, layout, forced-outage recovery, hydration, all 81 checks, and a clean preview build.

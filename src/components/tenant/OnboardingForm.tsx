@@ -1,17 +1,16 @@
 import { useState } from "react";
-import { db as supabase } from "@/lib/db";
+import { supabase } from "@/integrations/supabase/client";
 import { slugify, isValidSlug } from "@/lib/slug";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function OnboardingForm({ onCreated, onSignOut, embedded = false }: { onCreated: () => void; onSignOut: () => void; embedded?: boolean }) {
+export function OnboardingForm({ onCreated, onSignOut }: { onCreated: () => void; onSignOut: () => void }) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [city, setCity] = useState("");
   const [locality, setLocality] = useState("");
-  const [phone, setPhone] = useState("");
   const [category, setCategory] = useState("Hardware & Electricals");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +25,7 @@ export function OnboardingForm({ onCreated, onSignOut, embedded = false }: { onC
     setBusy(true);
     setError(null);
     const { error } = await supabase.rpc("create_business", {
-      _public_name: name, _slug: finalSlug, _city: city, _locality: locality, _category: category, _phone: phone,
+      _public_name: name, _slug: finalSlug, _city: city, _locality: locality, _category: category,
     });
     setBusy(false);
     if (error) {
@@ -37,10 +36,10 @@ export function OnboardingForm({ onCreated, onSignOut, embedded = false }: { onC
   }
 
   return (
-    <div className={embedded ? "flex justify-center" : "flex min-h-screen items-center justify-center bg-muted px-4 py-8"}>
-      <form onSubmit={submit} className={embedded ? "w-full max-w-md space-y-3" : "w-full max-w-md space-y-3 rounded-xl border bg-card p-6 shadow-sm"}>
-        <h1 className="text-xl font-bold text-foreground">Set up your shop</h1>
-        <p className="text-sm text-muted-foreground">Your online store goes live as soon as you finish. You can change these details later.</p>
+    <div className="flex min-h-screen items-center justify-center bg-muted px-4 py-8">
+      <form onSubmit={submit} className="w-full max-w-md space-y-3 rounded-xl border bg-card p-6 shadow-sm">
+        <h1 className="text-xl font-bold text-foreground">Set up your business</h1>
+        <p className="text-sm text-muted-foreground">You can change these details later.</p>
         <div className="space-y-1">
           <Label htmlFor="bname">Shop name</Label>
           <Input id="bname" required minLength={2} value={name} onChange={(e) => setName(e.target.value)} />
@@ -63,15 +62,11 @@ export function OnboardingForm({ onCreated, onSignOut, embedded = false }: { onC
           </div>
         </div>
         <div className="space-y-1">
-          <Label htmlFor="bphone">Phone</Label>
-          <Input id="bphone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98765 43210" />
-        </div>
-        <div className="space-y-1">
           <Label htmlFor="bcat">Category</Label>
           <Input id="bcat" value={category} onChange={(e) => setCategory(e.target.value)} />
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="w-full" disabled={busy}>{busy ? "Creating…" : "Start business"}</Button>
+        <Button type="submit" className="w-full" disabled={busy}>{busy ? "Creating…" : "Create business"}</Button>
         <Button type="button" variant="ghost" className="w-full" onClick={onSignOut}>Sign out</Button>
       </form>
     </div>
