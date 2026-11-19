@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
-import { db as supabase } from "@/lib/db";
-import type { Tables } from "@/lib/db-types";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import { AuthScreen } from "./AuthScreen";
 import { OnboardingForm } from "./OnboardingForm";
 import { ShopSettings, type Business } from "./ShopSettings";
 import { PickupOrders } from "./PickupOrders";
 import { playChime } from "./orderAlerts";
-import { MerchantStoreProvider, StoreConnectionProvider, type ShopSettingsTab } from "./store-context";
-import { Button } from "@/components/ui/button";
-import { startSync, stopSync } from "@/lib/cloud-sync";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { MerchantStoreProvider, type ShopSettingsTab } from "./store-context";
 
 /** Mark a pickup order collected once its GST bill is saved (non-draft). */
 function useBilledOrders(enabled: boolean, onDone: () => void) {
@@ -43,7 +40,7 @@ function syncCompanyName(b: Business) {
   } catch { /* ignore */ }
 }
 
-/** Billing requires a signed-in merchant with a shop; first sign-in shows shop setup. */
+/** Owner sign-in + business setup in front of the billing app. Data isolation itself is enforced by database policies. */
 export function BusinessGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -59,30 +56,17 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   const [publishing, setPublishing] = useState(false);
   const [alert, setAlert] = useState<string | null>(null);
   const [ordersVersion, setOrdersVersion] = useState(0);
-  const [connectionOpen, setConnectionOpen] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [synced, setSynced] = useState<string | null>(null);
-  const [syncError, setSyncError] = useState(false);
-
-  const openConnection = useCallback(() => setConnectionOpen(true), []);
 
   useEffect(() => {
-    if (sessionStorage.getItem("hisaaboo:connect-store") === "1") {
-      sessionStorage.removeItem("hisaaboo:connect-store");
-      setConnectionOpen(true);
-    }
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     return () => data.subscription.unsubscribe();
   }, []);
 
   const loadBusiness = useCallback(async () => {
-    setConnectionError(null);
-    const { data: m, error: memberError } = await supabase.from("business_members").select("business_id").order("created_at").limit(1).maybeSingle();
-    if (memberError) { setConnectionError("Your online store could not be loaded. Please try again."); return; }
+    const { data: m } = await supabase.from("business_members").select("business_id").order("created_at").limit(1).maybeSingle();
     if (!m) return setBusiness(null);
-    const { data: b, error } = await supabase.from("businesses").select("*").eq("id", m.business_id).maybeSingle();
-    if (error) { setConnectionError("Your online store could not be loaded. Please try again."); return; }
+    const { data: b } = await supabase.from("businesses").select("*").eq("id", m.business_id).maybeSingle();
     if (b) syncCompanyName(b as Business);
     setBusiness((b as Business) ?? null);
   }, []);
@@ -90,18 +74,6 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (session) { setBusiness(undefined); loadBusiness(); } else setBusiness(undefined);
   }, [session?.user.id, loadBusiness]);
-
-  const userId = session?.user.id;
-  const runSync = useCallback(() => {
-    if (!userId) return;
-    setSyncError(false);
-    startSync(userId).then(() => setSynced(userId)).catch(() => setSyncError(true));
-  }, [userId]);
-  useEffect(() => { setSynced(null); runSync(); }, [runSync]);
-
-  useEffect(() => {
-    if (business) setConnectionOpen(false);
-  }, [business]);
 
   const businessId = business?.id;
   const bumpOrders = useCallback(() => setOrdersVersion((v) => v + 1), []);
@@ -154,13 +126,6 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await queryClient.cancelQueries();
     queryClient.clear();
-    setOrdersOpen(false);
-    setSettingsOpen(false);
-    setAlert(null);
-    setConnectionOpen(false);
-    setBusiness(undefined);
-    await stopSync();
-    setSynced(null);
     await supabase.auth.signOut();
   }, [queryClient]);
 
@@ -196,45 +161,18 @@ export function BusinessGate({ children }: { children: ReactNode }) {
     openShopSettings,
     togglePublish,
     signOut,
-    userEmail: session?.user.email ?? "",
     refreshStore: loadStore,
-  }) : null, [business, newOrders, activeOrders, publishedProducts, recentOrders, ordersVersion, storeError, publishing, openOrders, openShopSettings, togglePublish, signOut, loadStore, session?.user.email]);
+  }) : null, [business, newOrders, activeOrders, publishedProducts, recentOrders, ordersVersion, storeError, publishing, openOrders, openShopSettings, togglePublish, signOut, loadStore]);
 
-  if (session === undefined) return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Checking account…</div>;
+  if (session === undefined) return <div className="min-h-screen" />;
   if (!session) return <AuthScreen />;
-  if (connectionError) return (
-    <div role="alert" className="flex min-h-screen flex-col items-center justify-center gap-3 px-4 text-center">
-      <p>{connectionError}</p>
-      <div className="flex gap-2"><Button onClick={() => void loadBusiness()}>Retry</Button><Button variant="ghost" onClick={() => void signOut()}>Sign out</Button></div>
-    </div>
-  );
-  if (business === undefined) return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Loading your shop…</div>;
-  if (syncError) return (
-    <div role="alert" className="flex min-h-screen flex-col items-center justify-center gap-3 px-4 text-center">
-      <p>Your saved bills could not be loaded. Please check your internet and try again.</p>
-      <div className="flex gap-2"><Button onClick={runSync}>Retry</Button><Button variant="ghost" onClick={() => void signOut()}>Sign out</Button></div>
-    </div>
-  );
-  if (synced !== session.user.id) return <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">Loading your saved bills…</div>;
-  if (business === null) return <OnboardingForm onCreated={loadBusiness} onSignOut={signOut} />;
+  if (business === undefined) return <div className="min-h-screen" />;
+  if (!business || !storeValue) return <OnboardingForm onCreated={loadBusiness} onSignOut={signOut} />;
 
   return (
-    <StoreConnectionProvider value={{ openConnection, connecting: session === undefined || (!!session && business === undefined && !connectionError) }}>
     <MerchantStoreProvider value={storeValue}>
       {children}
-      <Dialog open={connectionOpen && !business} onOpenChange={setConnectionOpen}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
-          <DialogTitle>Connect online store</DialogTitle>
-          <DialogDescription>Store account</DialogDescription>
-          {session === undefined ? <p role="status">Checking account…</p>
-            : !session ? <AuthScreen embedded />
-            : connectionError ? <div role="alert"><p>{connectionError}</p><Button onClick={() => void loadBusiness()}>Retry</Button></div>
-            : business === undefined ? <p role="status">Loading store…</p>
-            : <OnboardingForm embedded onCreated={loadBusiness} onSignOut={signOut} />}
-          <Button variant="ghost" onClick={() => setConnectionOpen(false)}>Continue billing</Button>
-        </DialogContent>
-      </Dialog>
-      {ordersOpen && business && <PickupOrders businessId={business.id} version={ordersVersion} onClose={() => setOrdersOpen(false)} />}
+      {ordersOpen && <PickupOrders businessId={business.id} version={ordersVersion} onClose={() => setOrdersOpen(false)} />}
       {alert && (
         <div role="alert" className="fixed right-3 top-3 z-[80] max-w-sm rounded-lg border border-primary bg-card p-4 text-sm text-card-foreground shadow-xl">
           <p className="font-semibold">🔔 {alert}</p>
@@ -244,7 +182,7 @@ export function BusinessGate({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
-      {settingsOpen && business && (
+      {settingsOpen && (
         <ShopSettings
           business={business}
           initialTab={settingsTab}
@@ -254,6 +192,5 @@ export function BusinessGate({ children }: { children: ReactNode }) {
         />
       )}
     </MerchantStoreProvider>
-    </StoreConnectionProvider>
   );
 }

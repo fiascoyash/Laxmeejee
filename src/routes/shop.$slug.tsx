@@ -1,19 +1,17 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/db-types";
+import type { Database } from "@/integrations/supabase/types";
 import { useCart, QtyControl, PickupCheckout } from "@/components/tenant/PickupCart";
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { MapPin, Search } from 'lucide-react';
-import { directionsUrl, filterShopProducts } from '@/lib/shop-catalogue';
-import { ProductPhoto } from '@/components/tenant/ProductPhoto';
+import { ResponseBadge } from "@/components/tenant/ResponseBadge";
+import type { ResponseStats } from "@/lib/discovery";
+import { SavedPickupOrders } from '@/components/tenant/SavedPickupOrders';
 
 type PublicShop = {
   slug: string; public_name: string; category: string | null; city: string | null;
   locality: string | null; address: string | null; phone: string | null; hours: string | null; tagline: string | null;
-  maps_url?: string | null;
-  products: { product_id: string; name: string; category: string | null; unit: string | null; price: number; description: string | null; in_stock: boolean; image_path?: string | null }[];
+  response: ResponseStats | null;
+  products: { product_id: string; name: string; category: string | null; unit: string | null; price: number; description: string | null; in_stock: boolean }[];
 };
 
 const getPublicShop = createServerFn({ method: "GET" })
@@ -41,18 +39,14 @@ const getPublicShop = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return null;
-    const { data: products, error: productsError } = await supabase.from("shop_products")
+    const { data: products } = await supabase.from("shop_products")
       .select("product_id, name, category, unit, price, description, in_stock")
       .eq("business_id", data.id).order("category").order("name");
-    if (productsError) throw new Error(productsError.message);
-    // Optional columns can be enabled independently without breaking existing shops.
-    const [{ data: location }, { data: photos }] = await Promise.all([
-      supabase.from('businesses').select('maps_url').eq('id', data.id).maybeSingle(),
-      supabase.from('shop_products').select('product_id,image_path').eq('business_id', data.id),
-    ]);
-    const images = new Map((photos ?? []).map(p => [p.product_id, p.image_path]));
+    const { data: stats } = await supabase.rpc("shop_response_stats");
+    const st = (stats ?? []).find((r) => r.business_id === data.id);
+    const response = st ? { responded: st.responded, avg_minutes: Number(st.avg_minutes), quick_share: Number(st.quick_share) } : null;
     const { id: _id, ...shop } = data;
-    return { ...shop, maps_url: location?.maps_url ?? null, products: (products ?? []).map(p => ({ ...p, image_path: images.get(p.product_id) ?? null })) } as PublicShop;
+    return { ...shop, response, products: products ?? [] } as PublicShop;
   });
 
 export const Route = createFileRoute("/shop/$slug")({
@@ -92,50 +86,41 @@ export const Route = createFileRoute("/shop/$slug")({
 function ShopPage() {
   const shop = Route.useLoaderData();
   const cart = useCart();
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('');
-  const categories = [...new Set(shop.products.map(p => p.category?.trim() || 'Other'))].sort();
-  const shown = filterShopProducts(shop.products, query, category);
-  const directions = directionsUrl(shop);
   const place = [shop.locality, shop.city].filter(Boolean).join(", ");
   return (
     <main className="min-h-screen bg-muted px-4 py-10">
-      <div className="mx-auto max-w-4xl text-foreground">
+      <div className="mx-auto max-w-xl rounded-xl border bg-card p-6 shadow-sm">
         {shop.category && <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{shop.category}</p>}
         <h1 className="mt-1 text-3xl font-bold text-foreground">{shop.public_name}</h1>
         {shop.tagline && <p className="mt-2 text-foreground">{shop.tagline}</p>}
         {place && <p className="mt-1 text-muted-foreground">{place}</p>}
+        <ResponseBadge stats={shop.response} className="mt-3" />
         <dl className="mt-6 space-y-3 text-sm">
           {shop.address && (<div><dt className="font-medium text-foreground">Address</dt><dd className="text-muted-foreground">{shop.address}</dd></div>)}
           {shop.hours && (<div><dt className="font-medium text-foreground">Timings</dt><dd className="text-muted-foreground">{shop.hours}</dd></div>)}
           {shop.phone && (<div><dt className="font-medium text-foreground">Phone</dt><dd><a className="text-primary hover:underline" href={`tel:${shop.phone}`}>{shop.phone}</a></dd></div>)}
         </dl>
-        {directions && <Button asChild variant="outline" className="mt-4"><a href={directions} target="_blank" rel="noopener noreferrer"><MapPin />Directions on Google Maps</a></Button>}
         <h2 className="mt-8 text-lg font-semibold text-foreground">Products</h2>
-        {shop.products.length > 0 && <div className="mt-3 space-y-3">
-          <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input aria-label="Search store products" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search products" className="h-10 w-full rounded-md border bg-background pl-10 pr-3 text-sm" /></div>
-          <label className="block text-sm font-medium">Category<select aria-label="Product category" value={category} onChange={e => setCategory(e.target.value)} className="mt-1 h-10 w-full rounded-md border bg-background px-3 sm:w-64"><option value="">All categories</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></label>
-        </div>}
+        <SavedPickupOrders />
         {shop.products.length === 0 ? (
           <p className="mt-2 rounded-lg bg-muted p-3 text-sm text-muted-foreground">Products will appear here soon.</p>
         ) : (
-          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-            {shown.map((p) => (
-              <li key={p.product_id} className="flex min-w-0 items-start gap-3 rounded-lg border bg-card p-3">
-                <ProductPhoto path={p.image_path} name={p.name} className="h-20 w-20" />
-                <div className="min-w-0 flex-1">
-                  <p className="break-words font-medium text-foreground">{p.name}</p>
+          <ul className="mt-3 divide-y rounded-lg border">
+            {shop.products.map((p) => (
+              <li key={p.product_id} className="flex items-start justify-between gap-3 p-3">
+                <div>
+                  <p className="font-medium text-foreground">{p.name}</p>
                   {(p.category || p.description) && <p className="text-xs text-muted-foreground">{[p.category, p.description].filter(Boolean).join(" · ")}</p>}
                   {!p.in_stock && <p className="text-xs text-destructive">Out of stock</p>}
-                  <p className="mt-2 break-words font-semibold text-foreground">₹{Number(p.price).toLocaleString("en-IN")}{p.unit ? <span className="text-xs font-normal text-muted-foreground"> /{p.unit}</span> : null}</p>
                   <QtyControl p={p} cart={cart} />
                 </div>
+                <p className="whitespace-nowrap font-semibold text-foreground">₹{Number(p.price).toLocaleString("en-IN")}{p.unit ? <span className="text-xs font-normal text-muted-foreground"> /{p.unit}</span> : null}</p>
               </li>
             ))}
           </ul>
         )}
-        {shop.products.length > 0 && shown.length === 0 && <div className="py-8 text-center"><p className="text-muted-foreground">No matching products.</p><Button variant="ghost" onClick={() => { setQuery(''); setCategory(''); }}>Clear filters</Button></div>}
         <PickupCheckout slug={shop.slug} products={shop.products} cart={cart} />
+        <p className="mt-6 text-xs text-muted-foreground">Prices shown by the shop. Tap Add to order for pickup at the store.</p>
       </div>
     </main>
   );

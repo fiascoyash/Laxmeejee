@@ -13,7 +13,6 @@ import {
 import { BulkImportModal } from './BulkImportModal';
 import { AddExistingStockModal } from './AddExistingStockModal';
 import { ProductLedgerModal } from './ProductLedgerModal';
-import { ProductPhotoEditor } from '@/components/tenant/ProductPhotoEditor';
 
 interface Props {
   catalog: ProductCatalogItem[];
@@ -25,7 +24,6 @@ interface Props {
 export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }: Props) {
   const [editing, setEditing] = useState<ProductCatalogItem | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [photoBusy, setPhotoBusy] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [showAddStock, setShowAddStock] = useState(false);
   const [addingStockProduct, setAddingStockProduct] = useState<ProductCatalogItem | null>(null);
@@ -154,7 +152,7 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
   };
 
   const handleSave = () => {
-    if (!editing || photoBusy) return;
+    if (!editing) return;
     if (!editing.name.trim()) {
       alert('Please enter a product name');
       return;
@@ -938,8 +936,6 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
                 </div>
               </div>
 
-              <ProductPhotoEditor key={editing.id || 'new'} path={editing.imagePath} name={editing.name} onChange={path => setEditing(current => current ? { ...current, imagePath: path } : current)} onBusy={setPhotoBusy} />
-
               {/* Industry-Specific Fields */}
               <div className="border-t border-slate-200 pt-4">
                 <h4 className="text-sm font-medium text-slate-700 mb-3">Industry-Specific Details</h4>
@@ -1069,7 +1065,6 @@ export function ProductCatalog({ catalog, onSave, businessType, suppliers = [] }
               </button>
               <button
                 onClick={handleSave}
-                disabled={photoBusy}
                 className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
