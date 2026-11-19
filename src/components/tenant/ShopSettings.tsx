@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { supabase } from "@/integrations/supabase/client";
+import { STORE_THEMES, storeThemeStyle } from "@/lib/store-themes";
 
 export type Business = {
   id: string; slug: string; public_name: string; is_published: boolean;
   category: string | null; city: string | null; locality: string | null;
   address: string | null; phone: string | null; hours: string | null; tagline: string | null;
+  accent_color?: string | null;
 };
 
 type CatalogItem = { id: string; name: string; category?: string; unit?: string; sellingPrice?: number; description?: string; stockQuantity?: number };
@@ -18,12 +20,12 @@ const input = "w-full rounded-md border bg-background px-3 py-2 text-sm text-for
 
 export function ShopSettings({ business, initialTab = "profile", onClose, onSaved, onCatalogueUpdated }: {
   business: Business;
-  initialTab?: "profile" | "catalogue" | "qr";
+  initialTab?: "profile" | "catalogue" | "look" | "qr";
   onClose: () => void;
   onSaved: (b: Business) => void;
   onCatalogueUpdated?: (count: number) => void;
 }) {
-  const [tab, setTab] = useState<"profile" | "catalogue" | "qr">(initialTab);
+  const [tab, setTab] = useState<"profile" | "catalogue" | "look" | "qr">(initialTab);
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/40 p-3" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="shop-settings-title" className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border bg-card text-card-foreground shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -32,16 +34,17 @@ export function ShopSettings({ business, initialTab = "profile", onClose, onSave
           <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">✕</button>
         </div>
         <div className="flex gap-1 border-b px-4 pt-2 text-sm">
-          {(["profile", "catalogue", "qr"] as const).map((t) => (
+          {(["profile", "catalogue", "look", "qr"] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)}
               className={`rounded-t-md px-3 py-2 ${tab === t ? "border-b-2 border-primary font-medium text-foreground" : "text-muted-foreground"}`}>
-              {t === "profile" ? "Shop profile" : t === "catalogue" ? "Online catalogue" : "Counter QR"}
+              {t === "profile" ? "Shop profile" : t === "catalogue" ? "Online catalogue" : t === "look" ? "Photos & colours" : "Counter QR"}
             </button>
           ))}
         </div>
         <div className="overflow-y-auto p-4">
           {tab === "profile" && <ProfileTab business={business} onSaved={onSaved} />}
           {tab === "catalogue" && <CatalogueTab business={business} onUpdated={onCatalogueUpdated} />}
+          {tab === "look" && <LookTab business={business} onSaved={onSaved} />}
           {tab === "qr" && <QrTab business={business} />}
         </div>
       </div>
@@ -179,6 +182,139 @@ function QrTab({ business }: { business: Business }) {
         <a href={src} download={`${business.slug}-qr.png`} className="rounded-md border px-4 py-2 text-sm">Download</a>
         <button type="button" onClick={print} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Print counter standee</button>
       </div>
+    </div>
+  );
+}
+
+type ShopRow = { product_id: string; name: string; price: number; category: string | null; image_path: string | null };
+
+function LookTab({ business, onSaved }: { business: Business; onSaved: (b: Business) => void }) {
+  const saved = business.accent_color || "amber";
+  const [accent, setAccent] = useState(saved);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [rows, setRows] = useState<ShopRow[] | null>(null);
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [photoMsg, setPhotoMsg] = useState("");
+
+  async function loadRows() {
+    const { data } = await supabase.from("shop_products").select("product_id, name, price, category, image_path").eq("business_id", business.id).order("name");
+    const list = (data ?? []) as ShopRow[];
+    setRows(list);
+    const paths = list.map((r) => r.image_path).filter((p): p is string => !!p);
+    if (paths.length) {
+      const { data: signed } = await supabase.storage.from("product-photos").createSignedUrls(paths, 3600);
+      const m: Record<string, string> = {};
+      for (const r of list) { const s = signed?.find((x) => x.path === r.image_path); if (s?.signedUrl) m[r.product_id] = s.signedUrl; }
+      setThumbs(m);
+    }
+  }
+  useEffect(() => { void loadRows(); }, [business.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function saveAccent() {
+    setBusy(true); setMsg("");
+    const { data, error } = await supabase.from("businesses").update({ accent_color: accent, updated_at: new Date().toISOString() }).eq("id", business.id).select("*").single();
+    setBusy(false);
+    if (error) return setMsg("Could not save: " + error.message);
+    onSaved(data as Business); setMsg("Colour saved. Your shop page now uses it.");
+  }
+
+  async function upload(row: ShopRow, file: File) {
+    setPhotoMsg("");
+    if (!file.type.startsWith("image/")) return setPhotoMsg("Please choose a photo file.");
+    if (file.size > 5 * 1024 * 1024) return setPhotoMsg("Photo must be smaller than 5 MB.");
+    setUploading(row.product_id);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const path = `${business.id}/${row.product_id.replace(/[^a-zA-Z0-9_-]/g, "_")}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("product-photos").upload(path, file, { contentType: file.type });
+    if (!error) {
+      const { error: e2 } = await supabase.from("shop_products").update({ image_path: path }).eq("business_id", business.id).eq("product_id", row.product_id);
+      if (!e2 && row.image_path) await supabase.storage.from("product-photos").remove([row.image_path]);
+      if (e2) setPhotoMsg("Could not save photo: " + e2.message);
+    } else setPhotoMsg("Could not upload: " + error.message);
+    setUploading(null);
+    await loadRows();
+  }
+
+  async function removePhoto(row: ShopRow) {
+    if (!row.image_path) return;
+    setUploading(row.product_id);
+    await supabase.from("shop_products").update({ image_path: null }).eq("business_id", business.id).eq("product_id", row.product_id);
+    await supabase.storage.from("product-photos").remove([row.image_path]);
+    setUploading(null);
+    await loadRows();
+  }
+
+  const preview = rows?.slice(0, 2) ?? [];
+  return (
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h3 className="font-semibold">Shop page colour</h3>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {STORE_THEMES.map((t) => (
+            <button key={t.id} type="button" onClick={() => setAccent(t.id)} aria-pressed={accent === t.id}
+              className={`rounded-lg border p-2 text-xs font-medium transition-all ${accent === t.id ? "border-primary ring-2 ring-primary" : "hover:border-foreground/40"}`}>
+              <span className="mb-1 block h-8 rounded-md" style={{ ...storeThemeStyle(t.id), backgroundImage: "var(--gradient-store-hero)" }} />
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">Preview (not saved yet)</p>
+        <div className="overflow-hidden rounded-xl border bg-store-surface" style={storeThemeStyle(accent)}>
+          <div className="flex items-center gap-3 p-4" style={{ backgroundImage: "var(--gradient-store-hero)" }}>
+            <span className="flex h-12 w-12 -rotate-3 items-center justify-center rounded-2xl bg-store-deep text-xl font-black text-store-deep-foreground shadow-store-lift">{business.public_name.charAt(0).toUpperCase()}</span>
+            <div className="min-w-0 text-store-foreground">
+              <p className="truncate text-lg font-black">{business.public_name}</p>
+              {business.tagline && <p className="truncate text-xs opacity-80">{business.tagline}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 p-3">
+            {(preview.length ? preview : [{ product_id: "a", name: "Sample item", price: 99 } as ShopRow]).map((p) => (
+              <div key={p.product_id} className="rounded-xl bg-background p-2 shadow-store-card">
+                <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-store-surface text-2xl font-black text-store-foreground/30">
+                  {thumbs[p.product_id] ? <img src={thumbs[p.product_id]} alt="" className="h-full w-full object-cover" /> : p.name.charAt(0)}
+                </div>
+                <p className="mt-1 truncate text-xs font-semibold text-foreground">{p.name}</p>
+                <div className="flex items-center justify-between"><span className="text-sm font-black text-foreground">₹{Number(p.price).toLocaleString("en-IN")}</span><span className="rounded-md bg-store-deep px-2 py-0.5 text-[10px] font-bold text-store-deep-foreground">ADD</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="button" disabled={busy || accent === saved} onClick={saveAccent} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60">{busy ? "Saving…" : "Save colour"}</button>
+          {accent !== saved && <button type="button" onClick={() => setAccent(saved)} className="text-sm text-muted-foreground">Undo</button>}
+          {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="font-semibold">Product photos</h3>
+        {rows === null ? <p className="text-sm text-muted-foreground">Loading…</p>
+          : rows.length === 0 ? <p className="text-sm text-muted-foreground">Put products on your shop page first (Online catalogue tab), then add their photos here.</p>
+          : (
+          <ul className="divide-y rounded-md border">
+            {rows.map((r) => (
+              <li key={r.product_id} className="flex items-center gap-3 p-2 text-sm">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted font-bold text-muted-foreground">
+                  {thumbs[r.product_id] && r.image_path ? <img src={thumbs[r.product_id]} alt="" className="h-full w-full object-cover" /> : r.name.charAt(0)}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                {uploading === r.product_id ? <span className="text-xs text-muted-foreground">Uploading…</span> : (
+                  <>
+                    <label className="cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                      {r.image_path ? "Change" : "Add photo"}
+                      <input type="file" accept="image/*" className="sr-only" aria-label={`Photo for ${r.name}`} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(r, f); }} />
+                    </label>
+                    {r.image_path && <button type="button" onClick={() => removePhoto(r)} className="text-xs text-destructive">Remove</button>}
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {photoMsg && <p className="text-sm text-destructive">{photoMsg}</p>}
+      </section>
     </div>
   );
 }

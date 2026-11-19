@@ -478,3 +478,24 @@
 /* Inline validation */
 .hb-field-invalid { border-color: var(--color-red-400, #f87171) !important; box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-red-400, #f87171) 18%, transparent) !important; }
 .hb-inline-error { margin-top: 0.25rem; font-size: 0.75rem; color: var(--color-red-600, #dc2626); animation: hs-fade-in 0.18s ease-out both; }
+
+/* Storefront (public shop page) — quick-commerce palette */
+:root {
+  --store: oklch(0.86 0.17 92);
+  --store-foreground: oklch(0.22 0.04 60);
+  --store-deep: oklch(0.52 0.15 150);
+  --store-deep-foreground: oklch(0.98 0.01 150);
+  --store-surface: oklch(0.975 0.012 95);
+  --shadow-store-card: 0 1px 0 oklch(0.9 0.02 95), 0 14px 28px -18px oklch(0.35 0.08 70 / 0.45);
+  --shadow-store-lift: 0 2px 0 oklch(0.9 0.02 95), 0 24px 40px -20px oklch(0.35 0.08 70 / 0.55);
+  --gradient-store-hero: radial-gradient(120% 90% at 85% 0%, oklch(0.93 0.14 100) 0%, transparent 55%), linear-gradient(135deg, oklch(0.86 0.17 92), oklch(0.8 0.17 75));
+}
+@theme inline {
+  --color-store: var(--store);
+  --color-store-foreground: var(--store-foreground);
+  --color-store-deep: var(--store-deep);
+  --color-store-deep-foreground: var(--store-deep-foreground);
+  --color-store-surface: var(--store-surface);
+  --shadow-store-card: var(--shadow-store-card);
+  --shadow-store-lift: var(--shadow-store-lift);
+}

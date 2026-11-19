@@ -45,6 +45,7 @@ export type Database = {
       }
       businesses: {
         Row: {
+          accent_color: string
           address: string | null
           category: string | null
           city: string | null
@@ -60,6 +61,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accent_color?: string
           address?: string | null
           category?: string | null
           city?: string | null
@@ -75,6 +77,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accent_color?: string
           address?: string | null
           category?: string | null
           city?: string | null
@@ -391,6 +394,7 @@ export type Database = {
           business_id: string
           category: string | null
           description: string | null
+          image_path: string | null
           in_stock: boolean
           name: string
           price: number
@@ -402,6 +406,7 @@ export type Database = {
           business_id?: string
           category?: string | null
           description?: string | null
+          image_path?: string | null
           in_stock?: boolean
           name: string
           price?: number
@@ -413,6 +418,7 @@ export type Database = {
           business_id?: string
           category?: string | null
           description?: string | null
+          image_path?: string | null
           in_stock?: boolean
           name?: string
           price?: number
