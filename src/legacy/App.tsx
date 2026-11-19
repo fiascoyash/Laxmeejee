@@ -6,6 +6,7 @@ import { Link } from '@tanstack/react-router';
 import { normalizeDiscovery } from '@/lib/discovery';
 import { getBillingView, type BillingView } from '@/lib/billing-navigation';
 import { useMerchantStore } from '@/components/tenant/store-context';
+import { AccountCard } from '@/components/tenant/AccountCard';
 import { SaveSuccessOverlay, SaveSuccessInfo } from './components/SaveSuccessOverlay';
 import { useEscapeStack } from './hooks/useEscapeStack';
 import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment, DEFAULT_TEMPLATE_SETTINGS } from './types';
@@ -38,7 +39,7 @@ import { PaymentModal } from './components/PaymentModal';
 import { PaymentDecisionModal, PaymentDecision } from './components/PaymentDecisionModal';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { isValidMobile, isValidGstin } from './utils/validation';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck, FileMinus, Store, BellRing, QrCode, LogOut } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck, FileMinus, Store, BellRing, QrCode } from 'lucide-react';
 import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog';
 import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
 import { PrintCenter } from './components/PrintCenter';
@@ -1703,18 +1704,7 @@ function App() {
         </nav>
 
         <div className="p-4 border-t border-slate-700">
-          {merchantStore && (
-            <button
-              type="button"
-              onClick={() => { setSidebarOpen(false); void merchantStore.signOut(); }}
-              aria-label="Sign out"
-              title={desktopSidebarCollapsed ? 'Sign out' : undefined}
-              className={`mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-primary-foreground/70 transition-colors hover:bg-primary/20 hover:text-primary-foreground ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}`}
-            >
-              <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className={desktopSidebarCollapsed ? 'lg:hidden' : ''}>Sign out</span>
-            </button>
-          )}
+          {merchantStore && <AccountCard collapsed={desktopSidebarCollapsed} onNavigate={() => setSidebarOpen(false)} />}
           <button
             onClick={() => setShowShortcutsModal(true)}
             aria-label="Keyboard Shortcuts"
