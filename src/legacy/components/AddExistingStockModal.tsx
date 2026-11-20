@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Save, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { db as supabase } from "@/lib/db";
 import { ProductCatalogItem, SupplierData } from '../types';
 import { todayLocal, validateStock, prepareStockPurchase, commitStockPurchase } from '../utils/addStock';
 

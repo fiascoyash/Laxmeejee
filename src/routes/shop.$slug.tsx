@@ -1,20 +1,19 @@
-import { useMemo, useState } from "react";
-import { storeThemeStyle } from "@/lib/store-themes";
-import { Search, ShoppingBag } from "lucide-react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "@/lib/db-types";
 import { useCart, QtyControl, PickupCheckout } from "@/components/tenant/PickupCart";
-import { ResponseBadge } from "@/components/tenant/ResponseBadge";
-import type { ResponseStats } from "@/lib/discovery";
-import { SavedPickupOrders } from '@/components/tenant/SavedPickupOrders';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { MapPin, Search } from 'lucide-react';
+import { directionsUrl, filterShopProducts } from '@/lib/shop-catalogue';
+import { ProductPhoto } from '@/components/tenant/ProductPhoto';
 
 type PublicShop = {
   slug: string; public_name: string; category: string | null; city: string | null;
-  locality: string | null; address: string | null; phone: string | null; hours: string | null; tagline: string | null; accent_color: string | null;
-  response: ResponseStats | null;
-  products: { product_id: string; name: string; category: string | null; unit: string | null; price: number; description: string | null; in_stock: boolean; image_url: string | null }[];
+  locality: string | null; address: string | null; phone: string | null; hours: string | null; tagline: string | null;
+  maps_url?: string | null;
+  products: { product_id: string; name: string; category: string | null; unit: string | null; price: number; description: string | null; in_stock: boolean; image_path?: string | null }[];
 };
 
 const getPublicShop = createServerFn({ method: "GET" })
@@ -36,32 +35,24 @@ const getPublicShop = createServerFn({ method: "GET" })
     });
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, slug, public_name, category, city, locality, address, phone, hours, tagline, accent_color")
+      .select("id, slug, public_name, category, city, locality, address, phone, hours, tagline")
       .eq("slug", slug)
       .eq("is_published", true)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return null;
-    const { data: products } = await supabase.from("shop_products")
-      .select("product_id, name, category, unit, price, description, in_stock, image_path")
+    const { data: products, error: productsError } = await supabase.from("shop_products")
+      .select("product_id, name, category, unit, price, description, in_stock")
       .eq("business_id", data.id).order("category").order("name");
-    const { data: stats } = await supabase.rpc("shop_response_stats").then((r) => r, () => ({ data: null }));
-    const st = (stats ?? []).find((r) => r.business_id === data.id);
-    const response = st ? { responded: st.responded, avg_minutes: Number(st.avg_minutes), quick_share: Number(st.quick_share) } : null;
-    const paths = (products ?? []).map((p) => p.image_path).filter((p): p is string => !!p);
-    const urls = new Map<string, string>();
-    if (paths.length) {
-      // Photos are optional: never let a photo problem break the shop page.
-      try {
-        const { data: signed } = await supabase.storage.from("product-photos").createSignedUrls(paths, 60 * 60 * 24);
-        for (const s of signed ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
-      } catch (e) {
-        console.error("Product photos unavailable", e);
-      }
-    }
-    const list = (products ?? []).map(({ image_path, ...p }) => ({ ...p, image_url: image_path ? urls.get(image_path) ?? null : null }));
+    if (productsError) throw new Error(productsError.message);
+    // Optional columns can be enabled independently without breaking existing shops.
+    const [{ data: location }, { data: photos }] = await Promise.all([
+      supabase.from('businesses').select('maps_url').eq('id', data.id).maybeSingle(),
+      supabase.from('shop_products').select('product_id,image_path').eq('business_id', data.id),
+    ]);
+    const images = new Map((photos ?? []).map(p => [p.product_id, p.image_path]));
     const { id: _id, ...shop } = data;
-    return { ...shop, response, products: list } as PublicShop;
+    return { ...shop, maps_url: location?.maps_url ?? null, products: (products ?? []).map(p => ({ ...p, image_path: images.get(p.product_id) ?? null })) } as PublicShop;
   });
 
 export const Route = createFileRoute("/shop/$slug")({
@@ -101,121 +92,51 @@ export const Route = createFileRoute("/shop/$slug")({
 function ShopPage() {
   const shop = Route.useLoaderData();
   const cart = useCart();
-  const [query, setQuery] = useState("");
-  const [active, setActive] = useState("All");
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('');
+  const categories = [...new Set(shop.products.map(p => p.category?.trim() || 'Other'))].sort();
+  const shown = filterShopProducts(shop.products, query, category);
+  const directions = directionsUrl(shop);
   const place = [shop.locality, shop.city].filter(Boolean).join(", ");
-  const initial = shop.public_name.trim().charAt(0).toUpperCase();
-
-  const categories = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of shop.products) { const c = p.category?.trim() || "Other"; m.set(c, (m.get(c) ?? 0) + 1); }
-    return [["All", shop.products.length] as const, ...[...m.entries()].sort((a, b) => b[1] - a[1])];
-  }, [shop.products]);
-
-  const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = shop.products.filter((p) => {
-      const c = p.category?.trim() || "Other";
-      if (active !== "All" && c !== active) return false;
-      return !q || `${p.name} ${c} ${p.description ?? ""}`.toLowerCase().includes(q);
-    });
-    const m = new Map<string, typeof list>();
-    for (const p of list) { const c = p.category?.trim() || "Other"; m.set(c, [...(m.get(c) ?? []), p]); }
-    return [...m.entries()];
-  }, [shop.products, query, active]);
-
-  const count = Object.values(cart.qty).reduce((s, n) => s + (n ?? 0), 0);
-  const total = shop.products.reduce((s, p) => s + Number(p.price) * (cart.qty[p.product_id] ?? 0), 0);
-
   return (
-    <main className="min-h-screen bg-store-surface pb-28" style={storeThemeStyle(shop.accent_color)}>
-      <header className="relative overflow-hidden pb-16 pt-8" style={{ backgroundImage: "var(--gradient-store-hero)" }}>
-        <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full border-[28px] border-store-foreground/10" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rotate-12 rounded-[2.5rem] bg-store-foreground/5" />
-        <div className="relative mx-auto max-w-5xl px-4">
-          <a href="/" className="inline-flex items-center gap-1 rounded-full bg-background/70 px-3 py-1 text-xs font-semibold text-store-foreground backdrop-blur hover:bg-background">← All shops</a>
-          <div className="mt-6 flex items-end gap-4">
-            <div className="flex h-20 w-20 shrink-0 -rotate-3 items-center justify-center rounded-3xl bg-store-deep text-4xl font-black text-store-deep-foreground shadow-store-lift sm:h-24 sm:w-24">{initial}</div>
-            <div className="min-w-0 text-store-foreground">
-              {shop.category && <p className="text-xs font-bold uppercase tracking-[0.18em] opacity-70">{shop.category}</p>}
-              <h1 className="truncate text-3xl font-black tracking-tight sm:text-5xl">{shop.public_name}</h1>
-              {shop.tagline && <p className="mt-1 text-sm font-medium opacity-80 sm:text-base">{shop.tagline}</p>}
-            </div>
-          </div>
-          <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-semibold text-store-foreground">
-            <span className="rounded-full bg-background px-3 py-1.5 shadow-store-card"><ResponseBadge stats={shop.response} /></span>
-            {place && <span className="rounded-full bg-background/80 px-3 py-1.5">📍 {place}</span>}
-            {shop.hours && <span className="rounded-full bg-background/80 px-3 py-1.5">🕒 {shop.hours}</span>}
-            {shop.phone && <a href={`tel:${shop.phone}`} className="rounded-full bg-store-deep px-3 py-1.5 text-store-deep-foreground hover:opacity-90">📞 Call shop</a>}
-          </div>
-        </div>
-      </header>
-
-      <div className="sticky top-0 z-20 -mt-8 px-4">
-        <div className="mx-auto max-w-5xl rounded-2xl bg-background p-3 shadow-store-lift">
-          <label className="flex items-center gap-2 rounded-xl bg-muted px-3">
-            <Search className="h-4 w-4 text-muted-foreground" aria-hidden />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search in ${shop.public_name}…`} aria-label="Search products" className="h-11 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
-          </label>
-          {shop.products.length > 0 && (
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" role="tablist" aria-label="Categories">
-              {categories.map(([c, n]) => (
-                <button key={c} type="button" role="tab" aria-selected={active === c} onClick={() => setActive(c)}
-                  className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold transition-all ${active === c ? "border-store-deep bg-store-deep text-store-deep-foreground shadow-store-card" : "border-border bg-background text-foreground hover:-translate-y-0.5 hover:border-store-deep"}`}>
-                  {c} <span className="ml-1 opacity-70">{n}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="mx-auto mt-6 max-w-5xl px-4">
-        <SavedPickupOrders />
+    <main className="min-h-screen bg-muted px-4 py-10">
+      <div className="mx-auto max-w-4xl text-foreground">
+        {shop.category && <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{shop.category}</p>}
+        <h1 className="mt-1 text-3xl font-bold text-foreground">{shop.public_name}</h1>
+        {shop.tagline && <p className="mt-2 text-foreground">{shop.tagline}</p>}
+        {place && <p className="mt-1 text-muted-foreground">{place}</p>}
+        <dl className="mt-6 space-y-3 text-sm">
+          {shop.address && (<div><dt className="font-medium text-foreground">Address</dt><dd className="text-muted-foreground">{shop.address}</dd></div>)}
+          {shop.hours && (<div><dt className="font-medium text-foreground">Timings</dt><dd className="text-muted-foreground">{shop.hours}</dd></div>)}
+          {shop.phone && (<div><dt className="font-medium text-foreground">Phone</dt><dd><a className="text-primary hover:underline" href={`tel:${shop.phone}`}>{shop.phone}</a></dd></div>)}
+        </dl>
+        {directions && <Button asChild variant="outline" className="mt-4"><a href={directions} target="_blank" rel="noopener noreferrer"><MapPin />Directions on Google Maps</a></Button>}
+        <h2 className="mt-8 text-lg font-semibold text-foreground">Products</h2>
+        {shop.products.length > 0 && <div className="mt-3 space-y-3">
+          <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input aria-label="Search store products" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search products" className="h-10 w-full rounded-md border bg-background pl-10 pr-3 text-sm" /></div>
+          <label className="block text-sm font-medium">Category<select aria-label="Product category" value={category} onChange={e => setCategory(e.target.value)} className="mt-1 h-10 w-full rounded-md border bg-background px-3 sm:w-64"><option value="">All categories</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></label>
+        </div>}
         {shop.products.length === 0 ? (
-          <p className="mt-4 rounded-2xl bg-background p-6 text-center text-sm text-muted-foreground shadow-store-card">Products will appear here soon.</p>
-        ) : groups.length === 0 ? (
-          <p className="mt-4 rounded-2xl bg-background p-6 text-center text-sm text-muted-foreground shadow-store-card">No items match “{query}”.</p>
-        ) : groups.map(([cat, items]) => (
-          <section key={cat} className="mt-6">
-            <h2 className="mb-3 text-lg font-black text-foreground">{cat} <span className="text-sm font-semibold text-muted-foreground">· {items.length}</span></h2>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {items.map((p) => (
-                <li key={p.product_id} className={`group flex flex-col rounded-2xl bg-background p-3 shadow-store-card transition-all duration-200 hover:-translate-y-1 hover:shadow-store-lift ${p.in_stock ? "" : "opacity-60"}`}>
-                  <div className="relative flex aspect-square overflow-hidden items-center justify-center rounded-xl bg-store-surface text-4xl font-black text-store-foreground/30 transition-transform duration-300 group-hover:scale-[1.03]">
-                    {p.image_url
-                      ? <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-full rounded-xl object-cover" />
-                      : p.name.trim().charAt(0).toUpperCase()}
-                    {!p.in_stock && <span className="absolute left-2 top-2 rounded-md bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">Out of stock</span>}
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-foreground">{p.name}</p>
-                  {p.description && <p className="line-clamp-2 text-xs text-muted-foreground">{p.description}</p>}
-                  {p.unit && <p className="text-xs text-muted-foreground">per {p.unit}</p>}
-                  <div className="mt-auto flex items-end justify-between gap-2 pt-2">
-                    <p className="text-base font-black text-foreground">₹{Number(p.price).toLocaleString("en-IN")}</p>
-                    {p.in_stock && <QtyControl p={p} cart={cart} />}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-        <div id="checkout" className="mt-8 scroll-mt-40 rounded-2xl bg-background p-4 shadow-store-card">
-          <PickupCheckout slug={shop.slug} products={shop.products} cart={cart} />
-          {count === 0 && <p className="text-sm text-muted-foreground">Tap Add on any item to order for pickup at the store.</p>}
-        </div>
-        {shop.address && <p className="mt-4 text-center text-xs text-muted-foreground">{shop.address}</p>}
+          <p className="mt-2 rounded-lg bg-muted p-3 text-sm text-muted-foreground">Products will appear here soon.</p>
+        ) : (
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {shown.map((p) => (
+              <li key={p.product_id} className="flex min-w-0 items-start gap-3 rounded-lg border bg-card p-3">
+                <ProductPhoto path={p.image_path} name={p.name} className="h-20 w-20" />
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-medium text-foreground">{p.name}</p>
+                  {(p.category || p.description) && <p className="text-xs text-muted-foreground">{[p.category, p.description].filter(Boolean).join(" · ")}</p>}
+                  {!p.in_stock && <p className="text-xs text-destructive">Out of stock</p>}
+                  <p className="mt-2 break-words font-semibold text-foreground">₹{Number(p.price).toLocaleString("en-IN")}{p.unit ? <span className="text-xs font-normal text-muted-foreground"> /{p.unit}</span> : null}</p>
+                  <QtyControl p={p} cart={cart} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {shop.products.length > 0 && shown.length === 0 && <div className="py-8 text-center"><p className="text-muted-foreground">No matching products.</p><Button variant="ghost" onClick={() => { setQuery(''); setCategory(''); }}>Clear filters</Button></div>}
+        <PickupCheckout slug={shop.slug} products={shop.products} cart={cart} />
       </div>
-
-      {count > 0 && (
-        <div className="fixed inset-x-0 bottom-4 z-30 px-4">
-          <button type="button" onClick={() => document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth" })}
-            className="mx-auto flex w-full max-w-xl items-center justify-between rounded-2xl bg-store-deep px-5 py-3.5 text-store-deep-foreground shadow-store-lift transition-transform hover:-translate-y-0.5">
-            <span className="flex items-center gap-2 text-sm font-bold"><ShoppingBag className="h-5 w-5" aria-hidden />{count} item{count > 1 ? "s" : ""} · ₹{total.toLocaleString("en-IN")}</span>
-            <span className="text-sm font-black">View pickup order →</span>
-          </button>
-        </div>
-      )}
     </main>
   );
 }

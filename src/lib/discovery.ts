@@ -1,10 +1,9 @@
 export type DiscoveryFilters = { q: string; city: string; locality: string; category: string; page: number };
-export type DirectoryProduct = { product_id: string; name: string; category: string | null; price: number; unit: string | null; in_stock: boolean };
+export type DirectoryProduct = { name: string; category: string | null; price: number; unit: string | null; in_stock: boolean };
 export type DirectoryShop = {
   id: string; slug: string; public_name: string; category: string | null; city: string | null;
   locality: string | null; address: string | null; hours: string | null; tagline: string | null;
   products: DirectoryProduct[];
-  response?: ResponseStats | null;
 };
 const text = (value: unknown) => typeof value === 'string' ? value.trim().slice(0, 100) : '';
 const normalized = (value: string | null) => (value ?? '').trim().toLocaleLowerCase('en-IN');
@@ -28,16 +27,4 @@ export function directoryOptions(values: (string | null)[]) {
   const unique = new Map<string, string>();
   for (const value of values) if (value?.trim()) unique.set(normalized(value), value.trim());
   return [...unique.values()].sort((a, b) => a.localeCompare(b));
-}
-export type ResponseStats = { responded: number; avg_minutes: number; quick_share: number };
-/** Shops have 15 minutes to answer a new pickup order; faster, consistent replies earn a higher rating. */
-export const RESPONSE_WINDOW_MINUTES = 15;
-export function responseRating(stats?: ResponseStats | null) {
-  if (!stats || stats.responded < 3) return null;
-  const m = Number(stats.avg_minutes);
-  let score = m <= 5 ? 5 : m <= 10 ? 4.5 : m <= 15 ? 4 : m <= 30 ? 3.5 : m <= 60 ? 3 : 2.5;
-  if (Number(stats.quick_share) < 0.5) score -= 0.5;
-  score = Math.max(1, score);
-  const time = m < 1 ? 'under a minute' : m < 60 ? `~${Math.round(m)} min` : `~${Math.round(m / 60)} hr`;
-  return { score, label: score >= 4.5 ? 'Super quick' : score >= 4 ? 'Quick to respond' : score >= 3 ? 'Responds' : 'Slow to respond', time, orders: stats.responded };
 }

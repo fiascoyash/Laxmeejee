@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { directoryOptions, filterDirectory, normalizeDiscovery, type DirectoryShop } from '@/lib/discovery';
 
 const shops: DirectoryShop[] = [
-  { id: 'a', slug: 'lights', public_name: 'Kumar Lights', category: 'Electricals', city: 'Bijnor', locality: 'Main Bazar', address: null, hours: null, tagline: null, products: [{ product_id: 'p', name: 'LED Bulb', category: null, price: 100, unit: 'pcs', in_stock: true }] },
-  { id: 'b', slug: 'medicine', public_name: 'Health Store', category: 'Pharmacy', city: 'Delhi', locality: 'Market Road', address: null, hours: null, tagline: null, products: [{ product_id: 'p', name: 'Tablets', category: null, price: 50, unit: 'strip', in_stock: false }] },
+  { id: 'a', slug: 'lights', public_name: 'Kumar Lights', category: 'Electricals', city: 'Bijnor', locality: 'Main Bazar', address: null, hours: null, tagline: null, products: [{ name: 'LED Bulb', category: null, price: 100, unit: 'pcs', in_stock: true }] },
+  { id: 'b', slug: 'medicine', public_name: 'Health Store', category: 'Pharmacy', city: 'Delhi', locality: 'Market Road', address: null, hours: null, tagline: null, products: [{ name: 'Tablets', category: null, price: 50, unit: 'strip', in_stock: false }] },
 ];
 describe('Local discovery', () => {
   it('finds a shop by name without case sensitivity', () => expect(filterDirectory(shops, normalizeDiscovery({ q: 'KUMAR' })).map(s => s.id)).toEqual(['a']));

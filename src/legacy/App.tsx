@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from '@tanstack/react-router';
 import { normalizeDiscovery } from '@/lib/discovery';
 import { getBillingView, type BillingView } from '@/lib/billing-navigation';
-import { useMerchantStore } from '@/components/tenant/store-context';
-import { AccountCard } from '@/components/tenant/AccountCard';
+import { useMerchantStore, useStoreConnection } from '@/components/tenant/store-context';
 import { SaveSuccessOverlay, SaveSuccessInfo } from './components/SaveSuccessOverlay';
 import { useEscapeStack } from './hooks/useEscapeStack';
 import { CompanyProfile, Customer, Product, ProductCatalogItem, Quotation, QuotationTemplate, Invoice, InvoiceStatus, NumberingSettings, TableColumn, GstMode, ShipTo, CustomerData, SupplierData, InvoicePayment, DEFAULT_TEMPLATE_SETTINGS } from './types';
@@ -39,7 +38,7 @@ import { PaymentModal } from './components/PaymentModal';
 import { PaymentDecisionModal, PaymentDecision } from './components/PaymentDecisionModal';
 import { exportTemplatePDF } from './utils/templatePdfExport';
 import { isValidMobile, isValidGstin } from './utils/validation';
-import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck, FileMinus, Store, BellRing, QrCode } from 'lucide-react';
+import { Sun, FileText, Package, Settings, FileDown, Save, List, Building2, Menu, X, Home, ChevronRight, LayoutGrid as Layout, Eye, Receipt, Trash2, PenTool, type LucideIcon, Keyboard, Users, Truck, Zap, BarChart3, AlertCircle, FileCheck, FileMinus, Store, BellRing, QrCode, LogOut } from 'lucide-react';
 import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog';
 import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
 import { PrintCenter } from './components/PrintCenter';
@@ -55,6 +54,7 @@ function getViewFromHash(): View {
 
 function App() {
   const merchantStore = useMerchantStore();
+  const storeConnection = useStoreConnection();
   const [view, setView] = useState<View>(getViewFromHash);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
@@ -1665,13 +1665,15 @@ function App() {
             <li><NavItem icon={FileText} label="New Quotation" currentView={view} targetView="selectTemplate" /></li>
             <li><NavItem icon={List} label="Quotation History" currentView={view} targetView="list" /></li>
           </ul>
-          {merchantStore && (
+          {(merchantStore || storeConnection) && (
             <div className="mt-4 px-3">
               <p className={`px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground/50 ${desktopSidebarCollapsed ? 'lg:hidden' : ''}`}>Online store</p>
               <ul className="space-y-1">
+                {merchantStore ? <>
                 <li><StoreAction icon={Store} label="View shop page" href={`/shop/${merchantStore.business.slug}`} live={merchantStore.business.is_published} onClick={() => setSidebarOpen(false)} /></li>
                 <li><StoreAction icon={BellRing} label="Pickup orders" badge={merchantStore.newOrders} onClick={() => { setSidebarOpen(false); merchantStore.openOrders(); }} /></li>
                 <li><StoreAction icon={QrCode} label="Catalogue & QR" onClick={() => { setSidebarOpen(false); merchantStore.openShopSettings('catalogue'); }} /></li>
+                </> : <li><Button variant="ghost" className={`w-full justify-start text-primary-foreground hover:bg-primary/20 hover:text-primary-foreground ${desktopSidebarCollapsed ? 'lg:justify-center' : ''}`} aria-label="Connect online store" title="Connect online store" onClick={() => { setSidebarOpen(false); storeConnection?.openConnection(); }}><Store aria-hidden="true" /><span className={desktopSidebarCollapsed ? 'lg:hidden' : ''}>Connect online store</span></Button></li>}
               </ul>
             </div>
           )}
@@ -1704,7 +1706,27 @@ function App() {
         </nav>
 
         <div className="p-4 border-t border-slate-700">
-          {merchantStore && <AccountCard collapsed={desktopSidebarCollapsed} onNavigate={() => setSidebarOpen(false)} />}
+          {merchantStore?.userEmail && (
+            <div className={`mb-2 flex items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-2 ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}`} title={merchantStore.userEmail}>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold uppercase text-primary-foreground" aria-hidden="true">{merchantStore.userEmail[0]}</span>
+              <span className={`min-w-0 ${desktopSidebarCollapsed ? 'lg:hidden' : ''}`}>
+                <span className="block text-[10px] uppercase tracking-wide text-slate-400">Signed in as</span>
+                <span className="block truncate text-xs text-slate-100">{merchantStore.userEmail}</span>
+              </span>
+            </div>
+          )}
+          {merchantStore && (
+            <button
+              type="button"
+              onClick={() => { setSidebarOpen(false); void merchantStore.signOut(); }}
+              aria-label="Sign out"
+              title={desktopSidebarCollapsed ? 'Sign out' : undefined}
+              className={`mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-primary-foreground/70 transition-colors hover:bg-primary/20 hover:text-primary-foreground ${desktopSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}`}
+            >
+              <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className={desktopSidebarCollapsed ? 'lg:hidden' : ''}>Sign out</span>
+            </button>
+          )}
           <button
             onClick={() => setShowShortcutsModal(true)}
             aria-label="Keyboard Shortcuts"
@@ -2291,7 +2313,7 @@ function App() {
                 <div className="p-6 space-y-4">
                   <button
                     onClick={() => setShowCompanyProfile(true)}
-                    className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
                   >
                     <div className="flex items-center gap-3">
                       <Building2 className="w-5 h-5 text-blue-600" />
@@ -2347,11 +2369,10 @@ function App() {
                 />
               </div>
 
-              <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h3 className="font-medium text-amber-800 mb-2">Data Storage</h3>
-                <p className="text-sm text-amber-700">
-                  All your data is stored locally in your browser. Clearing browser data will remove all quotations and settings.
-                  Consider exporting important quotations to PDF for backup.
+              <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                <h3 className="font-medium text-emerald-800 mb-2">Cloud Sync &amp; Backup Active</h3>
+                <p className="text-sm text-emerald-700">
+                  Your quotations, invoices, customers, products and settings are saved to your signed-in account and available on every device you sign in from.
                 </p>
               </div>
             </div>
