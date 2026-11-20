@@ -53,8 +53,7 @@ const getPublicShop = createServerFn({ method: "GET" })
     if (paths.length) {
       // Photos are optional: never let a photo problem break the shop page.
       try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: signed } = await supabaseAdmin.storage.from("product-photos").createSignedUrls(paths, 60 * 60 * 24);
+        const { data: signed } = await supabase.storage.from("product-photos").createSignedUrls(paths, 60 * 60 * 24);
         for (const s of signed ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
       } catch (e) {
         console.error("Product photos unavailable", e);
