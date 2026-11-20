@@ -4,7 +4,7 @@ const query = vi.hoisted(() => ({ select: vi.fn(), eq: vi.fn() }));
 vi.mock('@tanstack/react-start', () => ({ createServerFn: () => ({
   inputValidator: () => ({ handler: (handler: (input: unknown) => unknown) => handler }),
 }) }));
-vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: (table: string) => {
+vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc: async () => ({ data: [], error: null }), from: (table: string) => {
   let publishedOnly = false;
   const chain = {
     select: (columns: string) => { query.select(table, columns); return chain; },

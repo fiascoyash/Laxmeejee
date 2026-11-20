@@ -62,22 +62,9 @@
   --color-stock-action: var(--stock-action);
   --color-stock-action-foreground: var(--stock-action-foreground);
   --color-stock-backdrop: var(--stock-backdrop);
-  --color-about-night: var(--about-night);
-  --color-about-ink: var(--about-ink);
-  --color-about-soft: var(--about-soft);
-  --color-about-green: var(--about-green);
-  --color-about-mint: var(--about-mint);
 }
 
 :root {
-  --about-night: oklch(0.21 0.039 249);
-  --about-ink: oklch(0.99 0.003 160);
-  --about-soft: oklch(0.83 0.025 220);
-  --about-green: oklch(0.62 0.14 163);
-  --about-mint: oklch(0.86 0.11 161);
-  --about-wash: oklch(0.97 0.019 163);
-  --about-line: oklch(0.42 0.04 220);
-  --about-hero-overlay: linear-gradient(90deg, var(--about-night) 0%, var(--about-night) 38%, transparent 85%);
   --stock-action: oklch(0.596 0.145 163.225);
   --stock-action-foreground: oklch(1 0 0);
   --stock-backdrop: oklch(0 0 0 / 50%);
@@ -492,49 +479,23 @@
 .hb-field-invalid { border-color: var(--color-red-400, #f87171) !important; box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-red-400, #f87171) 18%, transparent) !important; }
 .hb-inline-error { margin-top: 0.25rem; font-size: 0.75rem; color: var(--color-red-600, #dc2626); animation: hs-fade-in 0.18s ease-out both; }
 
-/* Founder-led About page; scoped to leave existing billing and storefronts unchanged. */
-.about-page { background: var(--background); color: var(--foreground); letter-spacing: 0; }
-.about-wrap { width: min(1152px, calc(100% - 48px)); margin-inline: auto; }
-.about-header { background: var(--background); border-bottom: 1px solid var(--border); }
-.about-cta { background: var(--about-green); color: var(--about-ink); }
-.about-cta:hover { background: color-mix(in oklab, var(--about-green) 85%, var(--about-night)); }
-.about-hero { position: relative; overflow: hidden; min-height: 610px; color: var(--about-ink); background: var(--about-night); }
-.about-hero-photo { position: absolute; right: 0; top: 0; height: 100%; width: 58%; object-fit: cover; object-position: center 38%; }
-.about-hero-shade { position: absolute; inset: 0; background: var(--about-hero-overlay); }
-.about-photo-caption { position: absolute; right: 32px; bottom: 28px; display: flex; flex-direction: column; gap: 4px; padding: 10px 16px; background: var(--about-night); border-left: 2px solid var(--about-mint); }
-.about-eyebrow { font: 600 11px/1.6 ui-monospace, monospace; }
-.about-heading { font-size: 40px; font-weight: 600; line-height: 1.2; }
-.about-section { padding-block: 88px; scroll-margin-top: 24px; }
-.about-origin-strip { background: var(--about-wash); color: var(--about-night); border-bottom: 1px solid var(--border); }
-.about-prose { font-size: 16px; line-height: 1.85; color: var(--muted-foreground); }
-.about-prose p + p { margin-top: 20px; }
-.about-prose strong { color: var(--foreground); font-weight: 500; }
-.about-evolution { background: var(--muted); }
-.about-timeline li { border-top: 2px solid var(--about-green); padding-top: 24px; }
-.about-insight, .about-footer { background: var(--about-night); color: var(--about-ink); }
-.about-connection { text-align: center; padding-block: 48px; }
-.about-connection-line { position: relative; height: 36px; width: 53%; margin: 20px auto 40px; border: 1px solid var(--about-mint); border-top: 0; }
-.about-connection-line::after { content: ''; position: absolute; left: 50%; top: 100%; height: 25px; width: 1px; background: var(--about-mint); }
-.about-hero .about-wrap { animation: fadeInUp .7s ease-out both; }
-.about-insight .about-prose { color: var(--about-soft); }
-.about-audience { border: 1px solid var(--border); padding: 36px; border-radius: 8px; }
-.about-audience-mint { background: var(--about-wash); color: var(--about-night); }
-.about-audience-mint .text-muted-foreground { color: var(--about-night); }
-.about-founder-note { background: var(--muted); }
-.about-page a { transition: opacity .2s; }
-.about-page a:hover { opacity: .85; }
-.about-page a:focus-visible { outline: 2px solid var(--about-green); outline-offset: 5px; }
-@media (max-width: 767px) {
-  .about-wrap { width: calc(100% - 40px); }
-  .about-heading { font-size: 30px; }
-  .about-section { padding-block: 56px; }
-  .about-hero { min-height: 620px; display: flex; align-items: flex-end; }
-  .about-hero-photo { width: 100%; height: 380px; object-position: center 25%; }
-  .about-hero-shade { background: linear-gradient(0deg, var(--about-night) 0%, var(--about-night) 35%, transparent 75%); }
-  .about-hero .about-wrap { padding-top: 220px; padding-bottom: 28px; }
-  .about-hero h1 { font-size: 48px; }
-  .about-photo-caption { top: 20px; bottom: auto; right: 20px; }
-  .about-origin-strip span { font-size: 12px; }
-  .about-audience { padding: 26px; }
+/* Storefront (public shop page) — quick-commerce palette */
+:root {
+  --store: oklch(0.86 0.17 92);
+  --store-foreground: oklch(0.22 0.04 60);
+  --store-deep: oklch(0.52 0.15 150);
+  --store-deep-foreground: oklch(0.98 0.01 150);
+  --store-surface: oklch(0.975 0.012 95);
+  --shadow-store-card: 0 1px 0 oklch(0.9 0.02 95), 0 14px 28px -18px oklch(0.35 0.08 70 / 0.45);
+  --shadow-store-lift: 0 2px 0 oklch(0.9 0.02 95), 0 24px 40px -20px oklch(0.35 0.08 70 / 0.55);
+  --gradient-store-hero: radial-gradient(120% 90% at 85% 0%, oklch(0.93 0.14 100) 0%, transparent 55%), linear-gradient(135deg, oklch(0.86 0.17 92), oklch(0.8 0.17 75));
 }
-@media (prefers-reduced-motion: reduce) { .about-page *, .about-page a { animation: none; transition: none; scroll-behavior: auto; } html:has(.about-page) { scroll-behavior: auto; } }
+@theme inline {
+  --color-store: var(--store);
+  --color-store-foreground: var(--store-foreground);
+  --color-store-deep: var(--store-deep);
+  --color-store-deep-foreground: var(--store-deep-foreground);
+  --color-store-surface: var(--store-surface);
+  --shadow-store-card: var(--shadow-store-card);
+  --shadow-store-lift: var(--shadow-store-lift);
+}

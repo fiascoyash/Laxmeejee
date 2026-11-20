@@ -2,8 +2,8 @@
 
 # North star
 
-Shop owners get paid in full for what they sell.
+Small Indian businesses get paid for their sales and file GST correctly
 
 ## Metric
 
-Invoices marked paid each week
+Invoices saved as final (non-draft) each week

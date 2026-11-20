@@ -7,29 +7,21 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
-
-## What Lovable manages
-
-Rules outside this block are the project's own. Change the pieces below in
-Lovable, not by hand. With the [Lovable MCP](https://mcp.lovable.dev)
-connected, `send_message` asks Lovable to do it; otherwise ask the user to
-use the editor.
-
-- **Database.** Do not add or edit `supabase/migrations/` or `drizzle/`.
-  Ask Lovable to change the schema.
-- **Generated files.** Do not edit a file whose header says it is automatically
-  generated.
-- **AI gateway.** Keep model calls on Lovable's gateway, and keep
-  `LOVABLE_API_KEY` out of browser code.
-- **Connectors.** Lovable provides native connectors. `list_connectors` shows
-  which are enabled; `add_connector` only returns the dashboard link. When a
-  connector is enabled, calls go through the connector gateway and need
-  `LOVABLE_API_KEY`. When Lovable does not provide one, users can bring their
-  own key and store it in Secrets.
-- **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
-- Billing data (keys prefixed solar_/laxmeejee_/hisaaboo_) stays in localStorage but is mirrored per merchant to `user_settings.settings.store` via `src/lib/cloud-sync.ts`; BusinessGate hydrates before rendering billing. Why: multi-device access without rewriting the legacy storage layer.
-- Shop publishing reads the legacy storage catalogue and upserts by business/product identity before removing deselected rows; this preserves billing defaults and avoids duplicate online products.
-- Product photos use private Storage paths and short-lived signed URLs; optional photo/map columns are probed so blocked schema updates never break existing shops.
-- Public editorial pages use independent SSR leaf routes, scoped styles and CDN asset pointers; this keeps founder stories crawlable without coupling them to merchant data or altering the legacy UI.
-- Account exports use paginated RLS reads; self-deletion revalidates the bearer user before dynamically loading admin cleanup, removes scoped records/photos before Auth, and blocks co-owned shops. Why: prevent cross-account access and premature closure; cleanup is retryable but non-atomic while database migrations are unavailable.
+
+- The Hisaaboo app lives in `src/legacy/` and renders client-only at `/billing`; preserve its hash navigation and localStorage. Shared billing-navigation helpers recognize billing bookmarks on `/`, default empty/invalid `/billing` hashes to `#home`, and redirect `/billing#landing` to `/` so only the public homepage renders the welcome screen and public section hashes stay public.
+- Editing an existing invoice saves directly (status derived from recorded payments, Draft preserved); the payment decision dialog is only for new invoices or explicitly finalizing a draft — keeps editing and payment collection separate.
+- Keep desktop sidebar collapse separate from the mobile drawer state and use the existing shared hamburger; navigation closes only the drawer so desktop collapse survives page changes.
+- Add Stock uses operation IDs, an invoker-permission RPC for atomic cloud histories, and snapshot-backed existing local keys for catalog/history; keep these boundaries to avoid duplicate increments and preserve the browser-local catalog. Additive decimal history fields retain compatibility with legacy integer workflows; use their fallback values in Product Details.
+- The GSTR-2B Analyzer (Reports tab) parses workbooks fully in the browser (src/legacy/utils/gstr2b.ts) and keeps results only in component state; headline totals use original sheets only so amendments/reversals are never double-counted.
+- The GSTR-3B preparation view (src/legacy/utils/gstr3b.ts + components/gst/Gstr3bPrep.tsx) is opened from the GSTR-2B Analyzer, keeps user inputs in component state only, prefers portal summary lines over row-level sums, and reads saved purchases read-only — so no records are created and nothing is double-counted.
+- GSTR-1 exports (components/gst/Gstr1Exports.tsx + utils/gstr1Json.ts) only read invoices; invoice PDFs reuse exportTemplatePDF with returnBlob so ZIP PDFs match the normal invoice download.
+- Credit/Debit Notes (src/legacy/utils/creditDebitNotes.ts, components/notes/) live only in localStorage key `hisaaboo_credit_debit_notes` and never modify invoices; GSTR-1 tables/JSON, GSTR-3B 3.1(a) books figure and customer khata all derive from those notes so adjustments are never stored twice.
+- Invoice PDFs take a Rule 48 `copies` option in exportTemplatePDF; "All 3 copies" renders one multi-page PDF (never several downloads) and the default stays Original for Recipient.
+- Tenancy: every cloud billing table carries `business_id` (defaulted by `current_business_id()`) and RLS via `is_business_member()`; businesses are created only through the `create_business` RPC (atomic shop + owner row). This keeps legacy billing inserts unchanged while isolating shops.
+- `BusinessGate` wraps the legacy app at `/billing` for owner sign-in and onboarding; public shop pages live at `/shop/$slug` and read only published rows via a publishable-key server function.
+- Public shop catalogue is a cloud snapshot (shop_products) the owner pushes from the browser-local catalogue; the local catalogue stays the source of truth.
+- Online-store controls share the BusinessGate merchant-store context and existing settings/order dialogs; realtime refreshes the dashboard and navigation together, and GST billing uses the existing invoice event flow to avoid duplicate order state.
+- Pickup-order recovery stays in the existing order queue and invoice event flow; status changes match business and prior status and confirm an updated row so stale or denied updates cannot appear successful.
+- Public discovery owns `/` inside the original legacy LandingPage (heroSearch/directory slots) with URL-backed filters and Query loaders; server reads use anonymous publishable-key RLS, safe projections, and paged scans so owner sessions cannot reveal unpublished shops or private billing data.
+- Shop response ratings come from pickup-order status timestamps stamped by a DB trigger and exposed only as aggregates (shop_response_stats) and code+phone lookups (track_pickup_order); never expose raw orders publicly. Active-code recovery requires phone plus case-insensitive nickname through a rate-limited RPC, never phone alone; browser-saved pickup references are separate from merchant billing storage and removed only after confirmed terminal status.

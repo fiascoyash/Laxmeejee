@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PickupOrders } from '@/components/tenant/PickupOrders';
 
 const cloud = vi.hoisted(() => ({ from: vi.fn(), update: vi.fn(), filters: vi.fn(), result: { data: [{ id: 'order-1' }], error: null } as { data: { id: string }[] | null; error: unknown } }));
-vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: cloud.from } }));
+vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: cloud.from, rpc: async () => ({ data: null, error: null }) } }));
 
 const order = {
   id: 'order-1', business_id: 'shop-1', order_code: 'ABCDEF', customer_name: 'Test Customer',

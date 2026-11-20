@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { Tables } from "@/lib/db-types";
+import type { Tables } from "@/integrations/supabase/types";
 import type { Business } from "./ShopSettings";
 
 export type ShopSettingsTab = "profile" | "catalogue" | "qr";
@@ -17,7 +17,6 @@ export type MerchantStoreContextValue = {
   openShopSettings: (tab?: ShopSettingsTab) => void;
   togglePublish: () => Promise<void>;
   signOut: () => Promise<void>;
-  userEmail: string;
   refreshStore: () => Promise<void>;
 };
 
@@ -27,14 +26,4 @@ export const MerchantStoreProvider = MerchantStoreContext.Provider;
 
 export function useMerchantStore() {
   return useContext(MerchantStoreContext);
-}
-
-type StoreConnectionValue = {
-  openConnection: () => void;
-  connecting: boolean;
-};
-const StoreConnectionContext = createContext<StoreConnectionValue | null>(null);
-export const StoreConnectionProvider = StoreConnectionContext.Provider;
-export function useStoreConnection() {
-  return useContext(StoreConnectionContext);
 }
