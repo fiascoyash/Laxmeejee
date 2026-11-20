@@ -45,15 +45,20 @@ const getPublicShop = createServerFn({ method: "GET" })
     const { data: products } = await supabase.from("shop_products")
       .select("product_id, name, category, unit, price, description, in_stock, image_path")
       .eq("business_id", data.id).order("category").order("name");
-    const { data: stats } = await supabase.rpc("shop_response_stats");
+    const { data: stats } = await supabase.rpc("shop_response_stats").then((r) => r, () => ({ data: null }));
     const st = (stats ?? []).find((r) => r.business_id === data.id);
     const response = st ? { responded: st.responded, avg_minutes: Number(st.avg_minutes), quick_share: Number(st.quick_share) } : null;
     const paths = (products ?? []).map((p) => p.image_path).filter((p): p is string => !!p);
     const urls = new Map<string, string>();
     if (paths.length) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: signed } = await supabaseAdmin.storage.from("product-photos").createSignedUrls(paths, 60 * 60 * 24);
-      for (const s of signed ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
+      // Photos are optional: never let a photo problem break the shop page.
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: signed } = await supabaseAdmin.storage.from("product-photos").createSignedUrls(paths, 60 * 60 * 24);
+        for (const s of signed ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
+      } catch (e) {
+        console.error("Product photos unavailable", e);
+      }
     }
     const list = (products ?? []).map(({ image_path, ...p }) => ({ ...p, image_url: image_path ? urls.get(image_path) ?? null : null }));
     const { id: _id, ...shop } = data;
