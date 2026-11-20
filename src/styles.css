@@ -499,3 +499,58 @@
   --shadow-store-card: var(--shadow-store-card);
   --shadow-store-lift: var(--shadow-store-lift);
 }
+
+/* ---------- About page (futuristic ambient) ---------- */
+:root {
+  --about-bg: oklch(0.16 0.04 255);
+  --about-surface: oklch(0.22 0.045 255 / 0.55);
+  --about-line: oklch(0.85 0.08 170 / 0.18);
+  --about-text: oklch(0.96 0.01 200);
+  --about-muted: oklch(0.78 0.03 220);
+  --about-green: oklch(0.72 0.17 158);
+  --about-mint: oklch(0.88 0.11 170);
+  --about-glow: 0 0 60px -10px oklch(0.72 0.17 158 / 0.55);
+}
+@theme inline {
+  --color-about-bg: var(--about-bg);
+  --color-about-surface: var(--about-surface);
+  --color-about-line: var(--about-line);
+  --color-about-text: var(--about-text);
+  --color-about-muted: var(--about-muted);
+  --color-about-green: var(--about-green);
+  --color-about-mint: var(--about-mint);
+}
+@utility about-glass {
+  background: var(--about-surface);
+  border: 1px solid var(--about-line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+@utility about-gradient-text {
+  background: linear-gradient(100deg, var(--about-mint), var(--about-green) 55%, var(--about-mint));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: about-shimmer 8s linear infinite;
+}
+@utility about-glow { box-shadow: var(--about-glow); }
+@utility about-grid {
+  background-image:
+    linear-gradient(var(--about-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--about-line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 30%, black 20%, transparent 70%);
+}
+.about-orb { position: absolute; border-radius: 9999px; filter: blur(80px); opacity: .45; animation: about-float 18s ease-in-out infinite; pointer-events: none; }
+.about-reveal { opacity: 0; transform: translateY(28px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.7,.2,1); }
+.about-reveal.is-visible { opacity: 1; transform: none; }
+.about-tilt { transition: transform .25s ease, box-shadow .25s ease; transform-style: preserve-3d; }
+.about-ring { position:absolute; inset:-10px; border-radius:9999px; background: conic-gradient(from 0deg, var(--about-green), transparent 40%, var(--about-mint), transparent 80%, var(--about-green)); animation: about-spin 10s linear infinite; }
+@keyframes about-shimmer { to { background-position: 200% center; } }
+@keyframes about-float { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,-30px) scale(1.1); } }
+@keyframes about-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .about-orb, .about-ring, .about-gradient-text { animation: none; }
+  .about-reveal { opacity: 1; transform: none; transition: none; }
+}

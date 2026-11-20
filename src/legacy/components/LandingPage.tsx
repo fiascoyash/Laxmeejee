@@ -210,6 +210,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
             <button onClick={scrollToFeatures} className="hover:text-emerald-600 transition-colors">Features</button>
             <button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">How it works</button>
             <button onClick={() => document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">Why Hisaaboo</button>
+            <a href="/about" className="hover:text-emerald-600 transition-colors">About Us</a>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -274,10 +275,10 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
               </button>
             </div>
 
-            <div className="landing-fade-up mt-8 flex items-center gap-4 justify-center lg:justify-start text-sm text-slate-400" style={{ animationDelay: '0.5s' }}>
-              <div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> No setup needed</div>
-              <div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> GST-ready</div>
-              <div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Free to start</div>
+            <div className="landing-fade-up mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 justify-center lg:justify-start text-sm text-slate-500" style={{ animationDelay: '0.5s' }}>
+              <div className="flex items-center gap-1.5 whitespace-nowrap"><CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" /> No setup needed</div>
+              <div className="flex items-center gap-1.5 whitespace-nowrap"><CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" /> GST-ready</div>
+              <div className="flex items-center gap-1.5 whitespace-nowrap"><CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" /> Free to start</div>
             </div>
           </div>
 
@@ -323,9 +324,9 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
                 <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Receive live pickup orders with a sound alert</li>
                 <li className="flex gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />Turn orders into GST bills in one click, plus khata and GST reports</li>
               </ul>
-              <div className="flex gap-3">
-                <button onClick={onEnterApp} className="px-5 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800">Start Free</button>
-                <button onClick={onEnterApp} className="px-5 py-2.5 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-white">Merchant Login</button>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={onEnterApp} className="whitespace-nowrap px-5 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800">Start Free</button>
+                <button onClick={onEnterApp} className="whitespace-nowrap px-5 py-2.5 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-white">Merchant Login</button>
               </div>
             </div>
           </div>
@@ -533,7 +534,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
                 </div>
               </div>
             </div>
-            <div className="absolute -top-4 -right-4 bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg landing-float" style={{ animationDelay: '1s' }}>
+            <div className="absolute -top-4 right-2 sm:-right-4 bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg landing-float" style={{ animationDelay: '1s' }}>
               GST-Ready
             </div>
           </div>
@@ -606,6 +607,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
                 <li><button onClick={scrollToFeatures} className="hover:text-emerald-400 transition-colors">Features</button></li>
                 <li><button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-400 transition-colors">How it works</button></li>
                 <li><button onClick={() => document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-400 transition-colors">Why Hisaaboo</button></li>
+                <li><a href="/about" className="hover:text-emerald-400 transition-colors">About Us</a></li>
               </ul>
             </div>
             <div>
