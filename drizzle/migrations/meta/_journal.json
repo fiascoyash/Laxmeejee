@@ -78,6 +78,13 @@
       "when": 1795151132726,
       "tag": "0010_scope_customer_reputation",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795153650020,
+      "tag": "0011_product_photos_anon_read",
+      "breakpoints": true
     }
   ]
 }
