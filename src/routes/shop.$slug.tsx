@@ -51,7 +51,8 @@ const getPublicShop = createServerFn({ method: "GET" })
     const paths = (products ?? []).map((p) => p.image_path).filter((p): p is string => !!p);
     const urls = new Map<string, string>();
     if (paths.length) {
-      const { data: signed } = await supabase.storage.from("product-photos").createSignedUrls(paths, 60 * 60 * 24);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: signed } = await supabaseAdmin.storage.from("product-photos").createSignedUrls(paths, 60 * 60 * 24);
       for (const s of signed ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
     }
     const list = (products ?? []).map(({ image_path, ...p }) => ({ ...p, image_url: image_path ? urls.get(image_path) ?? null : null }));
@@ -184,7 +185,7 @@ function ShopPage() {
                     {!p.in_stock && <span className="absolute left-2 top-2 rounded-md bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">Out of stock</span>}
                   </div>
                   <p className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-foreground">{p.name}</p>
-                  {p.description && <p className="line-clamp-1 text-xs text-muted-foreground">{p.description}</p>}
+                  {p.description && <p className="line-clamp-2 text-xs text-muted-foreground">{p.description}</p>}
                   {p.unit && <p className="text-xs text-muted-foreground">per {p.unit}</p>}
                   <div className="mt-auto flex items-end justify-between gap-2 pt-2">
                     <p className="text-base font-black text-foreground">₹{Number(p.price).toLocaleString("en-IN")}</p>

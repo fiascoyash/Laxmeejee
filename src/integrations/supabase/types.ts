@@ -142,6 +142,9 @@ export type Database = {
         Row: {
           accepted_at: string | null
           business_id: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           collected_at: string | null
           created_at: string
           customer_name: string
@@ -159,6 +162,9 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           business_id: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           collected_at?: string | null
           created_at?: string
           customer_name: string
@@ -176,6 +182,9 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           business_id?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           collected_at?: string | null
           created_at?: string
           customer_name?: string
@@ -441,6 +450,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_pickup_order: {
+        Args: { _code: string; _phone: string; _reason: string }
+        Returns: boolean
+      }
       create_business: {
         Args: {
           _category?: string
@@ -452,6 +465,10 @@ export type Database = {
         Returns: string
       }
       current_business_id: { Args: never; Returns: string }
+      customer_reputation: {
+        Args: { _business_id: string; _phone: string }
+        Returns: Json
+      }
       is_business_member: {
         Args: {
           _business_id: string

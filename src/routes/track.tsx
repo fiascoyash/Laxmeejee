@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SavedPickupOrders } from "@/components/tenant/SavedPickupOrders";
 import { removeSavedPickup, savePickup } from "@/lib/saved-pickups";
+import { ResponseCountdown } from "@/components/pickup/ResponseCountdown";
 import { isValidPickupPhone, normalizePickupPhone } from "@/lib/pickup-phone";
 
 type Tracked = {
   order_code: string; status: string; total: number; items: { name: string; qty: number; price: number }[];
   created_at: string; responded_at: string | null; accepted_at: string | null; ready_at: string | null; collected_at: string | null;
+  cancelled_by?: string | null; cancel_reason?: string | null;
   shop_name: string; shop_slug: string; shop_phone: string | null; shop_address: string | null;
 };
 const text = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v).slice(0, 20) : "");
@@ -49,6 +51,18 @@ function TrackPage() {
   const [phone, setPhone] = useState(search.phone);
   const [nickname, setNickname] = useState('');
   const [recovering, setRecovering] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  async function cancelOrder() {
+    if (reason.trim().length < 3) { setError("Please tell the shop why you are cancelling."); return; }
+    setCancelling(true); setError("");
+    const { error } = await supabase.rpc("cancel_pickup_order", { _code: search.code, _phone: search.phone, _reason: reason });
+    setCancelling(false);
+    if (error) { setError(error.message.includes("no longer") ? "This order can no longer be cancelled — please call the shop." : "Couldn't cancel. Please try again."); return; }
+    setCancelOpen(false); setReason(""); setRefresh(n => n + 1);
+  }
   const [matches, setMatches] = useState<{ order_code: string; shop_slug: string; shop_name: string }[]>([]);
   useEffect(() => {
     if (search.code) { setCode(search.code); setMode('code'); }
@@ -95,7 +109,7 @@ function TrackPage() {
     load();
     const t = setInterval(load, 15000);
     return () => { alive = false; clearInterval(t); };
-  }, [search.code, search.phone]);
+  }, [search.code, search.phone, refresh]);
 
   const cancelled = order?.status === "cancelled";
   return (
@@ -120,7 +134,7 @@ function TrackPage() {
           <section className="mt-6">
             <p className="text-sm text-muted-foreground">Order #{order.order_code} at <Link to="/shop/$slug" params={{ slug: order.shop_slug }} className="font-medium text-primary hover:underline">{order.shop_name}</Link></p>
             {cancelled ? (
-              <p className="mt-4 flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive"><XCircle className="size-5" />The shop couldn't take this order. Please call them or try another shop.</p>
+              <p className="mt-4 flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive"><XCircle className="size-5 shrink-0" />{order.cancelled_by === "customer" ? `You cancelled this order${order.cancel_reason ? ` (“${order.cancel_reason}”)` : ""}.` : `The shop couldn't take this order${order.cancel_reason ? ` (“${order.cancel_reason}”)` : ""}. Please call them or try another shop.`}</p>
             ) : (
               <ol className="mt-4 space-y-3">
                 {STEPS.map((s) => { const at = order[s.key]; return (
@@ -131,7 +145,16 @@ function TrackPage() {
                   </li>); })}
               </ol>
             )}
-            {order.status === "new" && <p className="mt-4 rounded-lg bg-muted p-3 text-xs text-muted-foreground">Waiting for the shop to accept. Shops are asked to reply within 15 minutes.</p>}
+            {order.status === "new" && <div className="mt-4"><ResponseCountdown createdAt={order.created_at} audience="customer" /><p className="mt-1 text-xs text-muted-foreground">Shops that reply on time earn a better reply-speed rating.</p></div>}
+            {(order.status === "new" || order.status === "accepted") && (cancelOpen ? (
+              <div className="mt-4 space-y-2 rounded-lg border p-3">
+                <p className="text-sm font-medium">Why are you cancelling?</p>
+                <div className="flex flex-wrap gap-2">{["Shop is taking too long", "Ordered by mistake", "Found it elsewhere", "Plans changed"].map(r => <Button key={r} type="button" size="sm" variant={reason === r ? "default" : "outline"} onClick={() => setReason(r)}>{r}</Button>)}</div>
+                <Input aria-label="Cancel reason" placeholder="Or write your own reason" value={reason} maxLength={300} onChange={e => setReason(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Your cancellations are part of your order history that shops can see.</p>
+                <div className="flex gap-2"><Button type="button" variant="destructive" disabled={cancelling} onClick={() => void cancelOrder()}>{cancelling ? "Cancelling…" : "Cancel order"}</Button><Button type="button" variant="ghost" onClick={() => setCancelOpen(false)}>Keep order</Button></div>
+              </div>
+            ) : <Button type="button" variant="outline" className="mt-4 w-full" onClick={() => setCancelOpen(true)}>Cancel order</Button>)}
             {order.status === "ready" && <p className="mt-4 rounded-lg bg-primary/10 p-3 text-sm font-medium text-primary">Your order is ready! Show code {order.order_code} at the counter and pay there.</p>}
             <ul className="mt-4 border-t pt-3 text-sm">{order.items.map((i, k) => <li key={k} className="flex justify-between"><span>{i.name} × {i.qty}</span><span>₹{(i.price * i.qty).toLocaleString("en-IN")}</span></li>)}
               <li className="mt-1 flex justify-between font-semibold"><span>Total</span><span>₹{Number(order.total).toLocaleString("en-IN")}</span></li></ul>

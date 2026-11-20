@@ -64,6 +64,20 @@
       "when": 1795112304887,
       "tag": "0008_product_photos_and_store_accent",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795113448059,
+      "tag": "0009_order_timer_cancel_reputation",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795151132726,
+      "tag": "0010_scope_customer_reputation",
+      "breakpoints": true
     }
   ]
 }

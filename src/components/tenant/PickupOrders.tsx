@@ -3,16 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
-import { RESPONSE_WINDOW_MINUTES } from "@/lib/discovery";
-
-function ResponseTimer({ createdAt }: { createdAt: string }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
-  const left = Math.ceil(RESPONSE_WINDOW_MINUTES - (now - new Date(createdAt).getTime()) / 60000);
-  return left > 0
-    ? <p className="mt-1 text-xs font-medium text-primary">Reply within {left} min to keep your quick-response rating</p>
-    : <p className="mt-1 text-xs font-medium text-destructive">Customer waiting {-left + RESPONSE_WINDOW_MINUTES} min — reply now</p>;
-}
+import { ResponseCountdown } from "@/components/pickup/ResponseCountdown";
 
 type Order = Tables<"pickup_orders">;
 const NEXT: Record<string, { to: string; label: string }[]> = {
@@ -78,7 +69,9 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{LABEL[o.status]}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString("en-IN")}</p>
-                    {o.status === "new" && <ResponseTimer createdAt={o.created_at} />}
+                    {o.status === "new" && <ResponseCountdown createdAt={o.created_at} audience="merchant" />}
+                    <CustomerHistory businessId={businessId} phone={o.customer_phone} />
+                    {o.status === "cancelled" && <p className="mt-1 rounded bg-destructive/10 p-2 text-xs text-destructive">{o.cancelled_by === "customer" ? "Cancelled by customer" : "Cancelled by shop"}{o.cancel_reason ? ` — “${o.cancel_reason}”` : ""}</p>}
                     <ul className="mt-2">{items.map((i, k) => <li key={k} className="flex justify-between"><span>{i.name} × {i.qty}{i.unit ? ` ${i.unit}` : ""}</span><span>₹{(i.price * i.qty).toLocaleString("en-IN")}</span></li>)}</ul>
                     <p className="mt-1 text-right font-semibold">Total ₹{Number(o.total).toLocaleString("en-IN")}</p>
                     {o.note && <p className="mt-1 rounded bg-muted p-2 text-xs">Note: {o.note}</p>}
@@ -99,4 +92,18 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
       </div>
     </div>
   );
+}
+
+const repCache = new Map<string, Promise<{ orders: number; collected: number; customer_cancelled: number } | null>>();
+function CustomerHistory({ businessId, phone }: { businessId: string; phone: string }) {
+  const [rep, setRep] = useState<{ orders: number; collected: number; customer_cancelled: number } | null>(null);
+  useEffect(() => {
+    const key = businessId + phone;
+    if (!repCache.has(key)) repCache.set(key, Promise.resolve(supabase.rpc("customer_reputation", { _business_id: businessId, _phone: phone })).then(({ data }) => (data as never) ?? null).catch(() => null));
+    let alive = true; void repCache.get(key)!.then((r) => { if (alive) setRep(r); });
+    return () => { alive = false; };
+  }, [businessId, phone]);
+  if (!rep || !rep.orders) return null;
+  const badge = rep.orders <= 1 ? "New customer" : rep.customer_cancelled / rep.orders > 0.3 ? "Often cancels" : "Reliable customer";
+  return <p className="mt-1 text-xs text-muted-foreground"><span className="font-semibold text-foreground">{badge}</span> · {rep.orders} order{rep.orders > 1 ? "s" : ""}, {rep.collected} collected, {rep.customer_cancelled} cancelled by them</p>;
 }

@@ -113,9 +113,11 @@ function CatalogueTab({ business, onUpdated }: { business: Business; onUpdated: 
 
   async function publish() {
     setBusy(true); setMsg("");
+    const { data: existing } = await supabase.from("shop_products").select("product_id, description").eq("business_id", business.id);
+    const descs = new Map((existing ?? []).map((r) => [r.product_id, r.description]));
     const rows = catalog.filter((p) => selected.has(p.id)).map((p) => ({
       business_id: business.id, product_id: p.id, name: p.name, category: p.category || null, unit: p.unit || null,
-      price: Number(p.sellingPrice) || 0, description: p.description || null,
+      price: Number(p.sellingPrice) || 0, description: descs.get(p.id) || p.description || null,
       in_stock: (Number(p.stockQuantity) || 0) > 0, updated_at: new Date().toISOString(),
     }));
     const keep = rows.map((r) => r.product_id);
@@ -186,7 +188,7 @@ function QrTab({ business }: { business: Business }) {
   );
 }
 
-type ShopRow = { product_id: string; name: string; price: number; category: string | null; image_path: string | null };
+type ShopRow = { product_id: string; name: string; price: number; category: string | null; image_path: string | null; description?: string | null };
 
 function LookTab({ business, onSaved }: { business: Business; onSaved: (b: Business) => void }) {
   const saved = business.accent_color || "amber";
@@ -199,7 +201,7 @@ function LookTab({ business, onSaved }: { business: Business; onSaved: (b: Busin
   const [photoMsg, setPhotoMsg] = useState("");
 
   async function loadRows() {
-    const { data } = await supabase.from("shop_products").select("product_id, name, price, category, image_path").eq("business_id", business.id).order("name");
+    const { data } = await supabase.from("shop_products").select("product_id, name, price, category, image_path, description").eq("business_id", business.id).order("name");
     const list = (data ?? []) as ShopRow[];
     setRows(list);
     const paths = list.map((r) => r.image_path).filter((p): p is string => !!p);
@@ -234,6 +236,16 @@ function LookTab({ business, onSaved }: { business: Business; onSaved: (b: Busin
       if (e2) setPhotoMsg("Could not save photo: " + e2.message);
     } else setPhotoMsg("Could not upload: " + error.message);
     setUploading(null);
+    await loadRows();
+  }
+
+  async function saveDetails(row: ShopRow, name: string, description: string) {
+    setPhotoMsg("");
+    const n = name.trim().slice(0, 120), d = description.trim().slice(0, 500);
+    if (n.length < 2) return setPhotoMsg("Product name is too short.");
+    const { error } = await supabase.from("shop_products").update({ name: n, description: d || null }).eq("business_id", business.id).eq("product_id", row.product_id);
+    if (error) return setPhotoMsg("Could not save details: " + error.message);
+    setPhotoMsg("Saved details for " + n + ".");
     await loadRows();
   }
 
@@ -299,7 +311,7 @@ function LookTab({ business, onSaved }: { business: Business; onSaved: (b: Busin
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted font-bold text-muted-foreground">
                   {thumbs[r.product_id] && r.image_path ? <img src={thumbs[r.product_id]} alt="" className="h-full w-full object-cover" /> : r.name.charAt(0)}
                 </span>
-                <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                <DetailsEditor row={r} onSave={saveDetails} />
                 {uploading === r.product_id ? <span className="text-xs text-muted-foreground">Uploading…</span> : (
                   <>
                     <label className="cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
@@ -313,8 +325,32 @@ function LookTab({ business, onSaved }: { business: Business; onSaved: (b: Busin
             ))}
           </ul>
         )}
-        {photoMsg && <p className="text-sm text-destructive">{photoMsg}</p>}
+        {photoMsg && <p className={`text-sm ${photoMsg.startsWith("Saved") ? "text-primary" : "text-destructive"}`}>{photoMsg}</p>}
       </section>
+    </div>
+  );
+}
+
+function DetailsEditor({ row, onSave }: { row: ShopRow; onSave: (r: ShopRow, name: string, desc: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(row.name);
+  const [desc, setDesc] = useState(row.description ?? "");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setName(row.name); setDesc(row.description ?? ""); }, [row.name, row.description]);
+  if (!open) return (
+    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setOpen(true)}>
+      <span className="block truncate">{row.name}</span>
+      <span className="block truncate text-xs text-muted-foreground">{row.description || "+ Add product details"}</span>
+    </button>
+  );
+  return (
+    <div className="min-w-0 flex-1 space-y-1">
+      <input className={input} aria-label="Product name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
+      <textarea className={input} aria-label="Product details" rows={3} maxLength={500} placeholder="Key details: size, brand, pack, use…" value={desc} onChange={(e) => setDesc(e.target.value)} />
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground" onClick={async () => { setBusy(true); await onSave(row, name, desc); setBusy(false); setOpen(false); }}>{busy ? "Saving…" : "Save details"}</button>
+        <button type="button" className="text-xs text-muted-foreground" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
     </div>
   );
 }
