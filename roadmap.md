@@ -47,3 +47,7 @@
 - [x] Bundle the original hero illustration with the site instead of depending on a preview URL.
 - [x] Keep the shared homepage visible when directory loading fails; show and verify an inline retry in the results area.
 - [x] Verify desktop/mobile artwork, layout, forced-outage recovery, hydration, all 81 checks, and a clean preview build.
+
+# About Us page
+- [x] Founder-led About page at /about from the brief, with SEO metadata, sitemap entry and homepage menu/footer links.
+- [x] Founder photo at the end of the page, bundled with the site so it works on Cloudflare.

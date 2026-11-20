@@ -1,5 +1,6 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { Link } from '@tanstack/react-router';
 
 // Embedded in code so the homepage picture survives every export and deployment.
 import { heroLocalShopImage as heroShop } from './heroLocalShopImage';
@@ -210,6 +211,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
             <button onClick={scrollToFeatures} className="hover:text-emerald-600 transition-colors">Features</button>
             <button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">How it works</button>
             <button onClick={() => document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">Why Hisaaboo</button>
+            <Link to="/about" className="hover:text-emerald-600 transition-colors">About</Link>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -606,6 +608,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
                 <li><button onClick={scrollToFeatures} className="hover:text-emerald-400 transition-colors">Features</button></li>
                 <li><button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-400 transition-colors">How it works</button></li>
                 <li><button onClick={() => document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-400 transition-colors">Why Hisaaboo</button></li>
+                <li><Link to="/about" className="hover:text-emerald-400 transition-colors">About Us</Link></li>
               </ul>
             </div>
             <div>
