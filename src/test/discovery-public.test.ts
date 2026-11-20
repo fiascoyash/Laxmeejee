@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const query = vi.hoisted(() => ({ select: vi.fn(), eq: vi.fn() }));
 vi.mock('@tanstack/react-start', () => ({ createServerFn: () => ({
   inputValidator: () => ({ handler: (handler: (input: unknown) => unknown) => handler }),
+  handler: (handler: (input: unknown) => unknown) => handler,
 }) }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc: async () => ({ data: [], error: null }), from: (table: string) => {
   let publishedOnly = false;
@@ -18,7 +19,7 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc: async () =
   return chain;
 } }) }));
 
-import { searchDirectory } from '@/lib/discovery.functions';
+import { loadDirectoryIndex, searchDirectory } from '@/lib/discovery.functions';
 import { normalizeDiscovery } from '@/lib/discovery';
 
 beforeEach(() => {
@@ -34,5 +35,12 @@ it('excludes unpublished shops and reads no customer, invoice or purchase detail
   expect(result.cities).toEqual(['Bijnor']);
   expect(query.eq).toHaveBeenCalledWith('businesses', 'is_published', true);
   expect(query.select.mock.calls.map(call => call[0])).toEqual(['businesses', 'shop_products']);
+  expect(query.select.mock.calls[0]?.[1]).toBe('id, slug, public_name, category, city, locality, address, hours, tagline');
+});
+
+it('homepage search index holds only published shops with the same safe columns', async () => {
+  const result = await (loadDirectoryIndex as unknown as () => Promise<{ shops: { slug: string }[] }>)();
+  expect(result.shops.map(shop => shop.slug)).toEqual(['public-shop']);
+  expect(query.eq).toHaveBeenCalledWith('businesses', 'is_published', true);
   expect(query.select.mock.calls[0]?.[1]).toBe('id, slug, public_name, category, city, locality, address, hours, tagline');
 });

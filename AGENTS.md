@@ -28,3 +28,5 @@
 
 - Images the app imports or serves must be embedded as text (data-URL/base64 .ts modules, or a server route decoding them) — the owner's Lovable→GitHub export drops binary files and a missing import breaks the Cloudflare build.
 - `.env.production` holds the original backend's public connection values and must stay in sync with the original backend — Vite production builds (Cloudflare) prefer it over `.env`, which the Lovable platform may rewrite to point at its own Cloud instance.
+- Homepage search loads the whole public directory once (`loadDirectoryIndex`, same safe columns as `searchDirectory`) and does relevance, suggestions, tabs and nearby ranking in the browser (src/lib/localSearch.ts, src/lib/customerLocation.ts) — typing never waits on the network and the customer's location never leaves the device except for the optional reverse-geocode lookup.
+- Homepage search navigations pass `resetScroll: false` and reveal results with a single scroll; never combine scrollIntoView with a router navigation that resets scroll (that caused the jump-and-snap-back bug).

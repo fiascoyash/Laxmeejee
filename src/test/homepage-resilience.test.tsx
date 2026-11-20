@@ -15,7 +15,7 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
 }));
 vi.mock('@/lib/discovery.queries', () => ({
-  directoryQuery: () => ({ queryKey: ['test-directory'], queryFn: directory.load, staleTime: 0 }),
+  directoryIndexQuery: () => ({ queryKey: ['test-directory'], queryFn: directory.load, staleTime: 0 }),
 }));
 vi.mock('@/legacy/components/LandingPage', () => ({
   LandingPage: ({ heroSearch, directory: results }: { heroSearch: ReactNode; directory: ReactNode }) => <main><h1>Your local market, connected.</h1>{heroSearch}{results}</main>,
@@ -41,12 +41,12 @@ function renderHomepage() {
 it('keeps the complete homepage visible when shop search fails and retries only the directory', async () => {
   renderHomepage();
   expect(screen.getByRole('heading', { name: 'Your local market, connected.' })).toBeInTheDocument();
-  expect(screen.getByRole('textbox', { name: 'Search shops or products' })).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: 'Search shops or products' })).toBeInTheDocument();
   expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent('Shop search couldn’t load');
   expect(screen.getByRole('heading', { name: 'Your local market, connected.' })).toBeInTheDocument();
 
   const callsBeforeRetry = directory.load.mock.calls.length;
-  directory.load.mockResolvedValue({ shops: [], total: 0, page: 1, pages: 1, cities: [], localities: [], categories: [] });
+  directory.load.mockResolvedValue({ shops: [] });
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByText('No matching shops')).toBeInTheDocument();
   await waitFor(() => expect(directory.load).toHaveBeenCalledTimes(callsBeforeRetry + 1));

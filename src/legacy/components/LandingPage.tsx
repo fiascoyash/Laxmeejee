@@ -15,7 +15,7 @@ interface Props {
   onEnterApp: () => void;
   /** Customer shop search shown inside the hero. */
   heroSearch?: ReactNode;
-  /** Live local shop directory shown right after the hero. */
+  /** Live search results and nearby shops shown right after the hero. */
   directory?: ReactNode;
 }
 
@@ -258,7 +258,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
               Discover nearby shops, explore products and order with ease. Run your business with digital storefronts, QR ordering, order management and GST billing — all in one place.
             </p>
 
-            {heroSearch && <div className="landing-fade-up mb-6 max-w-xl mx-auto lg:mx-0 text-left" style={{ animationDelay: '0.35s' }}>{heroSearch}</div>}
+            {heroSearch && <div className="landing-fade-up relative z-20 mb-6 max-w-xl mx-auto lg:mx-0 text-left" style={{ animationDelay: '0.35s' }}>{heroSearch}</div>}
 
             <div className="landing-fade-up flex flex-col sm:flex-row gap-3 justify-center lg:justify-start" style={{ animationDelay: '0.4s' }}>
               <button
@@ -303,6 +303,9 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
         </div>
       </section>
 
+      {/* Search results and nearby shops sit right below the hero search. */}
+      {directory && <section id="shops" className="py-16 bg-white scroll-mt-16">{directory}</section>}
+
       <section id="experiences" className="py-20 bg-white scroll-mt-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 text-center mb-12">One Hisaaboo. Two connected experiences.</h2>
@@ -334,7 +337,6 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
         </div>
       </section>
 
-      {directory && <section id="shops" className="py-16 bg-white scroll-mt-16">{directory}</section>}
 
       {/* What's new */}
       <section id="new" className="py-20 bg-emerald-50/50 scroll-mt-16">
