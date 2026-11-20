@@ -27,3 +27,4 @@
 - Shop response ratings come from pickup-order status timestamps stamped by a DB trigger and exposed only as aggregates (shop_response_stats) and code+phone lookups (track_pickup_order); never expose raw orders publicly. Active-code recovery requires phone plus case-insensitive nickname through a rate-limited RPC, never phone alone; browser-saved pickup references are separate from merchant billing storage and removed only after confirmed terminal status.
 
 - Images the app imports or serves must be embedded as text (data-URL/base64 .ts modules, or a server route decoding them) — the owner's Lovable→GitHub export drops binary files and a missing import breaks the Cloudflare build.
+- `.env.production` holds the original backend's public connection values and must stay in sync with the original backend — Vite production builds (Cloudflare) prefer it over `.env`, which the Lovable platform may rewrite to point at its own Cloud instance.
