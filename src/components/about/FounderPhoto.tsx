@@ -1,9 +1,9 @@
 // Founder portrait shown at the end of the About page story.
-// The photo is a real file bundled with the site (not a Lovable-hosted link) so it
-// works on the Cloudflare deployment.
-import founderPhotoUrl from "@/assets/founder-yash.jpg";
+// The photo is embedded as text (see founderPhotoImage.ts) so GitHub exports and the
+// Cloudflare build always include it.
+import { founderPhotoImage } from "./founderPhotoImage";
 
-const founderPhoto: string | null = founderPhotoUrl;
+const founderPhoto: string | null = founderPhotoImage;
 
 export function FounderPhoto() {
   return (
