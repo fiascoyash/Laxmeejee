@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Circle, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, MapPin, Navigation, Phone, Store, Sun, XCircle } from "lucide-react";
+import { normalizeDiscovery } from "@/lib/discovery";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,10 @@ export const Route = createFileRoute("/track")({
   }),
   component: TrackPage,
 });
+
+const homeSearch = normalizeDiscovery({});
+const directionsUrl = (name: string, address: string | null) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent([name, address].filter(Boolean).join(", "))}`;
 
 const STEPS = [
   { key: "created_at", label: "Order placed" },
@@ -113,7 +118,22 @@ function TrackPage() {
 
   const cancelled = order?.status === "cancelled";
   return (
-    <main className="min-h-screen bg-muted px-4 py-10">
+    <div className="flex min-h-screen flex-col bg-muted">
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+          <Link to="/" search={homeSearch} className="flex items-center gap-2 font-bold text-foreground">
+            <Sun className="size-6 text-primary" aria-hidden="true" />Hisaaboo
+          </Link>
+          <nav aria-label="Main" className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
+            <Link to="/" search={homeSearch} hash="shops" className="hover:text-foreground">Find Shops</Link>
+            <Link to="/about" className="hover:text-foreground">About</Link>
+          </nav>
+        </div>
+      </header>
+    <main className="flex-1 px-4 py-6">
+      <div className="mx-auto max-w-md">
+        <Link to="/" search={homeSearch} hash="shops" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" aria-hidden="true" />Back to all shops</Link>
+      </div>
       <div className="mx-auto max-w-md rounded-lg border bg-card p-6 shadow-sm">
         <h1 className="text-2xl font-bold">Track your order</h1>
         <SavedPickupOrders />
@@ -155,14 +175,34 @@ function TrackPage() {
                 <div className="flex gap-2"><Button type="button" variant="destructive" disabled={cancelling} onClick={() => void cancelOrder()}>{cancelling ? "Cancelling…" : "Cancel order"}</Button><Button type="button" variant="ghost" onClick={() => setCancelOpen(false)}>Keep order</Button></div>
               </div>
             ) : <Button type="button" variant="outline" className="mt-4 w-full" onClick={() => setCancelOpen(true)}>Cancel order</Button>)}
-            {order.status === "ready" && <p className="mt-4 rounded-lg bg-primary/10 p-3 text-sm font-medium text-primary">Your order is ready! Show code {order.order_code} at the counter and pay there.</p>}
+            {order.status === "ready" && <p className="mt-4 rounded-lg bg-primary/10 p-3 text-sm font-medium text-primary">Your order is ready! Show code {order.order_code} at the counter and pay there.{order.shop_address ? " Tap Get directions to reach the shop." : ""}</p>}
+            {!cancelled && order.status !== "collected" && (order.shop_address || order.shop_phone) && (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {order.shop_address && <Button asChild variant={order.status === "ready" ? "default" : "outline"} className={order.shop_phone ? "" : "col-span-2"}><a href={directionsUrl(order.shop_name, order.shop_address)} target="_blank" rel="noopener noreferrer"><Navigation className="size-4" aria-hidden="true" />Get directions</a></Button>}
+                {order.shop_phone && <Button asChild variant="outline" className={order.shop_address ? "" : "col-span-2"}><a href={`tel:${order.shop_phone}`}><Phone className="size-4" aria-hidden="true" />Call shop</a></Button>}
+              </div>
+            )}
             <ul className="mt-4 border-t pt-3 text-sm">{order.items.map((i, k) => <li key={k} className="flex justify-between"><span>{i.name} × {i.qty}</span><span>₹{(i.price * i.qty).toLocaleString("en-IN")}</span></li>)}
               <li className="mt-1 flex justify-between font-semibold"><span>Total</span><span>₹{Number(order.total).toLocaleString("en-IN")}</span></li></ul>
-            {(order.shop_phone || order.shop_address) && <p className="mt-3 text-xs text-muted-foreground">{order.shop_address}{order.shop_phone && <> · <a className="text-primary" href={`tel:${order.shop_phone}`}>{order.shop_phone}</a></>}</p>}
-            <p className="mt-3 text-xs text-muted-foreground">This page refreshes by itself.</p>
+            {(order.shop_phone || order.shop_address) && <p className="mt-3 text-xs text-muted-foreground">{order.shop_address && <MapPin className="mr-1 inline size-3" aria-hidden="true" />}{order.shop_address}{order.shop_phone && <> · <a className="text-primary" href={`tel:${order.shop_phone}`}>{order.shop_phone}</a></>}</p>}
+            {(cancelled || order.status === "collected") && order.shop_phone && <Button asChild variant="outline" className="mt-4 w-full"><a href={`tel:${order.shop_phone}`}><Phone className="size-4" aria-hidden="true" />Call shop</a></Button>}
+            {!cancelled && order.status !== "collected" && <p className="mt-3 text-xs text-muted-foreground">This page refreshes by itself.</p>}
+            <div className="mt-5 grid grid-cols-2 gap-2 border-t pt-4">
+              <Button asChild variant="secondary"><Link to="/shop/$slug" params={{ slug: order.shop_slug }}><Store className="size-4" aria-hidden="true" />Visit shop</Link></Button>
+              <Button asChild variant="secondary"><Link to="/" search={homeSearch} hash="shops">Explore more shops</Link></Button>
+            </div>
           </section>
         )}
       </div>
     </main>
+      <footer className="border-t bg-background py-5 text-center text-xs text-muted-foreground">
+        <nav aria-label="Footer" className="flex justify-center gap-4">
+          <Link to="/" search={homeSearch} className="hover:text-foreground">Home</Link>
+          <Link to="/" search={homeSearch} hash="shops" className="hover:text-foreground">Find Shops</Link>
+          <Link to="/about" className="hover:text-foreground">About Us</Link>
+        </nav>
+        <p className="mt-2">© Hisaaboo</p>
+      </footer>
+    </div>
   );
 }
