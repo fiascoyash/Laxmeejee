@@ -8,6 +8,7 @@ import { OnboardingForm } from "./OnboardingForm";
 import { ShopSettings, type Business } from "./ShopSettings";
 import { PickupOrders } from "./PickupOrders";
 import { playChime } from "./orderAlerts";
+import { newOrderAlert } from "@/lib/tableOrders";
 import { MerchantStoreProvider, type ShopSettingsTab } from "./store-context";
 
 /** Mark a pickup order collected once its GST bill is saved (non-draft). */
@@ -113,10 +114,11 @@ export function BusinessGate({ children }: { children: ReactNode }) {
         setOrdersVersion((v) => v + 1);
         void loadStore();
         if (payload.eventType === "INSERT") {
-          const o = payload.new as { customer_name: string; order_code: string; total: number };
+          const o = payload.new as { customer_name: string; order_code: string; total: number; note?: string | null };
+          const msg = newOrderAlert(o);
           playChime();
-          setAlert(`New pickup order #${o.order_code} from ${o.customer_name} — ₹${Number(o.total).toLocaleString("en-IN")}`);
-          if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification("New pickup order", { body: `${o.customer_name} — #${o.order_code}` });
+          setAlert(msg.banner);
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(msg.title, { body: msg.body });
         }
       }).subscribe();
     if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission().catch(() => {});

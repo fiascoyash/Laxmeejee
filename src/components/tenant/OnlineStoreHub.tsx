@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { parseTableNote } from "@/lib/tableOrders";
 import {
   ArrowUpRight,
   BellRing,
@@ -159,7 +160,7 @@ export function OnlineStoreHub() {
                   <li key={order.id} className="py-3 first:pt-1 last:pb-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">#{order.order_code} · {order.customer_name}</p>
+                        <p className="truncate text-sm font-semibold">{parseTableNote(order.note).table && <span className="mr-1 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">{parseTableNote(order.note).table}</span>}#{order.order_code} · {order.customer_name}</p>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground" title={itemSummary}>{itemSummary || "Pickup order"}</p>
                       </div>
                       <div className="shrink-0 text-right">

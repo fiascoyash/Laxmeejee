@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { savePickup, type SavedPickup } from "@/lib/saved-pickups";
 import { isValidPickupPhone, normalizePickupPhone } from "@/lib/pickup-phone";
+import { NOTE_MAX, tableNote } from "@/lib/tableOrders";
 
 type P = { product_id: string; name: string; unit: string | null; price: number; in_stock: boolean };
 
@@ -27,7 +28,7 @@ export function QtyControl({ p, cart }: { p: P; cart: ReturnType<typeof useCart>
   );
 }
 
-export function PickupCheckout({ slug, products, cart, compact = false }: { slug: string; products: P[]; cart: ReturnType<typeof useCart>; compact?: boolean }) {
+export function PickupCheckout({ slug, products, cart, compact = false, table = "" }: { slug: string; products: P[]; cart: ReturnType<typeof useCart>; compact?: boolean; table?: string }) {
   const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   const [placed, setPlaced] = useState<SavedPickup | null>(null);
@@ -58,7 +59,7 @@ export function PickupCheckout({ slug, products, cart, compact = false }: { slug
     setBusy(true);
     try {
       const { data, error } = await supabase.rpc("place_pickup_order", {
-        _slug: slug, _name: name.trim(), _phone: normalizedPhone, _note: note,
+        _slug: slug, _name: name.trim(), _phone: normalizedPhone, _note: tableNote(table, note),
         _items: lines.map((p) => ({ product_id: p.product_id, qty: (cart.qty[p.product_id] ?? 0) })),
       });
       if (error || typeof data !== 'string' || !data) { setErr(error?.message ?? 'Could not place your order. Please try again.'); return; }
@@ -70,7 +71,8 @@ export function PickupCheckout({ slug, products, cart, compact = false }: { slug
 
   return (
     <form onSubmit={submit} className={`${compact ? "mt-4 p-3" : "mt-6 p-4"} space-y-3 rounded-lg border`}>
-      <h2 className={`${compact ? "text-base" : "text-lg"} font-semibold text-foreground`}>Pick up at store</h2>
+      <h2 className={`${compact ? "text-base" : "text-lg"} font-semibold text-foreground`}>{table ? `Order to ${table}` : "Pick up at store"}</h2>
+      {table && <p className="rounded-md bg-muted px-3 py-2 text-xs font-medium text-foreground">Dine-in: the shop will see this order is for {table}.</p>}
       <ul className="text-sm">
         {lines.map((p) => <li key={p.product_id} className="flex justify-between"><span>{p.name} × {(cart.qty[p.product_id] ?? 0)}</span><span>₹{(Number(p.price) * (cart.qty[p.product_id] ?? 0)).toLocaleString("en-IN")}</span></li>)}
         <li className="mt-1 flex justify-between border-t pt-1 font-semibold"><span>Estimated total</span><span>₹{total.toLocaleString("en-IN")}</span></li>
@@ -78,9 +80,9 @@ export function PickupCheckout({ slug, products, cart, compact = false }: { slug
       <label className="block text-sm font-medium">Give this order a nickname<input required aria-label="Order nickname" value={name} onChange={(e) => setName(e.target.value)} placeholder="Batman, Chai Lover… who’s picking up?" minLength={2} maxLength={80} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" /></label>
       <p className="text-xs text-muted-foreground">Your real name works too. Keep this nickname private — it helps recover your order.</p>
       <input required aria-label="Mobile number" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10-digit mobile number" inputMode="tel" autoComplete="tel" maxLength={16} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note for the shop (optional)" maxLength={500} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note for the shop (optional)" maxLength={table ? NOTE_MAX - table.length - 3 : NOTE_MAX} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
       {err && <p role="alert" className="text-sm text-destructive">{err}</p>}
-      <Button type="submit" disabled={busy} className="w-full">{busy ? "Placing order…" : "Place pickup order"}</Button>
+      <Button type="submit" disabled={busy} className="w-full">{busy ? "Placing order…" : table ? "Place order" : "Place pickup order"}</Button>
       <p className="text-xs text-muted-foreground">No online payment — pay at the shop when you collect.</p>
     </form>
   );

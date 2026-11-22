@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import { TableQrStandee } from "@/components/tenant/TableQrStandee";
 import { supabase } from "@/integrations/supabase/client";
 import { STORE_THEMES, storeThemeStyle } from "@/lib/store-themes";
 
@@ -37,7 +37,7 @@ export function ShopSettings({ business, initialTab = "profile", onClose, onSave
           {(["profile", "catalogue", "look", "qr"] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)}
               className={`rounded-t-md px-3 py-2 ${tab === t ? "border-b-2 border-primary font-medium text-foreground" : "text-muted-foreground"}`}>
-              {t === "profile" ? "Shop profile" : t === "catalogue" ? "Online catalogue" : t === "look" ? "Photos & colours" : "Counter QR"}
+              {t === "profile" ? "Shop profile" : t === "catalogue" ? "Online catalogue" : t === "look" ? "Photos & colours" : "Counter & Table QR"}
             </button>
           ))}
         </div>
@@ -161,31 +161,7 @@ function CatalogueTab({ business, onUpdated }: { business: Business; onUpdated: 
 }
 
 function QrTab({ business }: { business: Business }) {
-  const url = `${window.location.origin}/shop/${business.slug}`;
-  const [src, setSrc] = useState("");
-  useEffect(() => { QRCode.toDataURL(url, { width: 600, margin: 2 }).then(setSrc); }, [url]);
-
-  function print() {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write(`<html><head><title>${business.public_name} QR</title></head><body style="font-family:sans-serif;text-align:center;padding:40px">
-      <h1 style="margin:0">${business.public_name.replace(/</g, "&lt;")}</h1><p style="font-size:18px">Scan to see our products & prices</p>
-      <img src="${src}" style="width:360px;height:360px"/><p style="font-size:14px">${url}</p>
-      <script>window.onload=()=>window.print()<\/script></body></html>`);
-    w.document.close();
-  }
-
-  return (
-    <div className="space-y-3 text-center">
-      {!business.is_published && <p className="rounded-md bg-muted p-2 text-sm text-muted-foreground">Your shop page is not published yet — customers who scan will see "not found" until you publish it.</p>}
-      {src && <img src={src} alt="Shop QR code" className="mx-auto h-56 w-56" />}
-      <p className="break-all text-sm text-muted-foreground">{url}</p>
-      <div className="flex justify-center gap-2">
-        <a href={src} download={`${business.slug}-qr.png`} className="rounded-md border px-4 py-2 text-sm">Download</a>
-        <button type="button" onClick={print} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Print counter standee</button>
-      </div>
-    </div>
-  );
+  return <TableQrStandee business={business} />;
 }
 
 type ShopRow = { product_id: string; name: string; price: number; category: string | null; image_path: string | null; description?: string | null };

@@ -51,3 +51,8 @@
 # About Us page
 - [x] Founder-led About page at /about from the brief, with SEO metadata, sitemap entry and homepage menu/footer links.
 - [x] Founder photo at the end of the page, bundled with the site so it works on Cloudflare.
+
+# Table QR standees
+- [x] "Counter & Table QR" tab: counter or table QR, single or bulk tables (up to 50), custom headline/message, shop colours, Powered by Hisaaboo footer, print 2/4 per A4, PNG download.
+- [x] Shop page reads ?table=, shows "Ordering from Table X" with Clear, and tags the order.
+- [x] Order queue, dashboard, instant alert and GST bill note show the table.

@@ -44,6 +44,7 @@ import { DuplicateDocumentDialog } from './components/DuplicateDocumentDialog';
 import { SimilarDocumentDialog } from './components/SimilarDocumentDialog';
 import { PrintCenter } from './components/PrintCenter';
 import { Printer } from 'lucide-react';
+import { parseTableNote } from '@/lib/tableOrders';
 import { createClient } from '@supabase/supabase-js';
 import { TermsEditor, getDefaultTerms } from './components/TermsEditor';
 
@@ -1221,7 +1222,7 @@ function App() {
         products,
         totalAmount: 0, totalCgst: 0, totalSgst: 0, roundOff: 0, grandTotal: 0,
         status: 'Draft',
-        notes: `Pickup order #${o.order_code}${o.note ? ` — ${o.note}` : ''}`,
+        notes: (() => { const t = parseTableNote(o.note); return `${t.table ? `Dine-in: ${t.table} · ` : ''}Pickup order #${o.order_code}${t.note ? ` — ${t.note}` : ''}`; })(),
         sourcePickupOrderId: o.id,
         selectedTemplateId: selectedTemplateId || template?.id,
         productColumns: savedColumns && savedColumns.length > 0 ? savedColumns : template?.schema?.productColumns || getDefaultProductColumns(),

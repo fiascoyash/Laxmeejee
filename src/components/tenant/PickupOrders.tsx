@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, UtensilsCrossed } from "lucide-react";
+import { parseTableNote } from "@/lib/tableOrders";
 import { ResponseCountdown } from "@/components/pickup/ResponseCountdown";
 
 type Order = Tables<"pickup_orders">;
@@ -62,11 +63,12 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
             <ul className="space-y-3">
               {list.map((o) => {
                 const items = (o.items as { name: string; qty: number; price: number; unit: string | null }[]) ?? [];
+                const tagged = parseTableNote(o.note);
                 return (
                   <li key={o.id} className="rounded-lg border p-3 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold">#{o.order_code} · {o.customer_name} · <a className="text-primary" href={`tel:${o.customer_phone}`}>{o.customer_phone}</a></p>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{LABEL[o.status]}</span>
+                      <p className="font-semibold">{tagged.table && <span className="mr-2 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground"><UtensilsCrossed className="size-3" aria-hidden="true" />{tagged.table}</span>}#{o.order_code} · {o.customer_name} · <a className="text-primary" href={`tel:${o.customer_phone}`}>{o.customer_phone}</a></p>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{tagged.table ? "Dine-in · " : ""}{LABEL[o.status]}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString("en-IN")}</p>
                     {o.status === "new" && <ResponseCountdown createdAt={o.created_at} audience="merchant" />}
@@ -74,7 +76,7 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
                     {o.status === "cancelled" && <p className="mt-1 rounded bg-destructive/10 p-2 text-xs text-destructive">{o.cancelled_by === "customer" ? "Cancelled by customer" : "Cancelled by shop"}{o.cancel_reason ? ` — “${o.cancel_reason}”` : ""}</p>}
                     <ul className="mt-2">{items.map((i, k) => <li key={k} className="flex justify-between"><span>{i.name} × {i.qty}{i.unit ? ` ${i.unit}` : ""}</span><span>₹{(i.price * i.qty).toLocaleString("en-IN")}</span></li>)}</ul>
                     <p className="mt-1 text-right font-semibold">Total ₹{Number(o.total).toLocaleString("en-IN")}</p>
-                    {o.note && <p className="mt-1 rounded bg-muted p-2 text-xs">Note: {o.note}</p>}
+                    {tagged.note && <p className="mt-1 rounded bg-muted p-2 text-xs">Note: {tagged.note}</p>}
                     <div className="mt-2 flex flex-wrap gap-2">
                       {o.status !== "cancelled" && (
                         <Button type="button" size="sm" variant="secondary" disabled={pendingId !== null} onClick={() => { window.dispatchEvent(new CustomEvent("hisaaboo:bill-from-order", { detail: o })); onClose(); }} className="bg-accent font-semibold text-accent-foreground ring-1 ring-primary">Generate GST bill</Button>
