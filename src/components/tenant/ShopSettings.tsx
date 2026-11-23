@@ -56,6 +56,10 @@ export function ShopSettings({ business, initialTab = "profile", onClose, onSave
   );
 }
 
+function L({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return <div className="block text-sm"><span className="mb-1 block font-medium">{label}</span>{children}{hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}</div>;
+}
+
 function ProfileTab({ business, onSaved }: { business: Business; onSaved: (b: Business) => void }) {
   const initial = splitAddress(business.address);
   const [f, setF] = useState({
@@ -89,9 +93,6 @@ function ProfileTab({ business, onSaved }: { business: Business; onSaved: (b: Bu
     onSaved(data as Business); setMsg("Saved.");
   }
 
-  const L = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
-    <div className="block text-sm"><span className="mb-1 block font-medium">{label}</span>{children}{hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}</div>
-  );
   return (
     <div className="space-y-3">
       <L label="Shop name *"><input className={input} value={f.public_name} onChange={set("public_name")} maxLength={80} /></L>
