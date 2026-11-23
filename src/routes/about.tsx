@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { HisaabooLogo } from "@/components/brand/HisaabooLogo";
 import { ArrowRight, CheckCircle2, FileText, LayoutTemplate, MapPin, Search, Store, Sun } from "lucide-react";
 import { normalizeDiscovery } from "@/lib/discovery";
 import { heroLocalShopImage } from "@/legacy/components/heroLocalShopImage";
@@ -89,8 +90,7 @@ function AboutPage() {
       <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/" search={shopsSearch} className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-            <Sun className="h-7 w-7 text-emerald-500" aria-hidden="true" />
-            <span className="text-xl font-bold tracking-tight text-slate-800">Hisaaboo</span>
+            <HisaabooLogo size={34} /><span className="sr-only">Hisaaboo</span>
           </Link>
           <nav aria-label="Main" className="flex items-center gap-2 text-sm font-medium text-slate-600 sm:gap-6">
             <Link to="/" search={shopsSearch} hash="shops" className="hidden hover:text-emerald-600 sm:inline">Find Shops</Link>

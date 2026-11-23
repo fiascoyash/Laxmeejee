@@ -1,5 +1,6 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { HisaabooLogo } from '@/components/brand/HisaabooLogo';
 import { Link } from '@tanstack/react-router';
 
 // Embedded in code so the homepage picture survives every export and deployment.
@@ -202,8 +203,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-100' : 'bg-transparent'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
-            <Sun className="w-7 h-7 text-emerald-500" />
-            <span className={`text-xl font-bold tracking-tight ${scrolled ? 'text-slate-800' : 'text-slate-800'}`}>Hisaaboo</span>
+            <HisaabooLogo size={34} /><span className="sr-only">Hisaaboo</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
             {directory && <button onClick={() => document.getElementById('shops')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">Find Shops</button>}
@@ -598,8 +598,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Sun className="w-6 h-6 text-emerald-500" />
-                <span className="text-lg font-bold text-white">Hisaaboo</span>
+                <HisaabooLogo size={30} tone="dark" /><span className="sr-only">Hisaaboo</span>
               </div>
               <p className="text-sm">Smart Billing & Business Management</p>
               <p className="text-sm mt-2 text-slate-500">Your local market, connected.</p>

@@ -1,5 +1,6 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
 import { useState, useEffect, useRef } from 'react';
+import { HisaabooLogo, HisaabooOwl } from '@/components/brand/HisaabooLogo';
 import { notify, invalidField } from './utils/notify';
 import { Button } from '@/components/ui/button';
 import { Link } from '@tanstack/react-router';
@@ -1653,9 +1654,9 @@ function App() {
         }`}
       >
         <div className={`p-6 border-b border-slate-700 ${desktopSidebarCollapsed ? 'lg:px-0 lg:flex lg:justify-center' : ''}`}>
-          {desktopSidebarCollapsed && <Sun aria-label="Hisaaboo" className="hb-logo-sun hidden lg:block w-8 h-8 text-emerald-500" />}
+          {desktopSidebarCollapsed && <span className="hidden lg:block"><HisaabooOwl size={36} title="Hisaaboo" /></span>}
           <div className={desktopSidebarCollapsed ? 'lg:hidden' : ''}>
-            <h1 className="hb-wordmark text-2xl font-bold text-white tracking-tight">Hisaaboo</h1>
+            <h1 className="hb-wordmark"><HisaabooLogo size={32} tone="dark" /><span className="sr-only">Hisaaboo</span></h1>
             <p className="text-slate-400 text-sm mt-1">Hisaab rakho. Business chalao.</p>
           </div>
         </div>
@@ -1737,8 +1738,7 @@ function App() {
                 <Menu className="w-6 h-6" />
               </Button>
               <div className="flex min-w-0 items-center gap-2 lg:hidden">
-                <Sun className="hb-logo-sun w-6 h-6 shrink-0 text-emerald-500" />
-                <span className="hb-wordmark truncate font-bold text-slate-800">Hisaaboo</span>
+                <HisaabooLogo size={28} /><span className="sr-only">Hisaaboo</span>
               </div>
             <div className="hidden lg:flex min-w-0 items-center gap-2 text-sm text-slate-500">
               <a

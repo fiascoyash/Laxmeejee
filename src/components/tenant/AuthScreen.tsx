@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { HisaabooLogo } from "@/components/brand/HisaabooLogo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -42,7 +43,7 @@ export function AuthScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted px-4">
       <div className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-foreground">Hisaaboo</h1>
+        <h1><HisaabooLogo size={36} /><span className="sr-only">Hisaaboo</span></h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {mode === "signin" ? "Sign in to your business" : "Create your owner account"}
         </p>

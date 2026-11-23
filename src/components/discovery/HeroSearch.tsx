@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { popularCategories, suggest, type Suggestion } from '@/lib/localSearch';
 import type { DirectoryShop } from '@/lib/discovery';
+import { HisaabooOwl } from '@/components/brand/HisaabooLogo';
 
 /** Landing-page search box with live suggestions and quick category chips. */
 export function HeroSearch({ shops, query, onSearch, onOpenShop, locationSlot }: {
@@ -17,6 +18,7 @@ export function HeroSearch({ shops, query, onSearch, onOpenShop, locationSlot }:
   const [draft, setDraft] = useState(query);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
+  const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
   useEffect(() => setDraft(query), [query]);
@@ -47,7 +49,7 @@ export function HeroSearch({ shops, query, onSearch, onOpenShop, locationSlot }:
 
   return (
     <div className="space-y-3">
-      <div className="flex min-h-8 items-center">{locationSlot}</div>
+      <div className="flex min-h-8 items-center justify-between gap-2"><div className="min-w-0">{locationSlot}</div><HisaabooOwl size={34} mode={shops === undefined ? 'searching' : focused ? 'typing' : 'idle'} lookTarget={draft.length} title={shops === undefined ? 'Searching nearby shops' : 'Hisaaboo owl'} /></div>
       <form role="search" className="flex scroll-mt-24 gap-2" onSubmit={e => { e.preventDefault(); commit(draft); }}>
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-3.5 size-5 text-muted-foreground" aria-hidden="true" />
@@ -64,8 +66,8 @@ export function HeroSearch({ shops, query, onSearch, onOpenShop, locationSlot }:
             enterKeyHint="search"
             value={draft}
             onChange={e => { setDraft(e.target.value); setOpen(true); setActive(-1); }}
-            onFocus={() => setOpen(true)}
-            onBlur={() => setOpen(false)}
+            onFocus={() => { setOpen(true); setFocused(true); }}
+            onBlur={() => { setOpen(false); setFocused(false); }}
             onKeyDown={onKeyDown}
             placeholder="Search products, shops or services"
             maxLength={100}

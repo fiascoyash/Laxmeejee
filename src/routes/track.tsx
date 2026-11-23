@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { HisaabooLogo } from "@/components/brand/HisaabooLogo";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, Circle, MapPin, Navigation, Phone, Store, Sun, XCircle } from "lucide-react";
 import { normalizeDiscovery } from "@/lib/discovery";
@@ -122,7 +123,7 @@ function TrackPage() {
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <Link to="/" search={homeSearch} className="flex items-center gap-2 font-bold text-foreground">
-            <Sun className="size-6 text-primary" aria-hidden="true" />Hisaaboo
+            <HisaabooLogo size={30} /><span className="sr-only">Hisaaboo home</span>
           </Link>
           <nav aria-label="Main" className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
             <Link to="/" search={homeSearch} hash="shops" className="hover:text-foreground">Find Shops</Link>
@@ -201,6 +202,7 @@ function TrackPage() {
           <Link to="/" search={homeSearch} hash="shops" className="hover:text-foreground">Find Shops</Link>
           <Link to="/about" className="hover:text-foreground">About Us</Link>
         </nav>
+        <div className="mt-3 flex justify-center"><HisaabooLogo size={24} /></div>
         <p className="mt-2">© Hisaaboo</p>
       </footer>
     </div>
