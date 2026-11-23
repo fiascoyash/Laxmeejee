@@ -1,4 +1,6 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
+import type { ProductStockMovement } from './types';
+import { applyInvoiceStockSale, reverseInvoiceStockSale } from './utils/invoiceStock';
 import { useState, useEffect, useRef } from 'react';
 import { HisaabooLogo, HisaabooOwl } from '@/components/brand/HisaabooLogo';
 import { notify, invalidField } from './utils/notify';
@@ -959,9 +961,11 @@ function App() {
 
     setInvoices(storage.getInvoices());
 
-    // Record stock movements for new, non-Draft sales
-    if (isNewInvoice && status !== 'Draft') {
-      await recordStockMovementsForSale(invoiceToPersist);
+    // Deduct stock + log Sale movements once per finalized invoice (new or Draft→final)
+    const saleMovements = applyInvoiceStockSale(invoiceToPersist);
+    if (saleMovements.length) {
+      setCatalog(storage.getProductCatalog());
+      void recordStockMovementsForSale(saleMovements);
     }
 
     // Background-sync payment changes to Supabase
@@ -1029,39 +1033,42 @@ function App() {
   };
 
   // Record stock movements when an invoice is finalized (sold)
-  const recordStockMovementsForSale = async (invoice: Invoice) => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const recordStockMovementsForSale = async (movements: ProductStockMovement[]) => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (!supabaseUrl || !supabaseAnonKey) return;
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      await supabase.from('product_stock_movements').insert(movements.map(m => ({
+        product_id: m.productId,
+        movement_type: m.movementType,
+        quantity_change: Math.round(m.quantityChange),
+        balance_after: Math.round(m.balanceAfter),
+        quantity_delta: m.quantityChange,
+        stock_balance: m.balanceAfter,
+        reference_type: m.referenceType,
+        reference_id: m.referenceId,
+        notes: m.notes,
+      })));
+    } catch (_) { /* background sync only */ }
+  };
 
-    if (!supabaseUrl || !supabaseAnonKey) return;
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    for (const product of invoice.products) {
-      if (!product.name || product.quantity <= 0) continue;
-
-      // Find the product in catalog to get its ID
-      const catalogItem = catalog.find(c => c.name.toLowerCase() === product.name.toLowerCase());
-      if (!catalogItem) continue;
-
-      const newStock = catalogItem.stockQuantity - product.quantity;
-
-      // Create stock movement record for sale
-      await supabase.from('product_stock_movements').insert({
-        product_id: catalogItem.id,
-        movement_type: 'sale',
-        quantity_change: -product.quantity,
-        balance_after: newStock,
-        reference_type: 'invoice',
-        reference_id: invoice.id,
-        notes: `Invoice: ${invoice.invoiceNumber}, Customer: ${invoice.customer.name}`,
-      });
+  const restoreStockForInvoices = (ids: string[]) => {
+    const all = storage.getInvoices();
+    const reversed = ids.flatMap(id => {
+      const inv = all.find(i => i.id === id);
+      return inv ? reverseInvoiceStockSale(inv) : [];
+    });
+    if (reversed.length) {
+      setCatalog(storage.getProductCatalog());
+      void recordStockMovementsForSale(reversed);
     }
   };
 
   // Delete invoice
   const deleteInvoice = (id: string) => {
     if (confirm('Are you sure you want to delete this invoice?')) {
+      restoreStockForInvoices([id]);
       storage.deleteInvoice(id);
       setInvoices(storage.getInvoices());
     }
@@ -1069,6 +1076,7 @@ function App() {
 
   const handleBulkDeleteInvoices = (ids: string[]) => {
     if (confirm(`Delete ${ids.length} invoice${ids.length !== 1 ? 's' : ''}? This cannot be undone.`)) {
+      restoreStockForInvoices(ids);
       ids.forEach(id => storage.deleteInvoice(id));
       setInvoices(storage.getInvoices());
     }
