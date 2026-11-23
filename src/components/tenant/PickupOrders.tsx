@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { RotateCcw, UtensilsCrossed } from "lucide-react";
 import { formatDistance, loadTableFence, parseTableNote, verifyOrderSpot } from "@/lib/tableOrders";
 import { ResponseCountdown } from "@/components/pickup/ResponseCountdown";
+import { MerchantFeedback } from '@/components/pickup/MerchantFeedback';
 
 type Order = Tables<"pickup_orders">;
 const NEXT: Record<string, { to: string; label: string }[]> = {
@@ -21,10 +22,12 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelFor, setCancelFor] = useState<Order | null>(null);
+  const [feedbackVersion, setFeedbackVersion] = useState(0);
   const fence = loadTableFence(businessId);
   const load = useCallback(async () => {
     const { data } = await supabase.from("pickup_orders").select("*").eq("business_id", businessId).order("created_at", { ascending: false }).limit(100);
     setOrders(data ?? []);
+    setFeedbackVersion(n => n+1);
   }, [businessId]);
   useEffect(() => { load(); }, [load, version]);
 
@@ -82,6 +85,7 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
                     <ul className="mt-2">{items.map((i, k) => <li key={k} className="flex justify-between"><span>{i.name} × {i.qty}{i.unit ? ` ${i.unit}` : ""}</span><span>₹{(i.price * i.qty).toLocaleString("en-IN")}</span></li>)}</ul>
                     <p className="mt-1 text-right font-semibold">Total ₹{Number(o.total).toLocaleString("en-IN")}</p>
                     {tagged.note && <p className="mt-1 rounded bg-muted p-2 text-xs">Note: {tagged.note}</p>}
+                    {o.status === 'collected' && <MerchantFeedback businessId={businessId} orderId={o.id} version={feedbackVersion} />}
                     <div className="mt-2 flex flex-wrap gap-2">
                       {o.status !== "cancelled" && (
                         <Button type="button" size="sm" variant="secondary" disabled={pendingId !== null} onClick={() => { window.dispatchEvent(new CustomEvent("hisaaboo:bill-from-order", { detail: o })); onClose(); }} className="bg-accent font-semibold text-accent-foreground ring-1 ring-primary">Generate GST bill</Button>

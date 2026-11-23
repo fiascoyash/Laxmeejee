@@ -10,6 +10,7 @@ import { SavedPickupOrders } from "@/components/tenant/SavedPickupOrders";
 import { removeSavedPickup, savePickup } from "@/lib/saved-pickups";
 import { ResponseCountdown } from "@/components/pickup/ResponseCountdown";
 import { isValidPickupPhone, normalizePickupPhone } from "@/lib/pickup-phone";
+import { CustomerFeedback } from '@/components/pickup/CustomerFeedback';
 
 type Tracked = {
   order_code: string; status: string; total: number; items: { name: string; qty: number; price: number }[];
@@ -188,6 +189,7 @@ function TrackPage() {
             {(order.shop_phone || order.shop_address) && <p className="mt-3 text-xs text-muted-foreground">{order.shop_address && <MapPin className="mr-1 inline size-3" aria-hidden="true" />}{order.shop_address}{order.shop_phone && <> · <a className="text-primary" href={`tel:${order.shop_phone}`}>{order.shop_phone}</a></>}</p>}
             {(cancelled || order.status === "collected") && order.shop_phone && <Button asChild variant="outline" className="mt-4 w-full"><a href={`tel:${order.shop_phone}`}><Phone className="size-4" aria-hidden="true" />Call shop</a></Button>}
             {!cancelled && order.status !== "collected" && <p className="mt-3 text-xs text-muted-foreground">This page refreshes by itself.</p>}
+            {order.status === 'collected' && <CustomerFeedback key={`${search.code}:${search.phone}`} code={search.code} phone={search.phone} />}
             <div className="mt-5 grid grid-cols-2 gap-2 border-t pt-4">
               <Button asChild variant="secondary"><Link to="/shop/$slug" params={{ slug: order.shop_slug }}><Store className="size-4" aria-hidden="true" />Visit shop</Link></Button>
               <Button asChild variant="secondary"><Link to="/" search={homeSearch} hash="shops">Explore more shops</Link></Button>

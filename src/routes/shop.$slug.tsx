@@ -10,6 +10,7 @@ import { useCart, QtyControl, PickupCheckout } from "@/components/tenant/PickupC
 import { ResponseBadge } from "@/components/tenant/ResponseBadge";
 import type { ResponseStats } from "@/lib/discovery";
 import { SavedPickupOrders } from '@/components/tenant/SavedPickupOrders';
+import { CustomerRating } from '@/components/pickup/CustomerRating';
 
 type PublicShop = {
   slug: string; public_name: string; category: string | null; city: string | null;
@@ -155,6 +156,7 @@ function ShopPage() {
           </div>
           <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-semibold text-store-foreground">
             <span className="rounded-full bg-background px-3 py-1.5 shadow-store-card"><ResponseBadge stats={shop.response} /></span>
+            <CustomerRating slug={shop.slug} />
             {place && <span className="rounded-full bg-background/80 px-3 py-1.5">📍 {place}</span>}
             {shop.hours && <span className="rounded-full bg-background/80 px-3 py-1.5">🕒 {shop.hours}</span>}
             {shop.phone && <a href={`tel:${shop.phone}`} className="rounded-full bg-store-deep px-3 py-1.5 text-store-deep-foreground hover:opacity-90">📞 Call shop</a>}

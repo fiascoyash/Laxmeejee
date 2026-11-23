@@ -15,7 +15,9 @@ const order = {
 beforeEach(() => {
   vi.clearAllMocks();
   cloud.result = { data: [{ id: order.id }], error: null };
-  cloud.from.mockImplementation(() => ({
+  cloud.from.mockImplementation((table: string) => table === 'pickup_feedback' ? {
+    select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
+  } : ({
     select: () => ({ eq: () => ({ order: () => ({ limit: async () => ({ data: [order] }) }) }) }),
     update: (values: unknown) => {
       cloud.update(values);
@@ -65,6 +67,6 @@ describe('Collected-order recovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reopen order' }));
     await screen.findByRole('alert');
     expect(screen.getByText('Collected')).toBeInTheDocument();
-    expect(cloud.from).toHaveBeenCalledTimes(2);
+    expect(cloud.from.mock.calls.filter(call => call[0] === 'pickup_orders')).toHaveLength(2);
   });
 });

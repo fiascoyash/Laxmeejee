@@ -58,4 +58,5 @@
 - [x] Order queue, dashboard, instant alert and GST bill note show the table.
 
 - [x] Table QR geofence setup, dashboard location labels, alert warning, merchant cancel reasons
-- [ ] Customer "order received" confirmation + review with anti-fake rules — needs a new database table on the original backend (owner must apply the change there)
+- [x] Customer receipt confirmation, optional ratings and issues, private merchant read access, protected aggregate shop ratings and anti-fake-rating tests.
+- [ ] Activate and verify live reviews — owner must run docs/customer-reviews-setup.sql on the original backend; no access to that database from here.
