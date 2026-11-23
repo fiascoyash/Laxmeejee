@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bulkTables, newOrderAlert, normalizeTable, parseTableNote, tableNote, tableUrl } from "@/lib/tableOrders";
+import { checkFence, verifyOrderSpot, bulkTables, newOrderAlert, normalizeTable, parseTableNote, tableNote, tableUrl } from "@/lib/tableOrders";
 
 describe("table QR links", () => {
   it("adds ?table=<name> to the shop link", () => {
@@ -30,8 +30,8 @@ describe("table tag on orders", () => {
     expect(tableNote("", "less spicy")).toBe("less spicy");
   });
   it("reads the table back for the order queue", () => {
-    expect(parseTableNote("[Table 3] less spicy")).toEqual({ table: "Table 3", note: "less spicy" });
-    expect(parseTableNote("just a note")).toEqual({ table: "", note: "just a note" });
+    expect(parseTableNote("[Table 3] less spicy")).toEqual({ table: "Table 3", note: "less spicy", spot: null });
+    expect(parseTableNote("just a note")).toEqual({ table: "", note: "just a note", spot: null });
   });
 });
 
@@ -45,5 +45,20 @@ describe("instant new-order alert", () => {
     const a = newOrderAlert({ customer_name: "Yash", order_code: "104", total: 450, note: "" });
     expect(a.banner).toBe("New pickup order #104 from Yash — ₹450");
     expect(a.title).toBe("New pickup order");
+  });
+});
+
+describe("dine-in geofence", () => {
+  const fence = { lat: 29.37, lng: 78.13, r: 150 };
+  it("allows a table order placed inside the 150 m range", () => {
+    expect(checkFence(fence, { lat: 29.3705, lng: 78.13, accuracy: 20 }).result).toBe("inside");
+  });
+  it("blocks a table order placed 2 km away", () => {
+    expect(checkFence(fence, { lat: 29.388, lng: 78.13, accuracy: 20 }).result).toBe("outside");
+  });
+  it("warns the merchant when an order note carries a far-away spot", () => {
+    const a = newOrderAlert({ customer_name: "Yash", order_code: "9", total: 100, note: "[Table 4][@29.38800,78.13000,20,2000] hi" }, fence);
+    expect(a.banner).toContain("check Table 4 before cooking");
+    expect(verifyOrderSpot(null, fence).status).toBe("unchecked");
   });
 });

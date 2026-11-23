@@ -56,3 +56,6 @@
 - [x] "Counter & Table QR" tab: counter or table QR, single or bulk tables (up to 50), custom headline/message, shop colours, Powered by Hisaaboo footer, print 2/4 per A4, PNG download.
 - [x] Shop page reads ?table=, shows "Ordering from Table X" with Clear, and tags the order.
 - [x] Order queue, dashboard, instant alert and GST bill note show the table.
+
+- [x] Table QR geofence setup, dashboard location labels, alert warning, merchant cancel reasons
+- [ ] Customer "order received" confirmation + review with anti-fake rules — needs a new database table on the original backend (owner must apply the change there)

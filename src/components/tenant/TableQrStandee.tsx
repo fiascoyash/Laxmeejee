@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { storeTheme } from "@/lib/store-themes";
-import { BULK_MAX, bulkTables, normalizeTable, tableUrl } from "@/lib/tableOrders";
+import { BULK_MAX, FENCE_DEFAULT, FENCE_MAX, FENCE_MIN, bulkTables, loadTableFence, makeFence, normalizeTable, saveTableFence, tableUrl, type TableFence } from "@/lib/tableOrders";
 
 type StandeeBusiness = { id: string; slug: string; public_name: string; is_published: boolean; accent_color?: string | null };
 type Card = { table: string; url: string; qr: string };
@@ -56,6 +56,20 @@ export function TableQrStandee({ business }: { business: StandeeBusiness }) {
   const [layout, setLayout] = useState<"four" | "two">("four");
   const [texts, setTexts] = useState<Texts>(() => loadTexts(business.id));
   const [cards, setCards] = useState<Card[]>([]);
+  const [fence, setFence] = useState<TableFence | null>(() => loadTableFence(business.id));
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState("");
+  const [saved, setSaved] = useState(false);
+  function updateFence(f: TableFence | null) { setFence(f); saveTableFence(business.id, f); setSaved(true); setTimeout(() => setSaved(false), 2500); }
+  function useHere() {
+    if (!navigator.geolocation) { setLocError("This device can't share its location."); return; }
+    setLocating(true); setLocError("");
+    navigator.geolocation.getCurrentPosition(
+      (p) => { setLocating(false); updateFence(makeFence(p.coords.latitude, p.coords.longitude, fence?.r ?? FENCE_DEFAULT)); },
+      () => { setLocating(false); setLocError("Couldn't get your location. Allow location access and stand inside the restaurant, then try again."); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  }
 
   useEffect(() => { try { localStorage.setItem(`hisaaboo_standee_${business.id}`, JSON.stringify(texts)); } catch { /* ignore */ } }, [texts, business.id]);
 
@@ -64,11 +78,11 @@ export function TableQrStandee({ business }: { business: StandeeBusiness }) {
   useEffect(() => {
     let alive = true;
     Promise.all(tables.map(async (table) => {
-      const url = tableUrl(origin, business.slug, table);
+      const url = tableUrl(origin, business.slug, table, fence);
       return { table, url, qr: await QRCode.toDataURL(url, { width: 600, margin: 1 }) };
     })).then((c) => { if (alive) setCards(c); });
     return () => { alive = false; };
-  }, [tables, origin, business.slug]);
+  }, [tables, origin, business.slug, fence]);
 
   const first = cards[0];
   const previewDoc = first ? `<html><head><style>${CSS} body{background:transparent;display:flex;justify-content:center;padding:8px}</style></head><body>${cardHtml(first, business.public_name, texts, business.accent_color)}</body></html>` : "";
@@ -134,6 +148,30 @@ export function TableQrStandee({ business }: { business: StandeeBusiness }) {
               <p className="col-span-3 text-xs text-muted-foreground">{tables.length ? `${tables.length} card(s): ${tables[0]} … ${tables[tables.length - 1]}` : "Enter a valid number range."} Up to {BULK_MAX} at a time.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {mode === "table" && (
+        <div className="space-y-2 rounded-md border p-3 text-sm">
+          <p className="font-medium">Stop fake orders from home</p>
+          <p className="text-xs text-muted-foreground">Save your restaurant's spot while standing inside it. Table orders will then work only within the range you pick.</p>
+          {fence ? (
+            <p className="rounded bg-success/10 p-2 text-xs text-success">✓ Location saved — table orders work within {fence.r} m of your restaurant.</p>
+          ) : (
+            <p className="rounded bg-warning/10 p-2 text-xs text-warning-foreground">Location not saved — anyone with a QR photo can order. Orders will show "Location not checked".</p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" disabled={locating} onClick={useHere} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-60">{locating ? "Finding location…" : fence ? "Update to my current location" : "Use my current location"}</button>
+            {fence && <button type="button" onClick={() => updateFence(null)} className="rounded-md border px-3 py-1.5 text-sm">Turn off location check</button>}
+            {saved && <span className="text-xs text-success">Saved</span>}
+          </div>
+          {fence && (
+            <label className="block"><span className="mb-1 block text-xs font-medium">Allowed range: {fence.r} m</span>
+              <input aria-label="Allowed range in metres" type="range" min={FENCE_MIN} max={FENCE_MAX} step={50} value={fence.r} onChange={(e) => updateFence(makeFence(fence.lat, fence.lng, Number(e.target.value)))} className="w-full" />
+            </label>
+          )}
+          {locError && <p role="alert" className="text-xs text-destructive">{locError}</p>}
+          {fence && <p className="text-xs text-muted-foreground">Reprint your table QRs after saving or changing this — older printed QRs don't carry the location.</p>}
         </div>
       )}
 

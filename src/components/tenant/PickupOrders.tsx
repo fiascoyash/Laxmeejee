@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { RotateCcw, UtensilsCrossed } from "lucide-react";
-import { parseTableNote } from "@/lib/tableOrders";
+import { formatDistance, loadTableFence, parseTableNote, verifyOrderSpot } from "@/lib/tableOrders";
 import { ResponseCountdown } from "@/components/pickup/ResponseCountdown";
 
 type Order = Tables<"pickup_orders">;
@@ -20,18 +20,22 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
   const [showDone, setShowDone] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelFor, setCancelFor] = useState<Order | null>(null);
+  const fence = loadTableFence(businessId);
   const load = useCallback(async () => {
     const { data } = await supabase.from("pickup_orders").select("*").eq("business_id", businessId).order("created_at", { ascending: false }).limit(100);
     setOrders(data ?? []);
   }, [businessId]);
   useEffect(() => { load(); }, [load, version]);
 
-  async function move(o: Order, status: string) {
+  async function move(o: Order, status: string, reason?: string) {
     setPendingId(o.id);
     setError(null);
     try {
+      const now = new Date().toISOString();
+      const patch = status === "cancelled" ? { status, updated_at: now, cancelled_by: "merchant", cancel_reason: reason ?? null, cancelled_at: now } : { status, updated_at: now };
       const { data, error: updateError } = await supabase.from("pickup_orders")
-        .update({ status, updated_at: new Date().toISOString() })
+        .update(patch)
         .eq("id", o.id).eq("business_id", businessId).eq("status", o.status).select("id");
       if (updateError) throw updateError;
       if (!data?.length) throw new Error("Order changed or could not be updated.");
@@ -70,6 +74,7 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
                       <p className="font-semibold">{tagged.table && <span className="mr-2 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground"><UtensilsCrossed className="size-3" aria-hidden="true" />{tagged.table}</span>}#{o.order_code} · {o.customer_name} · <a className="text-primary" href={`tel:${o.customer_phone}`}>{o.customer_phone}</a></p>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{tagged.table ? "Dine-in · " : ""}{LABEL[o.status]}</span>
                     </div>
+                    {tagged.table && <SpotLabel check={verifyOrderSpot(tagged.spot, fence)} table={tagged.table} />}
                     <p className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString("en-IN")}</p>
                     {o.status === "new" && <ResponseCountdown createdAt={o.created_at} audience="merchant" />}
                     <CustomerHistory businessId={businessId} phone={o.customer_phone} />
@@ -82,7 +87,7 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
                         <Button type="button" size="sm" variant="secondary" disabled={pendingId !== null} onClick={() => { window.dispatchEvent(new CustomEvent("hisaaboo:bill-from-order", { detail: o })); onClose(); }} className="bg-accent font-semibold text-accent-foreground ring-1 ring-primary">Generate GST bill</Button>
                       )}
                       {(NEXT[o.status] ?? []).map((n) => (
-                        <Button key={n.to} type="button" size="sm" disabled={pendingId !== null} variant={n.to === "cancelled" || o.status === "collected" ? "outline" : "default"} onClick={() => move(o, n.to)}>{o.status === "collected" && <RotateCcw aria-hidden="true" />}{n.label}</Button>
+                        <Button key={n.to} type="button" size="sm" disabled={pendingId !== null} variant={n.to === "cancelled" || o.status === "collected" ? "outline" : "default"} onClick={() => n.to === "cancelled" ? setCancelFor(o) : move(o, n.to)}>{o.status === "collected" && <RotateCcw aria-hidden="true" />}{n.label}</Button>
                       ))}
                     </div>
                   </li>
@@ -90,6 +95,36 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
               })}
             </ul>
           )}
+        </div>
+      </div>
+      {cancelFor && <CancelReason order={cancelFor} busy={pendingId !== null} onClose={() => setCancelFor(null)} onConfirm={async (r) => { const o = cancelFor; setCancelFor(null); await move(o, "cancelled", r); }} />}
+    </div>
+  );
+}
+
+function SpotLabel({ check, table }: { check: ReturnType<typeof verifyOrderSpot>; table: string }) {
+  if (check.status === "verified") return <p className="mt-1 text-xs font-medium text-success">✓ At restaurant{check.dist != null ? ` · ${formatDistance(check.dist)}` : ""}</p>;
+  if (check.status === "far") return <p className="mt-1 rounded bg-destructive/10 p-2 text-xs font-medium text-destructive">⚠ Ordered from {formatDistance(check.dist ?? NaN)} away — look at {table} before cooking. If it's empty, call the customer or decline.</p>;
+  return <p className="mt-1 text-xs text-muted-foreground">Location not checked — glance at {table} before cooking.</p>;
+}
+
+export const SHOP_CANCEL_REASONS = ["Item out of stock", "Shop / kitchen closing", "Too many orders right now"];
+export const CUSTOMER_CANCEL_REASONS = ["Table empty / customer not here", "Customer phone unreachable", "Customer asked to cancel"];
+
+function CancelReason({ order, busy, onClose, onConfirm }: { order: Order; busy: boolean; onClose: () => void; onConfirm: (reason: string) => void }) {
+  const [reason, setReason] = useState("");
+  const chip = (r: string) => <Button key={r} type="button" size="sm" variant={reason === r ? "default" : "outline"} onClick={() => setReason(r)}>{r}</Button>;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/40 p-3">
+      <div role="dialog" aria-modal="true" aria-labelledby="cancel-reason-title" className="w-full max-w-md space-y-3 rounded-xl bg-card p-4 text-card-foreground shadow-xl">
+        <h3 id="cancel-reason-title" className="font-semibold">Why are you cancelling #{order.order_code}?</h3>
+        <p className="text-xs text-muted-foreground">The customer sees this reason on their tracking page.</p>
+        <p className="text-xs font-medium">Shop reason</p><div className="flex flex-wrap gap-2">{SHOP_CANCEL_REASONS.map(chip)}</div>
+        <p className="text-xs font-medium">Customer reason</p><div className="flex flex-wrap gap-2">{CUSTOMER_CANCEL_REASONS.map(chip)}</div>
+        <input aria-label="Cancel reason" className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="Or write your own reason" maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>Keep order</Button>
+          <Button type="button" variant="destructive" disabled={busy || reason.trim().length < 3} onClick={() => onConfirm(reason.trim())}>Cancel order</Button>
         </div>
       </div>
     </div>

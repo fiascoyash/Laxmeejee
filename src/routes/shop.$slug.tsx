@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { storeThemeStyle } from "@/lib/store-themes";
 import { Search, ShoppingBag, UtensilsCrossed, X } from "lucide-react";
-import { normalizeTable } from "@/lib/tableOrders";
+import { normalizeTable, parseFence, encodeFence } from "@/lib/tableOrders";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
@@ -66,7 +66,12 @@ const getPublicShop = createServerFn({ method: "GET" })
   });
 
 export const Route = createFileRoute("/shop/$slug")({
-  validateSearch: (s: Record<string, unknown>): { table?: string } => { const table = normalizeTable(s["table"]); return table ? { table } : {}; },
+  validateSearch: (s: Record<string, unknown>): { table?: string; geo?: string } => {
+    const table = normalizeTable(s["table"]);
+    if (!table) return {};
+    const fence = parseFence(s["geo"]);
+    return fence ? { table, geo: encodeFence(fence) } : { table };
+  },
   loader: async ({ params }) => {
     const shop = await getPublicShop({ data: params.slug });
     if (!shop) throw notFound();
@@ -102,7 +107,9 @@ export const Route = createFileRoute("/shop/$slug")({
 
 function ShopPage() {
   const shop = Route.useLoaderData();
-  const { table = "" } = Route.useSearch();
+  const { table = "", geo } = Route.useSearch();
+  const fence = useMemo(() => parseFence(geo), [geo]);
+  const leaveTable = () => void navigate({ search: {}, replace: true, resetScroll: false });
   const navigate = Route.useNavigate();
   const cart = useCart();
   const [query, setQuery] = useState("");
@@ -178,7 +185,7 @@ function ShopPage() {
         {table && (
           <div role="status" className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-store-deep px-4 py-3 text-store-deep-foreground shadow-store-card">
             <span className="flex min-w-0 items-center gap-2 text-sm font-bold"><UtensilsCrossed className="size-5 shrink-0" aria-hidden="true" /><span className="truncate">Ordering from {table}</span></span>
-            <button type="button" onClick={() => void navigate({ search: {}, replace: true, resetScroll: false })} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-background/20 px-3 py-1 text-xs font-semibold hover:bg-background/30"><X className="size-3" aria-hidden="true" />Clear</button>
+            <button type="button" onClick={leaveTable} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-background/20 px-3 py-1 text-xs font-semibold hover:bg-background/30"><X className="size-3" aria-hidden="true" />Clear</button>
           </div>
         )}
         <SavedPickupOrders />
@@ -211,7 +218,7 @@ function ShopPage() {
           </section>
         ))}
         <div id="checkout" className="mt-8 scroll-mt-40 rounded-2xl bg-background p-4 shadow-store-card">
-          <PickupCheckout slug={shop.slug} products={shop.products} cart={cart} table={table} />
+          <PickupCheckout slug={shop.slug} products={shop.products} cart={cart} table={table} fence={fence} onLeaveTable={leaveTable} />
           {count === 0 && <p className="text-sm text-muted-foreground">Tap Add on any item to order for pickup at the store.</p>}
         </div>
         {shop.address && <p className="mt-4 text-center text-xs text-muted-foreground">{shop.address}</p>}
