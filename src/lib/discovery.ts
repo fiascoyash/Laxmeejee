@@ -3,6 +3,7 @@ export type DirectoryProduct = { product_id: string; name: string; category: str
 export type DirectoryShop = {
   id: string; slug: string; public_name: string; category: string | null; city: string | null;
   locality: string | null; address: string | null; hours: string | null; tagline: string | null;
+  latitude?: number; longitude?: number;
   products: DirectoryProduct[];
   response?: ResponseStats | null;
 };

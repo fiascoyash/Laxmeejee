@@ -4,6 +4,10 @@ import { slugify, isValidSlug } from "@/lib/slug";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SuggestInput } from "@/components/tenant/SuggestInput";
+import { INDIAN_CITIES, SHOP_CATEGORIES } from "@/lib/shopAddress";
+
+const field = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm";
 
 export function OnboardingForm({ onCreated, onSignOut }: { onCreated: () => void; onSignOut: () => void }) {
   const [name, setName] = useState("");
@@ -11,13 +15,14 @@ export function OnboardingForm({ onCreated, onSignOut }: { onCreated: () => void
   const [slugTouched, setSlugTouched] = useState(false);
   const [city, setCity] = useState("");
   const [locality, setLocality] = useState("");
-  const [category, setCategory] = useState("Hardware & Electricals");
+  const [category, setCategory] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const finalSlug = slugTouched ? slug : slugify(name);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!city.trim() || !category.trim()) { setError("Please choose your city and category."); return; }
     if (!isValidSlug(finalSlug)) {
       setError("Web address must be 3–50 lowercase letters, numbers or dashes.");
       return;
@@ -54,7 +59,7 @@ export function OnboardingForm({ onCreated, onSignOut }: { onCreated: () => void
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label htmlFor="bcity">City</Label>
-            <Input id="bcity" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Bijnor" />
+            <SuggestInput id="bcity" className={field} value={city} onChange={setCity} options={INDIAN_CITIES} placeholder="Start typing, e.g. Bijnor" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="bloc">Locality</Label>
@@ -63,7 +68,8 @@ export function OnboardingForm({ onCreated, onSignOut }: { onCreated: () => void
         </div>
         <div className="space-y-1">
           <Label htmlFor="bcat">Category</Label>
-          <Input id="bcat" value={category} onChange={(e) => setCategory(e.target.value)} />
+          <SuggestInput id="bcat" className={field} value={category} onChange={setCategory} options={SHOP_CATEGORIES} placeholder="Start typing, e.g. Grocery" />
+          <p className="text-xs text-muted-foreground">Add your exact map location later in Shop page settings.</p>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button type="submit" className="w-full" disabled={busy}>{busy ? "Creating…" : "Create business"}</Button>

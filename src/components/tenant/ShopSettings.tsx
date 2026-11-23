@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { TableQrStandee } from "@/components/tenant/TableQrStandee";
 import { supabase } from "@/integrations/supabase/client";
+import { SuggestInput } from "@/components/tenant/SuggestInput";
+import { LocationPin } from "@/components/tenant/LocationPin";
+import { HOURS_PRESETS, INDIAN_CITIES, SHOP_CATEGORIES, isValidIndianPhone, joinAddress, splitAddress, type Pin } from "@/lib/shopAddress";
+import { isValidPincode, pincodeFrom } from "@/lib/customerLocation";
 import { STORE_THEMES, storeThemeStyle } from "@/lib/store-themes";
 
 export type Business = {
@@ -53,43 +57,60 @@ export function ShopSettings({ business, initialTab = "profile", onClose, onSave
 }
 
 function ProfileTab({ business, onSaved }: { business: Business; onSaved: (b: Business) => void }) {
+  const initial = splitAddress(business.address);
   const [f, setF] = useState({
     public_name: business.public_name, tagline: business.tagline ?? "", category: business.category ?? "",
-    phone: business.phone ?? "", address: business.address ?? "", locality: business.locality ?? "",
-    city: business.city ?? "", hours: business.hours ?? "",
+    phone: business.phone ?? "", street: initial.street, locality: business.locality ?? "",
+    city: business.city ?? "", pincode: pincodeFrom(initial.street) ?? "", hours: business.hours ?? "",
   });
+  const [pin, setPin] = useState<Pin | null>(initial.pin);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
+  const upd = (k: keyof typeof f, v: string) => setF((o) => ({ ...o, [k]: v }));
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => upd(k, e.target.value);
 
   async function save() {
     if (!f.public_name.trim()) return setMsg("Shop name is required.");
+    if (f.phone.trim() && !isValidIndianPhone(f.phone)) return setMsg("Enter a valid 10-digit mobile number.");
+    if (f.pincode.trim() && !isValidPincode(f.pincode.trim())) return setMsg("PIN code must be 6 digits.");
+    if (!f.city.trim()) return setMsg("City is required so customers can find you.");
     setBusy(true); setMsg("");
-    const clean = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim() || null])) as Record<string, string | null>;
-    const { data, error } = await supabase.from("businesses").update({ ...clean, public_name: f.public_name.trim(), updated_at: new Date().toISOString() })
-      .eq("id", business.id).select("*").single();
+    let street = f.street.trim();
+    const pc = f.pincode.trim();
+    if (pc && !street.includes(pc)) street = street ? `${street} - ${pc}` : pc;
+    const t = (v: string) => v.trim() || null;
+    const { data, error } = await supabase.from("businesses").update({
+      public_name: f.public_name.trim(), tagline: t(f.tagline), category: t(f.category), phone: t(f.phone.replace(/[\s-]/g, "")),
+      address: t(joinAddress(street, pin)), locality: t(f.locality), city: t(f.city), hours: t(f.hours),
+      updated_at: new Date().toISOString(),
+    }).eq("id", business.id).select("*").single();
     setBusy(false);
     if (error) return setMsg("Could not save: " + error.message);
     onSaved(data as Business); setMsg("Saved.");
   }
 
-  const fields: [keyof typeof f, string, string?][] = [
-    ["public_name", "Shop name"], ["tagline", "Short line about your shop", "e.g. LED lights & electrical goods since 1995"],
-    ["category", "Category", "e.g. Electricals"], ["phone", "Phone"], ["address", "Street address"],
-    ["locality", "Area / locality"], ["city", "City"], ["hours", "Timings", "e.g. Mon–Sat 10am–8pm"],
-  ];
+  const L = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
+    <div className="block text-sm"><span className="mb-1 block font-medium">{label}</span>{children}{hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}</div>
+  );
   return (
     <div className="space-y-3">
-      {fields.map(([k, label, ph]) => (
-        <label key={k} className="block text-sm">
-          <span className="mb-1 block font-medium">{label}</span>
-          {k === "address" ? <textarea rows={2} className={input} value={f[k]} onChange={set(k)} />
-            : <input className={input} value={f[k]} placeholder={ph} onChange={set(k)} />}
-        </label>
-      ))}
+      <L label="Shop name *"><input className={input} value={f.public_name} onChange={set("public_name")} maxLength={80} /></L>
+      <L label="Short line about your shop" hint={`${f.tagline.length}/100`}><input className={input} value={f.tagline} maxLength={100} placeholder="e.g. LED lights & electrical goods since 1995" onChange={set("tagline")} /></L>
+      <L label="Category" hint="Pick from the list or type your own."><SuggestInput className={input} value={f.category} onChange={(v) => upd("category", v)} options={SHOP_CATEGORIES} placeholder="Start typing, e.g. Electricals" /></L>
+      <L label="Phone"><input className={input} type="tel" inputMode="tel" value={f.phone} maxLength={14} placeholder="10-digit mobile number" onChange={set("phone")} /></L>
+      <L label="Shop location on map" hint="Stand inside your shop and tap Pin for the most accurate directions.">
+        <LocationPin pin={pin} onPin={setPin} onPlace={(p) => setF((o) => ({ ...o, locality: o.locality || p.locality || "", city: o.city || p.city || "", pincode: o.pincode || p.pincode || "" }))} />
+      </L>
+      <L label="Street address" hint="Shop number, building, road and a nearby landmark."><textarea rows={2} className={input} value={f.street} placeholder="e.g. Shop 12, Civil Lines Road, near SBI Bank" onChange={set("street")} /></L>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <L label="Area / locality"><input className={input} value={f.locality} placeholder="e.g. Civil Lines" onChange={set("locality")} /></L>
+        <L label="City *"><SuggestInput className={input} value={f.city} onChange={(v) => upd("city", v)} options={INDIAN_CITIES} placeholder="e.g. Bijnor" /></L>
+        <L label="PIN code"><input className={input} inputMode="numeric" maxLength={6} value={f.pincode} placeholder="246701" onChange={(e) => upd("pincode", e.target.value.replace(/\D/g, ""))} /></L>
+      </div>
+      <L label="Timings"><SuggestInput className={input} value={f.hours} onChange={(v) => upd("hours", v)} options={HOURS_PRESETS} placeholder="e.g. Mon–Sat 10am–8pm" /></L>
       <div className="flex items-center gap-3">
         <button type="button" disabled={busy} onClick={save} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60">{busy ? "Saving…" : "Save profile"}</button>
-        {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
+        {msg && <span role="status" className="text-sm text-muted-foreground">{msg}</span>}
       </div>
     </div>
   );

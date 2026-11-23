@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
+import { splitAddress } from '@/lib/shopAddress';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import { directoryOptions, filterDirectory, normalizeDiscovery, type DirectoryShop, type DirectoryProduct } from './discovery';
@@ -23,7 +24,7 @@ async function loadPublishedDirectory(): Promise<DirectoryShop[]> {
       .select('id, slug, public_name, category, city, locality, address, hours, tagline')
       .eq('is_published', true).order('public_name').order('id').range(offset, offset + 499);
     if (error) throw new Error('Could not load shops. Please try again.');
-    shops.push(...(data ?? []).map(shop => ({ ...shop, products: [] })));
+    shops.push(...(data ?? []).map(shop => { const { street, pin } = splitAddress(shop.address); return { ...shop, address: street || null, ...(pin ? { latitude: pin.lat, longitude: pin.lng } : {}), products: [] }; }));
     if (!data || data.length < 500) break;
   }
   const byId = new Map(shops.map(shop => [shop.id, shop]));

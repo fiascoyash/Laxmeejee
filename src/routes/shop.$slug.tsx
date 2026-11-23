@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { directionsTo, splitAddress } from "@/lib/shopAddress";
 import { storeThemeStyle } from "@/lib/store-themes";
 import { Search, ShoppingBag, UtensilsCrossed, X } from "lucide-react";
 import { normalizeTable, parseFence, encodeFence } from "@/lib/tableOrders";
@@ -223,7 +224,7 @@ function ShopPage() {
           <PickupCheckout slug={shop.slug} products={shop.products} cart={cart} table={table} fence={fence} onLeaveTable={leaveTable} />
           {count === 0 && <p className="text-sm text-muted-foreground">Tap Add on any item to order for pickup at the store.</p>}
         </div>
-        {shop.address && <p className="mt-4 text-center text-xs text-muted-foreground">{shop.address}</p>}
+        {shop.address && <p className="mt-4 text-center text-xs text-muted-foreground">{splitAddress(shop.address).street} · <a className="underline" href={directionsTo(shop.public_name, shop.address)} target="_blank" rel="noopener noreferrer">Get directions</a></p>}
       </div>
 
       {count > 0 && (

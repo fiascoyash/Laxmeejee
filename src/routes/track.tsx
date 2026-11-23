@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { directionsTo, splitAddress } from "@/lib/shopAddress";
 import { HisaabooLogo } from "@/components/brand/HisaabooLogo";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, Circle, MapPin, Navigation, Phone, Store, Sun, XCircle } from "lucide-react";
@@ -37,8 +38,7 @@ export const Route = createFileRoute("/track")({
 });
 
 const homeSearch = normalizeDiscovery({});
-const directionsUrl = (name: string, address: string | null) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent([name, address].filter(Boolean).join(", "))}`;
+const directionsUrl = (name: string, address: string | null) => directionsTo(name, address);
 
 const STEPS = [
   { key: "created_at", label: "Order placed" },
@@ -186,7 +186,7 @@ function TrackPage() {
             )}
             <ul className="mt-4 border-t pt-3 text-sm">{order.items.map((i, k) => <li key={k} className="flex justify-between"><span>{i.name} × {i.qty}</span><span>₹{(i.price * i.qty).toLocaleString("en-IN")}</span></li>)}
               <li className="mt-1 flex justify-between font-semibold"><span>Total</span><span>₹{Number(order.total).toLocaleString("en-IN")}</span></li></ul>
-            {(order.shop_phone || order.shop_address) && <p className="mt-3 text-xs text-muted-foreground">{order.shop_address && <MapPin className="mr-1 inline size-3" aria-hidden="true" />}{order.shop_address}{order.shop_phone && <> · <a className="text-primary" href={`tel:${order.shop_phone}`}>{order.shop_phone}</a></>}</p>}
+            {(order.shop_phone || order.shop_address) && <p className="mt-3 text-xs text-muted-foreground">{order.shop_address && <MapPin className="mr-1 inline size-3" aria-hidden="true" />}{splitAddress(order.shop_address).street}{order.shop_phone && <> · <a className="text-primary" href={`tel:${order.shop_phone}`}>{order.shop_phone}</a></>}</p>}
             {(cancelled || order.status === "collected") && order.shop_phone && <Button asChild variant="outline" className="mt-4 w-full"><a href={`tel:${order.shop_phone}`}><Phone className="size-4" aria-hidden="true" />Call shop</a></Button>}
             {!cancelled && order.status !== "collected" && <p className="mt-3 text-xs text-muted-foreground">This page refreshes by itself.</p>}
             {order.status === 'collected' && <CustomerFeedback key={`${search.code}:${search.phone}`} code={search.code} phone={search.phone} />}
