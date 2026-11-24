@@ -8,6 +8,7 @@ import { SaveProductDialog } from './SaveProductDialog';
 import { ProductAutocomplete } from './ProductAutocomplete';
 import { useEscapeStack } from '../hooks/useEscapeStack';
 import { moveItem } from '../utils/reorder';
+import { recalcLine } from '../utils/lineAmount';
 import { useRowDrag, DragHandle, MoveButtons, SerialJump } from './RowReorder';
 
 interface Props {
@@ -281,7 +282,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       // Carry attributes from catalog (NEW)
       attributes: catalogItem.attributes ? { ...catalogItem.attributes } : undefined,
     };
-    onChange([...products, newProduct]);
+    onChange([...products, recalcLine({ ...newProduct, priceSource: 'rate' } as Product, gstMode)]);
     setShowCatalog(false);
   };
 
@@ -305,9 +306,9 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
   const updateGst = (id: string, raw: string) => {
     onChange(products.map(p => {
       if (p.id !== id) return p;
-      if (raw.startsWith('cat:')) return { ...p, gstPercent: 0, gstCategory: raw.slice(4) };
+      if (raw.startsWith('cat:')) return recalcLine({ ...p, gstPercent: 0, gstCategory: raw.slice(4) }, gstMode);
       const { gstCategory, ...rest } = p as any;
-      return { ...rest, gstPercent: Number(raw) };
+      return recalcLine({ ...rest, gstPercent: Number(raw) }, gstMode);
     }));
   };
 
@@ -348,7 +349,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               onChange={(val) => updateProduct(product.id, 'name', val)}
               onSelect={(item) => {
                 onChange(products.map(p =>
-                  p.id === product.id ? {
+                  p.id === product.id ? recalcLine({
                     ...p,
                     name: item.name,
                     description: visibleKeys.has('description') ? (p.description || '') : undefined,
@@ -357,6 +358,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     unit: item.unit || 'piece',
                     unitPrice: item.sellingPrice,
                     isManualAmount: false,
+                    manualAmount: undefined,
+                    priceSource: 'rate',
                     batchNumber: item.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
                     expiryDate: item.expiryDate || (visibleKeys.has('expiryDate') ? '' : undefined),
                     wattage: item.wattage || (visibleKeys.has('wattage') ? 0 : undefined),
@@ -365,7 +368,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     warrantyMonths: item.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
                     serialNumber: item.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
                     attributes: item.attributes ? { ...item.attributes } : undefined,
-                  } : p
+                  }, gstMode) : p
                 ));
               }}
               catalog={catalog}
@@ -425,23 +428,9 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               value={product.quantity || ''}
               onChange={(e) => {
                 const newQuantity = Number(e.target.value) || 1;
-                // If manual amount is set, recalculate rate from amount/quantity
-                if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
-                  const newRate = roundTo2(product.manualAmount / newQuantity);
-                  onChange(products.map(p =>
-                    p.id === product.id ? {
-                      ...p,
-                      quantity: newQuantity,
-                      unitPrice: newRate,
-                      isManualAmount: true  // Keep manual amount flag
-                    } : p
+                onChange(products.map(p =>
+                    p.id === product.id ? recalcLine({ ...p, quantity: newQuantity }, gstMode) : p
                   ));
-                } else {
-                  // Normal behavior: just update quantity
-                  onChange(products.map(p =>
-                    p.id === product.id ? { ...p, quantity: newQuantity, isManualAmount: false } : p
-                  ));
-                }
               }}
               className="w-16 px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-center"
             />
@@ -466,7 +455,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
             onChange={(e) => {
               // Reset manual amount when rate changes
               onChange(products.map(p =>
-                p.id === product.id ? { ...p, unitPrice: Number(e.target.value), isManualAmount: false } : p
+                p.id === product.id ? recalcLine({ ...p, unitPrice: e.target.value === '' ? 0 : Number(e.target.value), priceSource: 'rate' }, gstMode) : p
               ));
             }}
             className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-blue-500 text-right"
@@ -503,13 +492,14 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     ...p,
                     manualAmount: manualValue,
                     isManualAmount: true,
+                    priceSource: 'amount',
                     unitPrice: calculatedRate
                   } : p
                 ));
               } else {
                 // Zero or invalid: just store the manual amount
                 onChange(products.map(p =>
-                  p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true } : p
+                  p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true, priceSource: 'amount' } : p
                 ));
               }
             }}
@@ -844,7 +834,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     onChange={(val) => updateProduct(product.id, 'name', val)}
                     onSelect={(item) => {
                       onChange(products.map(p =>
-                        p.id === product.id ? {
+                        p.id === product.id ? recalcLine({
                           ...p,
                           name: item.name,
                           description: visibleKeys.has('description') ? (p.description || '') : undefined,
@@ -853,6 +843,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                           unit: item.unit || 'piece',
                           unitPrice: item.sellingPrice,
                           isManualAmount: false,
+                    manualAmount: undefined,
+                    priceSource: 'rate',
                           batchNumber: item.batchNumber || (visibleKeys.has('batchNumber') ? '' : undefined),
                           expiryDate: item.expiryDate || (visibleKeys.has('expiryDate') ? '' : undefined),
                           wattage: item.wattage || (visibleKeys.has('wattage') ? 0 : undefined),
@@ -861,7 +853,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                           warrantyMonths: item.warrantyMonths || (visibleKeys.has('warrantyMonths') ? 0 : undefined),
                           serialNumber: item.serialNumber || (visibleKeys.has('serialNumber') ? '' : undefined),
                           attributes: item.attributes ? { ...item.attributes } : undefined,
-                        } : p
+                        }, gstMode) : p
                       ));
                     }}
                     catalog={catalog}
@@ -902,21 +894,9 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     value={product.quantity || ''}
                     onChange={(e) => {
                       const newQuantity = Number(e.target.value) || 1;
-                      if (product.isManualAmount && product.manualAmount !== undefined && newQuantity > 0) {
-                        const newRate = roundTo2(product.manualAmount / newQuantity);
-                        onChange(products.map(p =>
-                          p.id === product.id ? {
-                            ...p,
-                            quantity: newQuantity,
-                            unitPrice: newRate,
-                            isManualAmount: true
-                          } : p
-                        ));
-                      } else {
-                        onChange(products.map(p =>
-                          p.id === product.id ? { ...p, quantity: newQuantity, isManualAmount: false } : p
-                        ));
-                      }
+                onChange(products.map(p =>
+                    p.id === product.id ? recalcLine({ ...p, quantity: newQuantity }, gstMode) : p
+                  ));
                     }}
                     className="flex-1 px-2 py-2 border border-slate-300 rounded text-center text-sm min-h-[44px]"
                   />
@@ -942,7 +922,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                   value={product.unitPrice || ''}
                   onChange={(e) => {
                     onChange(products.map(p =>
-                      p.id === product.id ? { ...p, unitPrice: Number(e.target.value), isManualAmount: false } : p
+                      p.id === product.id ? recalcLine({ ...p, unitPrice: e.target.value === '' ? 0 : Number(e.target.value), priceSource: 'rate' }, gstMode) : p
                     ));
                   }}
                   className="w-full px-2 py-2 border border-slate-300 rounded text-right text-sm min-h-[44px]"
@@ -987,12 +967,13 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                           ...p,
                           manualAmount: manualValue,
                           isManualAmount: true,
+                          priceSource: 'amount',
                           unitPrice: calculatedRate
                         } : p
                       ));
                     } else {
                       onChange(products.map(p =>
-                        p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true } : p
+                        p.id === product.id ? { ...p, manualAmount: manualValue, isManualAmount: true, priceSource: 'amount' } : p
                       ));
                     }
                   }}
@@ -1211,7 +1192,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     type="radio"
                     name="gstMode"
                     checked={gstMode === 'inclusive'}
-                    onChange={() => onGstModeChange('inclusive')}
+                    onChange={() => { onChange(products.map(p => recalcLine(p, 'inclusive'))); onGstModeChange('inclusive'); }}
                     className="w-5 h-5 text-blue-600"
                   />
                   <span className="text-sm text-slate-700">Inclusive GST (price includes GST)</span>
@@ -1221,7 +1202,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
                     type="radio"
                     name="gstMode"
                     checked={gstMode === 'exclusive'}
-                    onChange={() => onGstModeChange('exclusive')}
+                    onChange={() => { onChange(products.map(p => recalcLine(p, 'exclusive'))); onGstModeChange('exclusive'); }}
                     className="w-5 h-5 text-blue-600"
                   />
                   <span className="text-sm text-slate-700">Exclusive GST (add GST on top)</span>
