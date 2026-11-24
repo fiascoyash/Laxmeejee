@@ -547,3 +547,17 @@
   --shadow-store-card: var(--shadow-store-card);
   --shadow-store-lift: var(--shadow-store-lift);
 }
+
+/* New-order alert banner: pulsing ring + wobbling bell */
+@keyframes order-alert-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 55%, transparent); }
+  50% { box-shadow: 0 0 0 10px color-mix(in oklch, var(--primary) 0%, transparent); }
+}
+@keyframes order-alert-wobble {
+  0%, 60%, 100% { transform: rotate(0); }
+  10%, 30%, 50% { transform: rotate(-14deg); }
+  20%, 40% { transform: rotate(14deg); }
+}
+.order-alert-banner { animation: order-alert-pulse 1.4s ease-in-out infinite; }
+.order-alert-bell { animation: order-alert-wobble 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .order-alert-banner, .order-alert-bell { animation: none; } }

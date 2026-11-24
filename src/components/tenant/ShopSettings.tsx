@@ -1,3 +1,4 @@
+import { AlertSettingsTab } from "@/components/tenant/AlertSettingsTab";
 import { useEffect, useState } from "react";
 import { TableQrStandee } from "@/components/tenant/TableQrStandee";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,12 +25,12 @@ const input = "w-full rounded-md border bg-background px-3 py-2 text-sm text-for
 
 export function ShopSettings({ business, initialTab = "profile", onClose, onSaved, onCatalogueUpdated }: {
   business: Business;
-  initialTab?: "profile" | "catalogue" | "look" | "qr";
+  initialTab?: "profile" | "catalogue" | "look" | "qr" | "alerts";
   onClose: () => void;
   onSaved: (b: Business) => void;
   onCatalogueUpdated?: (count: number) => void;
 }) {
-  const [tab, setTab] = useState<"profile" | "catalogue" | "look" | "qr">(initialTab);
+  const [tab, setTab] = useState<"profile" | "catalogue" | "look" | "qr" | "alerts">(initialTab);
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/40 p-3" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="shop-settings-title" className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border bg-card text-card-foreground shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -37,11 +38,11 @@ export function ShopSettings({ business, initialTab = "profile", onClose, onSave
           <h2 id="shop-settings-title" className="font-semibold">Shop page settings</h2>
           <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">✕</button>
         </div>
-        <div className="flex gap-1 border-b px-4 pt-2 text-sm">
-          {(["profile", "catalogue", "look", "qr"] as const).map((t) => (
+        <div className="flex gap-1 overflow-x-auto whitespace-nowrap border-b px-4 pt-2 text-sm">
+          {(["profile", "catalogue", "look", "qr", "alerts"] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)}
               className={`rounded-t-md px-3 py-2 ${tab === t ? "border-b-2 border-primary font-medium text-foreground" : "text-muted-foreground"}`}>
-              {t === "profile" ? "Shop profile" : t === "catalogue" ? "Online catalogue" : t === "look" ? "Photos & colours" : "Counter & Table QR"}
+              {t === "profile" ? "Shop profile" : t === "catalogue" ? "Online catalogue" : t === "look" ? "Photos & colours" : t === "qr" ? "Counter & Table QR" : "Alerts & Sound"}
             </button>
           ))}
         </div>
@@ -50,6 +51,7 @@ export function ShopSettings({ business, initialTab = "profile", onClose, onSave
           {tab === "catalogue" && <CatalogueTab business={business} onUpdated={onCatalogueUpdated} />}
           {tab === "look" && <LookTab business={business} onSaved={onSaved} />}
           {tab === "qr" && <QrTab business={business} />}
+          {tab === "alerts" && <AlertSettingsTab businessId={business.id} />}
         </div>
       </div>
     </div>

@@ -7,8 +7,9 @@ import { AuthScreen } from "./AuthScreen";
 import { OnboardingForm } from "./OnboardingForm";
 import { ShopSettings, type Business } from "./ShopSettings";
 import { PickupOrders } from "./PickupOrders";
-import { playChime } from "./orderAlerts";
-import { loadTableFence, newOrderAlert } from "@/lib/tableOrders";
+import { installAudioUnlock, loadAlertSettings, startOrderAlert, stopOrderAlert } from "./orderAlerts";
+import { BellRing, UtensilsCrossed } from "lucide-react";
+import { loadTableFence, newOrderAlert, parseTableNote, verifyOrderSpot } from "@/lib/tableOrders";
 import { MerchantStoreProvider, type ShopSettingsTab } from "./store-context";
 
 /** Mark a pickup order collected once its GST bill is saved (non-draft). */
@@ -55,7 +56,7 @@ export function BusinessGate({ children }: { children: ReactNode }) {
   const [recentOrders, setRecentOrders] = useState<Tables<"pickup_orders">[]>([]);
   const [storeError, setStoreError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
-  const [alert, setAlert] = useState<string | null>(null);
+  const [alert, setAlert] = useState<{ text: string; table: string; far: boolean } | null>(null);
   const [ordersVersion, setOrdersVersion] = useState(0);
 
   useEffect(() => {
@@ -115,15 +116,21 @@ export function BusinessGate({ children }: { children: ReactNode }) {
         void loadStore();
         if (payload.eventType === "INSERT") {
           const o = payload.new as { customer_name: string; order_code: string; total: number; note?: string | null };
-          const msg = newOrderAlert(o, loadTableFence(businessId));
-          playChime();
-          setAlert(msg.banner);
+          const fence = loadTableFence(businessId);
+          const msg = newOrderAlert(o, fence);
+          const tagged = parseTableNote(o.note);
+          const far = !!tagged.table && verifyOrderSpot(tagged.spot, fence).status === "far";
+          startOrderAlert({ ...loadAlertSettings(businessId), order: { ...(tagged.table ? { table: tagged.table } : {}), customerName: o.customer_name, total: Number(o.total), isFar: far } });
+          setAlert({ text: msg.banner, table: tagged.table, far });
           if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(msg.title, { body: msg.body });
         }
       }).subscribe();
     if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission().catch(() => {});
-    return () => { supabase.removeChannel(ch); };
+    return () => { supabase.removeChannel(ch); stopOrderAlert(); };
   }, [businessId, loadStore]);
+
+  useEffect(() => installAudioUnlock(), []);
+  const dismissAlert = useCallback(() => { stopOrderAlert(); setAlert(null); }, []);
 
   const signOut = useCallback(async () => {
     await queryClient.cancelQueries();
@@ -144,7 +151,7 @@ export function BusinessGate({ children }: { children: ReactNode }) {
     setBusiness(data as Business);
   }, [business]);
 
-  const openOrders = useCallback(() => setOrdersOpen(true), []);
+  const openOrders = useCallback(() => { stopOrderAlert(); setOrdersOpen(true); }, []);
   const openShopSettings = useCallback((tab: ShopSettingsTab = "profile") => {
     setSettingsTab(tab);
     setSettingsOpen(true);
@@ -176,11 +183,17 @@ export function BusinessGate({ children }: { children: ReactNode }) {
       {children}
       {ordersOpen && <PickupOrders businessId={business.id} version={ordersVersion} onClose={() => setOrdersOpen(false)} />}
       {alert && (
-        <div role="alert" className="fixed right-3 top-3 z-[80] max-w-sm rounded-lg border border-primary bg-card p-4 text-sm text-card-foreground shadow-xl">
-          <p className="font-semibold">🔔 {alert}</p>
-          <div className="mt-2 flex gap-3">
-            <button type="button" className="font-medium text-primary hover:underline" onClick={() => { setOrdersOpen(true); setAlert(null); }}>View order</button>
-            <button type="button" className="text-muted-foreground hover:underline" onClick={() => setAlert(null)}>Dismiss</button>
+        <div role="alert" className="order-alert-banner fixed inset-x-2 top-2 z-[80] mx-auto max-w-xl rounded-xl border-2 border-primary bg-card p-4 text-card-foreground shadow-2xl">
+          <div className="flex items-start gap-3">
+            <span className="order-alert-bell grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"><BellRing className="size-5" aria-hidden /></span>
+            <div className="min-w-0 flex-1">
+              {alert.table && <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground"><UtensilsCrossed className="size-3" aria-hidden />{alert.table}</span>}
+              <p className={`text-sm font-semibold ${alert.far ? "text-destructive" : ""}`}>{alert.text}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button type="button" className="flex-1 rounded-lg bg-primary px-4 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90" onClick={() => { dismissAlert(); setOrdersOpen(true); }}>View order</button>
+            <button type="button" className="rounded-lg border px-4 py-3 text-sm font-medium hover:bg-muted" onClick={dismissAlert}>Mute / Dismiss</button>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { RotateCcw, UtensilsCrossed } from "lucide-react";
 import { formatDistance, loadTableFence, parseTableNote, verifyOrderSpot } from "@/lib/tableOrders";
 import { ResponseCountdown } from "@/components/pickup/ResponseCountdown";
+import { stopOrderAlert } from "./orderAlerts";
 import { MerchantFeedback } from '@/components/pickup/MerchantFeedback';
 
 type Order = Tables<"pickup_orders">;
@@ -29,9 +30,11 @@ export function PickupOrders({ businessId, version = 0, onClose }: { businessId:
     setOrders(data ?? []);
     setFeedbackVersion(n => n+1);
   }, [businessId]);
+  useEffect(() => { stopOrderAlert(); }, []);
   useEffect(() => { load(); }, [load, version]);
 
   async function move(o: Order, status: string, reason?: string) {
+    stopOrderAlert();
     setPendingId(o.id);
     setError(null);
     try {

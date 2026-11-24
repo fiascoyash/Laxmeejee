@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import type { Tables } from "@/integrations/supabase/types";
 import type { Business } from "./ShopSettings";
 
-export type ShopSettingsTab = "profile" | "catalogue" | "qr";
+export type ShopSettingsTab = "profile" | "catalogue" | "qr" | "alerts";
 
 export type MerchantStoreContextValue = {
   business: Business;
