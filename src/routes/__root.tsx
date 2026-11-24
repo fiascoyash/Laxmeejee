@@ -81,12 +81,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Hisaaboo" },
       { name: "description", content: "Smart billing & business management" },
-      { name: "author", content: "Lovable" },
+      { name: "author", content: "Hisaaboo" },
+      { name: "google-site-verification", content: "917qyWMN4H9-WwU_5mTMFBW-stmia9wOsSczS2P2L8c" },
+      { property: "og:site_name", content: "Hisaaboo" },
       { property: "og:title", content: "Hisaaboo" },
       { property: "og:description", content: "Smart billing & business management" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

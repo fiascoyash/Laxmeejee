@@ -18,6 +18,43 @@ import { rankNearby, searchCatalog, type ItemHit, type SearchTab, type StoreHit 
 
 const PAGE_SIZE = 12;
 
+const SITE = "https://hisaaboo.com";
+const HOME_JSON_LD = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${SITE}/#organization`,
+    name: "Hisaaboo",
+    legalName: "Hisaaboo",
+    url: SITE,
+    logo: `${SITE}/favicon.svg`,
+    slogan: "Bringing Local Shops & Customer Together.",
+    description: "Local commerce and discovery platform connecting neighbourhood merchants with customers.",
+    foundingLocation: { "@type": "Place", name: "Bijnor, Uttar Pradesh, India", address: { "@type": "PostalAddress", addressLocality: "Bijnor", addressRegion: "Uttar Pradesh", addressCountry: "IN" } },
+    contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: "support@hisaaboo.com", url: `${SITE}/contact`, availableLanguage: ["en", "hi"] },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${SITE}/#website`,
+    name: "Hisaaboo",
+    url: `${SITE}/`,
+    publisher: { "@id": `${SITE}/#organization` },
+    potentialAction: { "@type": "SearchAction", target: `${SITE}/?q={search_term_string}`, "query-input": "required name=search_term_string" },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Hisaaboo main navigation",
+    itemListElement: [
+      ["Explore Shops", `${SITE}/`],
+      ["About Us", `${SITE}/about`],
+      ["Contact Us", `${SITE}/contact`],
+      ["Track Pickup Order", `${SITE}/track`],
+    ].map(([name, url], i) => ({ "@type": "SiteNavigationElement", position: i + 1, name, url })),
+  },
+];
+
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => normalizeDiscovery(search),
   loader: async ({ context }) => {
@@ -32,21 +69,20 @@ export const Route = createFileRoute("/")({
   notFoundComponent: () => <p className="p-8">No shops found.</p>,
   head: () => ({
     meta: [
-      { title: "Hisaaboo — Find Local Shops & Products" },
-      {
-        name: "description",
-        content:
-          "Find local shops and products on Hisaaboo. Search by city, locality and category, browse public prices and order for in-store pickup.",
-      },
-      { property: "og:title", content: "Hisaaboo — Find Local Shops & Products" },
-      {
-        property: "og:description",
-        content:
-          "Discover local businesses, browse products and order for pickup without a customer account.",
-      },
+      { title: "Hisaaboo — Your City, Your Shops, Your Discovery" },
+      { name: "description", content: "Discover local shops and neighbourhood products on Hisaaboo. Explore public prices, browse nearby businesses, and place convenient in-store pickup orders." },
+      { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
+      { property: "og:site_name", content: "Hisaaboo" },
+      { property: "og:title", content: "Hisaaboo — Your City, Your Shops, Your Discovery" },
+      { property: "og:description", content: "Bringing Local Shops & Customer Together. Search and discover products from verified neighbourhood stores." },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://hisaaboo.com/" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Hisaaboo — Your City, Your Shops, Your Discovery" },
+      { name: "twitter:description", content: "Bringing Local Shops & Customer Together. Search and discover products from verified neighbourhood stores." },
     ],
+    links: [{ rel: "canonical", href: "https://hisaaboo.com/" }],
+    scripts: HOME_JSON_LD.map((data) => ({ type: "application/ld+json", children: JSON.stringify(data) })),
   }),
   component: Index,
 });

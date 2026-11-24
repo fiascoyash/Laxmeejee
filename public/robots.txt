@@ -1,16 +1,21 @@
 User-agent: Googlebot
 Allow: /
+Disallow: /billing
 
 User-agent: Bingbot
 Allow: /
+Disallow: /billing
 
 User-agent: Twitterbot
 Allow: /
+Disallow: /billing
 
 User-agent: facebookexternalhit
 Allow: /
+Disallow: /billing
 
 User-agent: *
 Allow: /
+Disallow: /billing
 
 Sitemap: https://hisaaboo.com/sitemap.xml
