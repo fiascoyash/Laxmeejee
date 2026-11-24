@@ -9,6 +9,8 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
+- Contact enquiries use validated email drafts only; never claim receipt or store form data without an approved support workflow. Public legal links require approved pages; the inline contact notice is not a full Privacy Policy.
+
 - The Hisaaboo app lives in `src/legacy/` and renders client-only at `/billing`; preserve its hash navigation and localStorage. Shared billing-navigation helpers recognize billing bookmarks on `/`, default empty/invalid `/billing` hashes to `#home`, and redirect `/billing#landing` to `/` so only the public homepage renders the welcome screen and public section hashes stay public.
 - Editing an existing invoice saves directly (status derived from recorded payments, Draft preserved); the payment decision dialog is only for new invoices or explicitly finalizing a draft — keeps editing and payment collection separate.
 - Keep desktop sidebar collapse separate from the mobile drawer state and use the existing shared hamburger; navigation closes only the drawer so desktop collapse survives page changes.

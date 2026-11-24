@@ -60,3 +60,9 @@
 - [x] Table QR geofence setup, dashboard location labels, alert warning, merchant cancel reasons
 - [x] Customer receipt confirmation, optional ratings and issues, private merchant read access, protected aggregate shop ratings and anti-fake-rating tests.
 - [ ] Activate and verify live reviews — owner must run docs/customer-reviews-setup.sql on the original backend; no access to that database from here.
+
+# Contact Us page
+- [x] Finish the frontend with matching header/footer, contact sections, and working support links.
+- [x] Verify email-draft submission, SEO, and desktop/mobile layouts; save the completed changes.
+- [ ] Link the full Privacy Policy — waiting for the owner's approved URL; the inline contact notice is available meanwhile.
+- [ ] Direct submission and confirmed receipt — requires an approved support workflow; frontend-only email drafts do not confirm delivery.

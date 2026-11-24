@@ -97,6 +97,7 @@ function AboutPage() {
             <Link to="/" search={shopsSearch} hash="features" className="hidden hover:text-emerald-600 md:inline">Features</Link>
             <Link to="/" search={shopsSearch} hash="how" className="hidden hover:text-emerald-600 md:inline">How it works</Link>
             <Link to="/about" aria-current="page" className="hidden font-semibold text-emerald-600 sm:inline">About</Link>
+            <Link to="/contact" className="hidden hover:text-emerald-600 sm:inline">Contact</Link>
             <Link to="/billing" className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700">Login</Link>
           </nav>
         </div>
@@ -277,6 +278,7 @@ function AboutPage() {
           <Link to="/" search={shopsSearch} hash="shops" className="hover:text-emerald-400">Find Shops</Link>
           <Link to="/" search={shopsSearch} hash="features" className="hover:text-emerald-400">Features</Link>
           <Link to="/" search={shopsSearch} hash="how" className="hover:text-emerald-400">How it works</Link>
+          <Link to="/contact" className="hover:text-emerald-400">Contact Us</Link>
           <Link to="/billing" className="hover:text-emerald-400">Login</Link>
         </nav>
         <p>© {new Date().getFullYear()} Hisaaboo. Your local market, connected.</p>

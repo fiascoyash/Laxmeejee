@@ -4,6 +4,42 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme inline {
+  --color-public-copy: var(--public-copy);
+  --color-public-inverse: var(--public-inverse);
+  --color-public-inverse-foreground: var(--public-inverse-foreground);
+  --color-public-inverse-muted: var(--public-inverse-muted);
+  --color-public-highlight: var(--public-highlight);
+  --color-public-tint: var(--public-tint);
+}
+
+.contact-page {
+  --background: var(--color-white);
+  --foreground: var(--color-slate-900);
+  --public-copy: var(--color-slate-600);
+  --muted: var(--color-slate-50);
+  --muted-foreground: var(--color-slate-500);
+  --primary: var(--color-emerald-600);
+  --primary-foreground: var(--color-white);
+  --ring: var(--color-emerald-500);
+  --border: var(--color-slate-200);
+  --input: var(--color-slate-300);
+  --destructive: var(--color-red-600);
+  --public-inverse: var(--color-slate-900);
+  --public-inverse-foreground: var(--color-white);
+  --public-inverse-muted: var(--color-slate-300);
+  --public-highlight: var(--color-emerald-400);
+  --public-tint: var(--color-emerald-50);
+  letter-spacing: 0;
+}
+
+.contact-page input, .contact-page select, .contact-page textarea { min-width: 0; }
+.contact-page article { min-width: 0; }
+.contact-page a, .contact-page button { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  html:has(.contact-page) { scroll-behavior: auto; }
+}
+
 /*
  * Design system definition.
  *

@@ -212,6 +212,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
             <button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">How it works</button>
             <button onClick={() => document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-600 transition-colors">Why Hisaaboo</button>
             <Link to="/about" className="hover:text-emerald-600 transition-colors">About</Link>
+            <Link to="/contact" className="hover:text-emerald-600 transition-colors">Contact</Link>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -610,6 +611,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
                 <li><button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-400 transition-colors">How it works</button></li>
                 <li><button onClick={() => document.getElementById('why')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-emerald-400 transition-colors">Why Hisaaboo</button></li>
                 <li><Link to="/about" className="hover:text-emerald-400 transition-colors">About Us</Link></li>
+                <li><Link to="/contact" className="hover:text-emerald-400 transition-colors">Contact Us</Link></li>
               </ul>
             </div>
             <div>

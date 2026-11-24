@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as BillingRouteImport } from './routes/billing'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as TrackRouteImport } from './routes/track'
 import { Route as OgAboutHisaabooDotjpgRouteImport } from './routes/og.about-hisaaboo[.]jpg'
 import { Route as ShopSlugRouteImport } from './routes/shop.$slug'
@@ -29,6 +30,11 @@ const AboutRoute = AboutRouteImport.update({
 const BillingRoute = BillingRouteImport.update({
   id: '/billing',
   path: '/billing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrackRoute = TrackRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/billing': typeof BillingRoute
+  '/contact': typeof ContactRoute
   '/track': typeof TrackRoute
   '/og/about-hisaaboo.jpg': typeof OgAboutHisaabooDotjpgRoute
   '/shop/$slug': typeof ShopSlugRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/billing': typeof BillingRoute
+  '/contact': typeof ContactRoute
   '/track': typeof TrackRoute
   '/og/about-hisaaboo.jpg': typeof OgAboutHisaabooDotjpgRoute
   '/shop/$slug': typeof ShopSlugRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/billing': typeof BillingRoute
+  '/contact': typeof ContactRoute
   '/track': typeof TrackRoute
   '/og/about-hisaaboo.jpg': typeof OgAboutHisaabooDotjpgRoute
   '/shop/$slug': typeof ShopSlugRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/billing'
+    | '/contact'
     | '/track'
     | '/og/about-hisaaboo.jpg'
     | '/shop/$slug'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/billing'
+    | '/contact'
     | '/track'
     | '/og/about-hisaaboo.jpg'
     | '/shop/$slug'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/billing'
+    | '/contact'
     | '/track'
     | '/og/about-hisaaboo.jpg'
     | '/shop/$slug'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   BillingRoute: typeof BillingRoute
+  ContactRoute: typeof ContactRoute
   TrackRoute: typeof TrackRoute
   OgAboutHisaabooDotjpgRoute: typeof OgAboutHisaabooDotjpgRoute
   ShopSlugRoute: typeof ShopSlugRoute
@@ -129,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/billing'
       fullPath: '/billing'
       preLoaderRoute: typeof BillingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/track': {
@@ -159,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   BillingRoute: BillingRoute,
+  ContactRoute: ContactRoute,
   TrackRoute: TrackRoute,
   OgAboutHisaabooDotjpgRoute: OgAboutHisaabooDotjpgRoute,
   ShopSlugRoute: ShopSlugRoute,
