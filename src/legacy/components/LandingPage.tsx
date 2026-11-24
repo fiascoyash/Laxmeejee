@@ -253,7 +253,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
 
             <p className="landing-fade-up text-xs font-bold tracking-[0.2em] text-emerald-700 uppercase mb-3" style={{ animationDelay: '0.1s' }}>One platform for local commerce</p>
             <h1 className="landing-fade-up text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight mb-4" style={{ animationDelay: '0.15s' }}>
-              Your local market, connected.
+              Your City, Your Shops, Your Discovery.
             </h1>
             <p className="landing-fade-up text-base text-slate-600 mb-8 max-w-lg mx-auto lg:mx-0" style={{ animationDelay: '0.25s' }}>
               Discover nearby shops, explore products and order with ease. Run your business with digital storefronts, QR ordering, order management and GST billing — all in one place.
@@ -571,7 +571,7 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
         <div className="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
-          <h2 className="text-3xl sm:text-5xl font-bold mb-4">Your local market, connected.</h2>
+          <h2 className="text-3xl sm:text-5xl font-bold mb-4">Bringing Local Shops &amp; Customer Together.</h2>
           <p className="text-lg text-emerald-50 mb-8 max-w-xl mx-auto">
             Start using Hisaaboo today — no setup, no cost to begin. Your invoices, quotations, and GST reports are a click away.
           </p>
@@ -601,8 +601,8 @@ export function LandingPage({ onEnterApp, heroSearch, directory }: Props) {
               <div className="flex items-center gap-2 mb-3">
                 <HisaabooLogo size={30} tone="dark" /><span className="sr-only">Hisaaboo</span>
               </div>
-              <p className="text-sm">Smart Billing & Business Management</p>
-              <p className="text-sm mt-2 text-slate-500">Your local market, connected.</p>
+              <p className="text-sm">Bringing Local Shops &amp; Customer Together.</p>
+              <p className="text-sm mt-2 text-slate-500">Your City, Your Shops, Your Discovery.</p>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-3 text-sm">Product</h4>

@@ -1346,7 +1346,7 @@ export function DocumentRenderer({
       }}
     >
       <span style={{ fontSize: `${9 * fontScale}px`, color: '#9ca3af', fontStyle: 'italic' }}>
-        Generated with Hisaaboo — Hisaab rakho. Business badhao.
+        Generated with Hisaaboo — Bringing Local Shops & Customer Together.
       </span>
     </div>
   ) : null;

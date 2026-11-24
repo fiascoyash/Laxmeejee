@@ -66,7 +66,7 @@ export function buildNotePdf(note, company) {
   const ph = doc.internal.pageSize.getHeight();
   doc.setFontSize(7.5); doc.setTextColor(120);
   doc.text('Computer-generated document. No signature required.', w / 2, ph - 14, { align: 'center' });
-  if (showBrand()) { doc.setFont('helvetica', 'italic'); doc.text('Generated with Hisaaboo - Hisaab rakho. Business badhao.', w / 2, ph - 9, { align: 'center' }); doc.setFont('helvetica', 'normal'); }
+  if (showBrand()) { doc.setFont('helvetica', 'italic'); doc.text('Generated with Hisaaboo - Bringing Local Shops & Customer Together.', w / 2, ph - 9, { align: 'center' }); doc.setFont('helvetica', 'normal'); }
   doc.setTextColor(0);
   return doc;
 }
@@ -90,7 +90,7 @@ tfoot td{font-weight:bold;background:#f1f5f9}@media print{body{margin:10mm}}</st
 <table><thead><tr><th>#</th><th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Rate</th><th>Taxable</th><th>GST</th>${inter ? '<th>IGST</th>' : '<th>CGST</th><th>SGST</th>'}<th>Total</th></tr></thead><tbody>${rows}</tbody>
 <tfoot><tr><td colspan=5>Total</td><td class=r>${money(note.subtotal)}</td><td></td>${inter ? `<td class=r>${money(note.igstTotal)}</td>` : `<td class=r>${money(note.cgstTotal)}</td><td class=r>${money(note.sgstTotal)}</td>`}<td class=r>${money(note.grandTotal)}</td></tr></tfoot></table>
 ${note.remarks ? `<p>Remarks: ${esc(note.remarks)}</p>` : ''}<p style="text-align:right;margin-top:40px">For ${esc(company?.companyName)}<br><br><br>Authorised Signatory</p>
-<p style="text-align:center;font-size:11px;color:#777;margin-top:30px">Computer-generated document. No signature required.${showBrand() ? '<br><i>Generated with Hisaaboo \u2014 Hisaab rakho. Business badhao.</i>' : ''}</p>
+<p style="text-align:center;font-size:11px;color:#777;margin-top:30px">Computer-generated document. No signature required.${showBrand() ? '<br><i>Generated with Hisaaboo \u2014 Bringing Local Shops & Customer Together.</i>' : ''}</p>
 <script>window.onload=()=>{window.print()}</script></body></html>`;
   const win = window.open('', '_blank');
   if (!win) return false;

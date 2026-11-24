@@ -47,7 +47,7 @@ export const Route = createFileRoute("/about")({
             "@type": "Organization",
             name: "Hisaaboo",
             url: SITE,
-            slogan: "Your local market, connected.",
+            slogan: "Bringing Local Shops & Customer Together.",
             founder: { "@type": "Person", name: "Yash", image: `${SITE}/og/about-hisaaboo.jpg` },
             foundingLocation: { "@type": "Place", name: "Bijnor, Uttar Pradesh, India" },
           },
@@ -110,7 +110,7 @@ function AboutPage() {
             <div>
               <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Our story</p>
               <h1 className="text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl">About Hisaaboo</h1>
-              <p className="mt-4 text-2xl font-semibold text-emerald-700 sm:text-3xl">Your local market, connected.</p>
+              <p className="mt-4 text-2xl font-semibold text-emerald-700 sm:text-3xl">Bringing Local Shops &amp; Customer Together.</p>
               <p className="mt-8 max-w-2xl text-lg font-semibold leading-relaxed text-slate-800">
                 Every big idea has a beginning. Hisaaboo began with a simple problem in a small business in Bijnor, Uttar Pradesh.
               </p>
@@ -258,7 +258,7 @@ function AboutPage() {
         <section aria-labelledby="cta" className="bg-slate-900 py-16 text-center lg:py-20">
           <div className="mx-auto max-w-3xl px-4 sm:px-6">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-400">Hisaaboo</p>
-            <h2 id="cta" className="mt-3 text-3xl font-bold text-white sm:text-4xl">Your local market, connected.</h2>
+            <h2 id="cta" className="mt-3 text-3xl font-bold text-white sm:text-4xl">Bringing Local Shops &amp; Customer Together.</h2>
             <p className="mt-3 text-lg text-slate-300">Discover locally. Connect directly. Grow together.</p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link to="/" search={shopsSearch} hash="shops" className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-6 py-3 font-semibold text-slate-900 transition-colors hover:bg-emerald-400">
@@ -281,7 +281,7 @@ function AboutPage() {
           <Link to="/contact" className="hover:text-emerald-400">Contact Us</Link>
           <Link to="/billing" className="hover:text-emerald-400">Login</Link>
         </nav>
-        <p>© {new Date().getFullYear()} Hisaaboo. Your local market, connected.</p>
+        <p>© {new Date().getFullYear()} Hisaaboo. Bringing Local Shops &amp; Customer Together.</p>
       </footer>
     </div>
   );

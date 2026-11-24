@@ -631,7 +631,7 @@ const generatePosReceipt = (
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(FS_SMALL);
     doc.setTextColor(156, 163, 175);
-    doc.text('Generated with Hisaaboo — Hisaab rakho. Business badhao.', centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
+    doc.text('Generated with Hisaaboo — Bringing Local Shops & Customer Together.', centerX, y + lh(FS_SMALL) * 0.8, { align: 'center' });
     y += lh(FS_SMALL) + 2;
   }
 
@@ -1698,7 +1698,7 @@ const generateVectorPDF = async (
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(brandingFs);
     doc.setTextColor(156, 163, 175);
-    doc.text('Generated with Hisaaboo — Hisaab rakho. Business badhao.', paperWidth / 2, y + lineHeightMm(brandingFs) * 0.8, { align: 'center' });
+    doc.text('Generated with Hisaaboo — Bringing Local Shops & Customer Together.', paperWidth / 2, y + lineHeightMm(brandingFs) * 0.8, { align: 'center' });
     y += lineHeightMm(brandingFs) + brandingPad;
   }
 

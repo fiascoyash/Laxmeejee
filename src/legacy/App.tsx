@@ -1665,7 +1665,7 @@ function App() {
           {desktopSidebarCollapsed && <span className="hidden lg:block"><HisaabooOwl size={36} title="Hisaaboo" /></span>}
           <div className={desktopSidebarCollapsed ? 'lg:hidden' : ''}>
             <h1 className="hb-wordmark"><HisaabooLogo size={32} tone="dark" /><span className="sr-only">Hisaaboo</span></h1>
-            <p className="text-slate-400 text-sm mt-1">Hisaab rakho. Business chalao.</p>
+            <p className="text-slate-400 text-sm mt-1">Bringing Local Shops & Customer Together.</p>
           </div>
         </div>
 

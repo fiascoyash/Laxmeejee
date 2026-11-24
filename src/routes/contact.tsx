@@ -39,7 +39,7 @@ export const Route = createFileRoute("/contact")({
           "@type": "Organization",
           name: "Hisaaboo",
           url: SITE,
-          slogan: "Your local market, connected.",
+          slogan: "Bringing Local Shops & Customer Together.",
           email: SUPPORT_EMAIL,
           contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: SUPPORT_EMAIL, areaServed: "IN" },
         },
@@ -315,7 +315,7 @@ function ContactPage() {
         <section aria-labelledby="cta" className="bg-public-inverse py-16 text-center lg:py-20">
           <div className="mx-auto max-w-3xl px-4 sm:px-6">
             <p className="text-xs font-semibold uppercase tracking-normal text-public-highlight">Stay connected</p>
-            <h2 id="cta" className="mt-3 text-3xl font-bold text-public-inverse-foreground sm:text-4xl">Your local market, connected.</h2>
+            <h2 id="cta" className="mt-3 text-3xl font-bold text-public-inverse-foreground sm:text-4xl">Bringing Local Shops &amp; Customer Together.</h2>
             <p className="mt-3 text-lg text-public-inverse-muted">Follow Hisaaboo for product updates, new features, local business stories and announcements.</p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link to="/" search={shopsSearch} hash="shops" className="h-auto whitespace-normal inline-flex items-center justify-center gap-2 rounded-lg bg-public-highlight px-6 py-3 font-semibold text-foreground transition-colors hover:bg-public-highlight/90">Explore Local Shops <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
@@ -328,13 +328,13 @@ function ContactPage() {
       <footer className="border-t border-border bg-public-inverse py-12 text-sm text-public-inverse-muted">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            <div><p className="text-2xl font-bold text-public-inverse-foreground">Hisaaboo</p><p className="mt-3">Your local market, connected.</p><p className="mt-2">Discover locally. Connect directly. Grow together.</p></div>
+            <div><p className="text-2xl font-bold text-public-inverse-foreground">Hisaaboo</p><p className="mt-3">Bringing Local Shops &amp; Customer Together.</p><p className="mt-2">Discover locally. Connect directly. Grow together.</p></div>
             <nav aria-label="Product" className="space-y-3"><h2 className="font-semibold text-public-inverse-foreground">Product</h2><Link to="/" search={shopsSearch} hash="features" className="block hover:text-public-highlight">Features</Link><Link to="/" search={shopsSearch} hash="how" className="block hover:text-public-highlight">How It Works</Link><Link to="/billing" className="block hover:text-public-highlight">For Businesses</Link></nav>
             <nav aria-label="Discover and company" className="space-y-3"><h2 className="font-semibold text-public-inverse-foreground">Discover & Company</h2><Link to="/" search={shopsSearch} hash="shops" className="block hover:text-public-highlight">Find Shops</Link><Link to="/about" className="block hover:text-public-highlight">About Us</Link><Link to="/contact" className="block hover:text-public-highlight">Contact Us</Link></nav>
             <nav aria-label="Support" className="space-y-3"><h2 className="font-semibold text-public-inverse-foreground">Support</h2><a href={`mailto:${SUPPORT_EMAIL}`} className="block break-words hover:text-public-highlight">{SUPPORT_EMAIL}</a><Link to="/track" search={{ code: "", phone: "" }} className="block hover:text-public-highlight">Track a pickup order</Link><a href="#privacy-notice" className="block hover:text-public-highlight">Contact privacy notice</a><Button variant="link" onClick={() => preset("Other", "Grievance or complaint")} className="h-auto p-0 text-public-inverse-muted hover:text-public-highlight">Grievance or complaint</Button></nav>
           </div>
           <address className="mt-10 max-w-2xl not-italic leading-relaxed">Business / correspondence address: {ADDRESS}</address>
-          <p className="mt-6 border-t border-public-inverse-muted/20 pt-6">© {new Date().getFullYear()} Hisaaboo. Your local market, connected.</p>
+          <p className="mt-6 border-t border-public-inverse-muted/20 pt-6">© {new Date().getFullYear()} Hisaaboo. Bringing Local Shops &amp; Customer Together.</p>
         </div>
       </footer>
     </div>

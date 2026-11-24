@@ -12,6 +12,7 @@ import { ResponseBadge } from "@/components/tenant/ResponseBadge";
 import type { ResponseStats } from "@/lib/discovery";
 import { SavedPickupOrders } from '@/components/tenant/SavedPickupOrders';
 import { CustomerRating } from '@/components/pickup/CustomerRating';
+import { HisaabooLogo, HisaabooOwl } from "@/components/brand/HisaabooLogo";
 
 type PublicShop = {
   slug: string; public_name: string; category: string | null; city: string | null;
@@ -147,6 +148,7 @@ function ShopPage() {
         <div aria-hidden className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rotate-12 rounded-[2.5rem] bg-store-foreground/5" />
         <div className="relative mx-auto max-w-5xl px-4">
           <a href="/" className="inline-flex items-center gap-1 rounded-full bg-background/70 px-3 py-1 text-xs font-semibold text-store-foreground backdrop-blur hover:bg-background">← All shops</a>
+          <a href="/" aria-label="Hisaaboo home" className="absolute right-4 top-0 inline-flex items-center gap-1.5 rounded-full bg-background/80 py-1 pl-1 pr-3 text-[11px] font-bold text-store-foreground shadow-store-card backdrop-blur hover:bg-background"><HisaabooOwl size={26} title="Hisaaboo" />on Hisaaboo</a>
           <div className="mt-6 flex items-end gap-4">
             <div className="flex h-20 w-20 shrink-0 -rotate-3 items-center justify-center rounded-3xl bg-store-deep text-4xl font-black text-store-deep-foreground shadow-store-lift sm:h-24 sm:w-24">{initial}</div>
             <div className="min-w-0 text-store-foreground">
@@ -224,6 +226,11 @@ function ShopPage() {
           <PickupCheckout slug={shop.slug} products={shop.products} cart={cart} table={table} fence={fence} onLeaveTable={leaveTable} />
           {count === 0 && <p className="text-sm text-muted-foreground">Tap Add on any item to order for pickup at the store.</p>}
         </div>
+        <a href="/" className="mt-8 flex flex-col items-center gap-1 text-center text-xs text-muted-foreground hover:text-foreground">
+          <span>Powered by</span>
+          <HisaabooLogo size={28} /><span className="sr-only">Hisaaboo</span>
+          <span className="mt-1 font-medium">Your City, Your Shops, Your Discovery.</span>
+        </a>
         {shop.address && <p className="mt-4 text-center text-xs text-muted-foreground">{splitAddress(shop.address).street} · <a className="underline" href={directionsTo(shop.public_name, shop.address)} target="_blank" rel="noopener noreferrer">Get directions</a></p>}
       </div>
 
