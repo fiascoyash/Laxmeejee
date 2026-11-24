@@ -7,6 +7,8 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { SaveProductDialog } from './SaveProductDialog';
 import { ProductAutocomplete } from './ProductAutocomplete';
 import { useEscapeStack } from '../hooks/useEscapeStack';
+import { moveItem } from '../utils/reorder';
+import { useRowDrag, DragHandle, MoveButtons, SerialJump } from './RowReorder';
 
 interface Props {
   products: Product[];
@@ -282,6 +284,12 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
     onChange([...products, newProduct]);
     setShowCatalog(false);
   };
+
+  const moveProduct = useCallback((from: number, to: number) => {
+    onChange(moveItem(products, from, to));
+  }, [products, onChange]);
+  const desktopDrag = useRowDrag(moveProduct);
+  const mobileDrag = useRowDrag(moveProduct);
 
   const removeProduct = (id: string) => {
     onChange(products.filter(p => p.id !== id));
@@ -669,7 +677,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
 
   const getCellClass = (colKey: string) => {
     if (colKey === 'name') return 'px-3 py-2 min-w-64';
-    if (colKey === 'sno') return 'px-3 py-2 text-slate-500 w-8';
+    if (colKey === 'sno') return 'px-2 py-2 text-slate-500 w-16';
     if (colKey === 'amount') return 'px-3 py-2 text-right font-medium text-slate-800';
     if (colKey === 'quantityUnit' || colKey === 'gstPercent') return 'px-3 py-2';
     return 'px-3 py-2';
@@ -677,7 +685,7 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
 
   const getHeaderClass = (colKey: string) => {
     if (colKey === 'name') return 'px-3 py-3 text-left font-semibold text-slate-700 min-w-64';
-    if (colKey === 'sno') return 'px-3 py-3 text-left font-semibold text-slate-700 w-8';
+    if (colKey === 'sno') return 'px-2 py-3 text-left font-semibold text-slate-700 w-16';
     if (colKey === 'amount') return 'px-3 py-3 text-right font-semibold text-slate-700 w-32';
     if (colKey === 'quantityUnit') return 'px-3 py-3 text-center font-semibold text-slate-700 w-36';
     if (colKey === 'gstPercent') return 'px-3 py-3 text-center font-semibold text-slate-700 w-24';
@@ -818,12 +826,18 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
       </div>
 
       {/* Mobile Card Layout */}
-      <div className="md:hidden space-y-3">
-        {products.map((product, index) => (
-          <div key={product.id} className="bg-slate-50 rounded-lg border border-slate-200 p-3">
+      <div className="md:hidden space-y-3" ref={mobileDrag.containerRef}>
+        {products.map((product, index) => {
+          const ind = mobileDrag.indicatorFor(index, products.length);
+          return (
+          <div key={product.id} data-reorder-index={index} className={`bg-slate-50 rounded-lg border border-slate-200 p-3 transition-shadow ${mobileDrag.dragIndex === index ? 'opacity-60 ring-2 ring-emerald-400' : ''} ${ind === 'before' ? 'shadow-[0_-3px_0_0_rgb(16,185,129)]' : ''} ${ind === 'after' ? 'shadow-[0_3px_0_0_rgb(16,185,129)]' : ''}`}>
             <div className="flex justify-between items-start mb-3">
               <div className="flex-1">
-                <div className="text-xs text-slate-500 mb-1">#{index + 1}</div>
+                <div className="flex items-center gap-1 text-xs text-slate-500 mb-1">
+                  <DragHandle {...mobileDrag.handleProps(index)} />
+                  <SerialJump index={index} total={products.length} onMove={moveProduct} prefix="#" />
+                  <span className="ml-auto"><MoveButtons index={index} total={products.length} onMove={moveProduct} large /></span>
+                </div>
                 <div className="flex items-center gap-1">
                   <ProductAutocomplete
                     value={product.name}
@@ -1042,7 +1056,8 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         {products.length === 0 && (
           <div className="text-center text-slate-500 py-8">
             No products added. Click "Add Row" or "Catalog" to add products.
@@ -1061,24 +1076,35 @@ export function ProductTable({ products, onChange, catalog, columns, onColumnsCh
               <th className="px-3 py-3 text-center font-semibold text-slate-700 w-12"></th>
             </tr>
           </thead>
-          <tbody>
-            {products.map((product, index) => (
-              <tr key={product.id} className="border-b border-gray-100 hover:bg-slate-50">
+          <tbody ref={desktopDrag.containerRef}>
+            {products.map((product, index) => {
+              const ind = desktopDrag.indicatorFor(index, products.length);
+              return (
+              <tr key={product.id} data-reorder-index={index} className={`border-b border-gray-100 hover:bg-slate-50 ${desktopDrag.dragIndex === index ? 'opacity-50 bg-emerald-50' : ''} ${ind === 'before' ? 'shadow-[inset_0_3px_0_0_rgb(16,185,129)]' : ''} ${ind === 'after' ? 'shadow-[inset_0_-3px_0_0_rgb(16,185,129)]' : ''}`}>
                 {visibleColumns.map(col => (
                   <td key={col.id} className={getCellClass(col.key)}>
-                    {col.key === 'sno' ? index + 1 : renderCell(product, col.key)}
+                    {col.key === 'sno' ? (
+                      <span className="inline-flex items-center gap-0.5 whitespace-nowrap">
+                        <DragHandle {...desktopDrag.handleProps(index)} />
+                        <SerialJump index={index} total={products.length} onMove={moveProduct} />
+                      </span>
+                    ) : renderCell(product, col.key)}
                   </td>
                 ))}
-                <td className="px-3 py-2 text-center">
+                <td className="px-2 py-2 text-center whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1">
+                  <MoveButtons index={index} total={products.length} onMove={moveProduct} />
                   <button
                     onClick={() => removeProduct(product.id)}
                     className="text-red-500 hover:text-red-700 p-1"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                  </span>
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {products.length === 0 && (
               <tr>
                 <td colSpan={visibleColumns.length + 1} className="px-3 py-8 text-center text-slate-500">
