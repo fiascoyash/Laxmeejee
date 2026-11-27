@@ -11,6 +11,7 @@ import { installAudioUnlock, loadAlertSettings, startOrderAlert, stopOrderAlert 
 import { BellRing, UtensilsCrossed } from "lucide-react";
 import { loadTableFence, newOrderAlert, parseTableNote, verifyOrderSpot } from "@/lib/tableOrders";
 import { MerchantStoreProvider, type ShopSettingsTab } from "./store-context";
+import { BillingSyncGate } from './BillingSyncGate';
 
 /** Mark a pickup order collected once its GST bill is saved (non-draft). */
 function useBilledOrders(enabled: boolean, onDone: () => void) {
@@ -25,21 +26,6 @@ function useBilledOrders(enabled: boolean, onDone: () => void) {
     window.addEventListener("hisaaboo:invoice-saved", h);
     return () => window.removeEventListener("hisaaboo:invoice-saved", h);
   }, [enabled, onDone]);
-}
-
-const DEMO_NAME = "Solar Energy Solutions Pvt Ltd";
-
-/** Copy the registered shop name into the billing profile when it still shows the demo placeholder. */
-function syncCompanyName(b: Business) {
-  try {
-    const raw = localStorage.getItem("solar_company_profile");
-    const prof = raw ? JSON.parse(raw) : null;
-    if (!prof) {
-      localStorage.setItem("solar_company_profile", JSON.stringify({ companyName: b.public_name, logo: "", gstNumber: "", address: b.address ?? "", email: "", phone: b.phone ?? "", bankName: "", bankAccount: "", bankIfsc: "", bankBranch: "", signature: "", businessType: "general", compliance: {} }));
-    } else if (!prof.companyName || prof.companyName === DEMO_NAME) {
-      localStorage.setItem("solar_company_profile", JSON.stringify({ ...prof, companyName: b.public_name }));
-    }
-  } catch { /* ignore */ }
 }
 
 /** Owner sign-in + business setup in front of the billing app. Data isolation itself is enforced by database policies. */
@@ -69,7 +55,6 @@ export function BusinessGate({ children }: { children: ReactNode }) {
     const { data: m } = await supabase.from("business_members").select("business_id").order("created_at").limit(1).maybeSingle();
     if (!m) return setBusiness(null);
     const { data: b } = await supabase.from("businesses").select("*").eq("id", m.business_id).maybeSingle();
-    if (b) syncCompanyName(b as Business);
     setBusiness((b as Business) ?? null);
   }, []);
 
@@ -180,7 +165,9 @@ export function BusinessGate({ children }: { children: ReactNode }) {
 
   return (
     <MerchantStoreProvider value={storeValue}>
-      {children}
+      <BillingSyncGate key={business.id} businessId={business.id} businessName={business.public_name} address={business.address ?? ''} phone={business.phone ?? ''}>
+        {children}
+      </BillingSyncGate>
       {ordersOpen && <PickupOrders businessId={business.id} version={ordersVersion} onClose={() => setOrdersOpen(false)} />}
       {alert && (
         <div role="alert" className="order-alert-banner fixed inset-x-2 top-2 z-[80] mx-auto max-w-xl rounded-xl border-2 border-primary bg-card p-4 text-card-foreground shadow-2xl">

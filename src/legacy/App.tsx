@@ -186,6 +186,21 @@ function App() {
 
   // Persist quotation column configuration whenever it changes
   useEffect(() => {
+    const refreshBilling = () => {
+      setCompanyProfile(storage.getCompanyProfile());
+      setQuotations(storage.getQuotations());
+      setCatalog(storage.getProductCatalog());
+      setTemplates(storage.getTemplates());
+      setInvoices(storage.getInvoices());
+      setCustomers(storage.getCustomers());
+      setSuppliers(storage.getSuppliers());
+      setNumberingSettings(storage.getNumberingSettings());
+    };
+    window.addEventListener('hisaaboo:billing-refreshed', refreshBilling);
+    return () => window.removeEventListener('hisaaboo:billing-refreshed', refreshBilling);
+  }, []);
+
+  useEffect(() => {
     if (productColumns && productColumns.length > 0) {
       storage.saveLastUsedQuotationColumns(productColumns);
     }
@@ -2302,7 +2317,7 @@ function App() {
                     onClick={() => setShowCompanyProfile(true)}
                     className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 text-left">
                       <Building2 className="w-5 h-5 text-blue-600" />
                       <div>
                         <div className="font-medium text-gray-800">Company Profile</div>
@@ -2356,13 +2371,6 @@ function App() {
                 />
               </div>
 
-              <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h3 className="font-medium text-amber-800 mb-2">Data Storage</h3>
-                <p className="text-sm text-amber-700">
-                  All your data is stored locally in your browser. Clearing browser data will remove all quotations and settings.
-                  Consider exporting important quotations to PDF for backup.
-                </p>
-              </div>
             </div>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { billingStorage } from '@/lib/billing-cache';
 import { storage } from './storage';
 import type { ProductCatalogItem, ProductPurchase, ProductStockMovement } from '../types';
 
@@ -41,7 +42,7 @@ export function prepareStockPurchase(product: ProductCatalogItem, input: {
 // Snapshot/restore keeps local writes together; operation IDs make retries safe.
 export function commitStockPurchase(operation: ReturnType<typeof prepareStockPurchase>) {
   const keys = ['solar_product_catalog', 'laxmeejee_product_purchases', 'laxmeejee_product_stock_movements'];
-  const snapshots = keys.map(key => localStorage.getItem(key));
+  const snapshots = keys.map(key => billingStorage.getItem(key));
   try {
     storage.saveProductPurchase(operation.purchase);
     storage.saveProductStockMovement(operation.movement);
@@ -50,8 +51,8 @@ export function commitStockPurchase(operation: ReturnType<typeof prepareStockPur
   } catch (error) {
     keys.forEach((key, index) => {
       const value = snapshots[index];
-      if (value === null || value === undefined) localStorage.removeItem(key);
-      else localStorage.setItem(key, value);
+      if (value === null || value === undefined) billingStorage.removeItem(key);
+      else billingStorage.setItem(key, value);
     });
     throw error;
   }

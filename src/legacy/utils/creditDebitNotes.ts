@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { calculateProductGst, isInterState } from './gstReports';
 import { roundTo2, generateId } from './storage';
+import { billingStorage } from '@/lib/billing-cache';
 
 export const NOTES_KEY = 'hisaaboo_credit_debit_notes';
 const CHANGE_EVENT = 'hisaaboo-notes-changed';
@@ -28,11 +29,11 @@ export const B2CL_LIMIT = 250000;
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 export function loadNotes() {
-  try { const raw = localStorage.getItem(NOTES_KEY); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v : []; }
+  try { const raw = billingStorage.getItem(NOTES_KEY); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v : []; }
   catch { return []; }
 }
 function writeNotes(notes) {
-  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+  billingStorage.setItem(NOTES_KEY, JSON.stringify(notes));
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 export function saveNote(note) {

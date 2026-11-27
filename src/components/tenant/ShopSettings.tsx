@@ -7,6 +7,7 @@ import { LocationPin } from "@/components/tenant/LocationPin";
 import { HOURS_PRESETS, INDIAN_CITIES, SHOP_CATEGORIES, isValidIndianPhone, joinAddress, splitAddress, type Pin } from "@/lib/shopAddress";
 import { isValidPincode, pincodeFrom } from "@/lib/customerLocation";
 import { STORE_THEMES, storeThemeStyle } from "@/lib/store-themes";
+import { billingStorage } from '@/lib/billing-cache';
 
 export type Business = {
   id: string; slug: string; public_name: string; is_published: boolean;
@@ -18,7 +19,7 @@ export type Business = {
 type CatalogItem = { id: string; name: string; category?: string; unit?: string; sellingPrice?: number; description?: string; stockQuantity?: number };
 
 function readCatalog(): CatalogItem[] {
-  try { return JSON.parse(localStorage.getItem("solar_product_catalog") || "[]"); } catch { return []; }
+  try { return JSON.parse(billingStorage.getItem("solar_product_catalog") || "[]"); } catch { return []; }
 }
 
 const input = "w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground";

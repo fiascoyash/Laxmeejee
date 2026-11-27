@@ -1,3 +1,10 @@
+# Billing data cloud sync
+- [x] Prepare owner-applied business_records SQL with member-only access and local SQL tests.
+- [x] Owner runs docs/business-records-setup.sql on the original database and confirms success.
+- [x] Connect existing billing saves to per-shop cache, first-upload confirmation, record-level saves, retry queue, realtime refresh and save status.
+- [x] Verify sync rules (19 checks) and clean build.
+- [ ] Live signed-in check on two devices — needs the owner, to avoid test data in the real database.
+
 # Add Stock
 - [x] Keep Add Stock within the viewport with a scrolling form and fixed controls.
 - [x] Validate unit-aware quantities/costs and save optional details with purchase/movement history exactly once.

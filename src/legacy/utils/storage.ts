@@ -1,4 +1,5 @@
 // @ts-nocheck -- original Hisaaboo code, type-checked loosely
+import { billingStorage } from '@/lib/billing-cache';
 import {
   CompanyProfile, Product, ProductCatalogItem, Quotation, QuotationTemplate, TableColumn,
   Invoice, InvoiceStatus, NumberingSettings, GstMode, CustomerData,
@@ -43,7 +44,7 @@ const getDefaultNumberingSettings = (): NumberingSettings => ({
 export const storage = {
   // Company Profile
   getCompanyProfile: (): CompanyProfile => {
-    const data = localStorage.getItem(STORAGE_KEYS.COMPANY_PROFILE);
+    const data = billingStorage.getItem(STORAGE_KEYS.COMPANY_PROFILE);
     return data ? JSON.parse(data) : {
       companyName: 'Solar Energy Solutions Pvt Ltd',
       logo: '',
@@ -62,12 +63,12 @@ export const storage = {
   },
 
   saveCompanyProfile: (profile: CompanyProfile): void => {
-    localStorage.setItem(STORAGE_KEYS.COMPANY_PROFILE, JSON.stringify(profile));
+    billingStorage.setItem(STORAGE_KEYS.COMPANY_PROFILE, JSON.stringify(profile));
   },
 
   // Quotations
   getQuotations: (): Quotation[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.QUOTATIONS);
+    const data = billingStorage.getItem(STORAGE_KEYS.QUOTATIONS);
     return data ? JSON.parse(data) : [];
   },
 
@@ -79,12 +80,12 @@ export const storage = {
     } else {
       quotations.unshift(quotation);
     }
-    localStorage.setItem(STORAGE_KEYS.QUOTATIONS, JSON.stringify(quotations));
+    billingStorage.setItem(STORAGE_KEYS.QUOTATIONS, JSON.stringify(quotations));
   },
 
   deleteQuotation: (id: string): void => {
     const quotations = storage.getQuotations().filter(q => q.id !== id);
-    localStorage.setItem(STORAGE_KEYS.QUOTATIONS, JSON.stringify(quotations));
+    billingStorage.setItem(STORAGE_KEYS.QUOTATIONS, JSON.stringify(quotations));
   },
 
   duplicateQuotation: (id: string): Quotation | null => {
@@ -107,12 +108,12 @@ export const storage = {
 
   // Product Catalog
   getProductCatalog: (): ProductCatalogItem[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.PRODUCT_CATALOG);
+    const data = billingStorage.getItem(STORAGE_KEYS.PRODUCT_CATALOG);
     return data ? JSON.parse(data) : getDefaultProducts();
   },
 
   saveProductCatalog: (products: ProductCatalogItem[]): void => {
-    localStorage.setItem(STORAGE_KEYS.PRODUCT_CATALOG, JSON.stringify(products));
+    billingStorage.setItem(STORAGE_KEYS.PRODUCT_CATALOG, JSON.stringify(products));
   },
 
   addCatalogProduct: (product: ProductCatalogItem): void => {
@@ -137,7 +138,7 @@ export const storage = {
 
   // Templates - Loads saved templates from localStorage, or initializes defaults
   getTemplates: (): QuotationTemplate[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    const data = billingStorage.getItem(STORAGE_KEYS.TEMPLATES);
     if (data) {
       try {
         const parsed = JSON.parse(data);
@@ -150,12 +151,12 @@ export const storage = {
     }
     // Only initialize defaults if localStorage is empty
     const defaults = getDefaultTemplates();
-    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(defaults));
+    billingStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(defaults));
     return defaults;
   },
 
   saveTemplates: (templates: QuotationTemplate[]): void => {
-    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
+    billingStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
   },
 
   saveTemplate: (template: QuotationTemplate): void => {
@@ -208,17 +209,17 @@ export const storage = {
 
   // Numbering Settings
   getNumberingSettings: (): NumberingSettings => {
-    const data = localStorage.getItem(STORAGE_KEYS.NUMBERING);
+    const data = billingStorage.getItem(STORAGE_KEYS.NUMBERING);
     return data ? { ...getDefaultNumberingSettings(), ...JSON.parse(data) } : getDefaultNumberingSettings();
   },
 
   saveNumberingSettings: (settings: NumberingSettings): void => {
-    localStorage.setItem(STORAGE_KEYS.NUMBERING, JSON.stringify(settings));
+    billingStorage.setItem(STORAGE_KEYS.NUMBERING, JSON.stringify(settings));
   },
 
   // Document Labels & Notes
   getDocumentLabelsNotes: (): DocumentLabelsNotesSettings => {
-    const data = localStorage.getItem(STORAGE_KEYS.DOCUMENT_LABELS_NOTES);
+    const data = billingStorage.getItem(STORAGE_KEYS.DOCUMENT_LABELS_NOTES);
     if (!data) return JSON.parse(JSON.stringify(DEFAULT_DOCUMENT_LABELS_NOTES));
     try {
       const parsed = JSON.parse(data) as DocumentLabelsNotesSettings;
@@ -229,12 +230,12 @@ export const storage = {
   },
 
   saveDocumentLabelsNotes: (settings: DocumentLabelsNotesSettings): void => {
-    localStorage.setItem(STORAGE_KEYS.DOCUMENT_LABELS_NOTES, JSON.stringify(settings));
+    billingStorage.setItem(STORAGE_KEYS.DOCUMENT_LABELS_NOTES, JSON.stringify(settings));
   },
 
   // Invoices
   getInvoices: (): Invoice[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.INVOICES);
+    const data = billingStorage.getItem(STORAGE_KEYS.INVOICES);
     return data ? JSON.parse(data) : [];
   },
 
@@ -246,7 +247,7 @@ export const storage = {
     } else {
       invoices.unshift(invoice);
     }
-    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    billingStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
     // Lets the shop layer mark a linked pickup order as collected once it is billed.
     if (invoice.sourcePickupOrderId && invoice.status !== 'Draft') {
       try { window.dispatchEvent(new CustomEvent('hisaaboo:invoice-saved', { detail: { orderId: invoice.sourcePickupOrderId, invoiceNumber: invoice.invoiceNumber } })); } catch { /* ignore */ }
@@ -255,10 +256,10 @@ export const storage = {
 
   deleteInvoice: (id: string): void => {
     const invoices = storage.getInvoices().filter(i => i.id !== id);
-    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    billingStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
     // Also remove all payment records for this invoice
     const payments = storage.getPayments().filter(p => p.invoiceId !== id);
-    localStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
+    billingStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
   },
 
   duplicateInvoice: (id: string): Invoice | null => {
@@ -288,7 +289,7 @@ export const storage = {
 
   // Customers (Party Management)
   getCustomers: (): CustomerData[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
+    const data = billingStorage.getItem(STORAGE_KEYS.CUSTOMERS);
     return data ? JSON.parse(data) : [];
   },
 
@@ -300,12 +301,12 @@ export const storage = {
     } else {
       customers.unshift(customer);
     }
-    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+    billingStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
   },
 
   deleteCustomer: (id: string): void => {
     const customers = storage.getCustomers().filter(c => c.id !== id);
-    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+    billingStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
   },
 
   getCustomerById: (id: string): CustomerData | undefined => {
@@ -338,7 +339,7 @@ export const storage = {
   // ─── Suppliers / Vendors ──────────────────────────────────────────────────
 
   getSuppliers: (): SupplierData[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.SUPPLIERS);
+    const data = billingStorage.getItem(STORAGE_KEYS.SUPPLIERS);
     return data ? JSON.parse(data) : [];
   },
 
@@ -350,15 +351,15 @@ export const storage = {
     } else {
       suppliers.unshift(supplier);
     }
-    localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers));
+    billingStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers));
   },
 
   deleteSupplier: (id: string): void => {
     const suppliers = storage.getSuppliers().filter(s => s.id !== id);
-    localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers));
+    billingStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers));
     // Also delete all transactions for this supplier
     const txns = storage.getSupplierTransactions().filter(t => t.supplierId !== id);
-    localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
+    billingStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
   },
 
   getSupplierById: (id: string): SupplierData | undefined => {
@@ -367,7 +368,7 @@ export const storage = {
 
   // Supplier Transactions
   getSupplierTransactions: (): SupplierTransaction[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS);
+    const data = billingStorage.getItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS);
     return data ? JSON.parse(data) : [];
   },
 
@@ -385,12 +386,12 @@ export const storage = {
     } else {
       txns.push(transaction);
     }
-    localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
+    billingStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
   },
 
   deleteSupplierTransaction: (id: string): void => {
     const txns = storage.getSupplierTransactions().filter(t => t.id !== id);
-    localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
+    billingStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify(txns));
   },
 
   // Recalculate running balance for a supplier's transactions (call after any change)
@@ -413,32 +414,32 @@ export const storage = {
     });
 
     const allTxns = storage.getSupplierTransactions().filter(t => t.supplierId !== supplierId);
-    localStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify([...allTxns, ...updatedTxns]));
+    billingStorage.setItem(STORAGE_KEYS.SUPPLIER_TRANSACTIONS, JSON.stringify([...allTxns, ...updatedTxns]));
   },
 
   // Last Used Column Configuration - persisted separately for quotations and invoices
   getLastUsedQuotationColumns: (): TableColumn[] | null => {
-    const data = localStorage.getItem(STORAGE_KEYS.LAST_USED_QUOTATION_COLUMNS);
+    const data = billingStorage.getItem(STORAGE_KEYS.LAST_USED_QUOTATION_COLUMNS);
     return data ? JSON.parse(data) : null;
   },
 
   saveLastUsedQuotationColumns: (columns: TableColumn[]): void => {
-    localStorage.setItem(STORAGE_KEYS.LAST_USED_QUOTATION_COLUMNS, JSON.stringify(columns));
+    billingStorage.setItem(STORAGE_KEYS.LAST_USED_QUOTATION_COLUMNS, JSON.stringify(columns));
   },
 
   getLastUsedInvoiceColumns: (): TableColumn[] | null => {
-    const data = localStorage.getItem(STORAGE_KEYS.LAST_USED_INVOICE_COLUMNS);
+    const data = billingStorage.getItem(STORAGE_KEYS.LAST_USED_INVOICE_COLUMNS);
     return data ? JSON.parse(data) : null;
   },
 
   saveLastUsedInvoiceColumns: (columns: TableColumn[]): void => {
-    localStorage.setItem(STORAGE_KEYS.LAST_USED_INVOICE_COLUMNS, JSON.stringify(columns));
+    billingStorage.setItem(STORAGE_KEYS.LAST_USED_INVOICE_COLUMNS, JSON.stringify(columns));
   },
 
   // ─── Product Purchases (Stock History) ─────────────────────────────────────
 
   getProductPurchases: (): ProductPurchase[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.PRODUCT_PURCHASES);
+    const data = billingStorage.getItem(STORAGE_KEYS.PRODUCT_PURCHASES);
     return data ? JSON.parse(data) : [];
   },
 
@@ -450,7 +451,7 @@ export const storage = {
     } else {
       purchases.unshift(purchase);
     }
-    localStorage.setItem(STORAGE_KEYS.PRODUCT_PURCHASES, JSON.stringify(purchases));
+    billingStorage.setItem(STORAGE_KEYS.PRODUCT_PURCHASES, JSON.stringify(purchases));
   },
 
   getProductPurchasesByProductId: (productId: string): ProductPurchase[] => {
@@ -462,7 +463,7 @@ export const storage = {
   // ─── Product Stock Movements ───────────────────────────────────────────────
 
   getProductStockMovements: (): ProductStockMovement[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.PRODUCT_STOCK_MOVEMENTS);
+    const data = billingStorage.getItem(STORAGE_KEYS.PRODUCT_STOCK_MOVEMENTS);
     return data ? JSON.parse(data) : [];
   },
 
@@ -474,7 +475,7 @@ export const storage = {
     } else {
       movements.unshift(movement);
     }
-    localStorage.setItem(STORAGE_KEYS.PRODUCT_STOCK_MOVEMENTS, JSON.stringify(movements));
+    billingStorage.setItem(STORAGE_KEYS.PRODUCT_STOCK_MOVEMENTS, JSON.stringify(movements));
   },
 
   getProductStockMovementsByProductId: (productId: string): ProductStockMovement[] => {
@@ -487,7 +488,7 @@ export const storage = {
 
   getPayments: (): InvoicePayment[] => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.INVOICE_PAYMENTS);
+      const data = billingStorage.getItem(STORAGE_KEYS.INVOICE_PAYMENTS);
       return data ? JSON.parse(data) : [];
     } catch { return []; }
   },
@@ -495,12 +496,12 @@ export const storage = {
   addPayment: (payment: InvoicePayment): void => {
     const payments = storage.getPayments();
     payments.unshift(payment);
-    localStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
+    billingStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
   },
 
   deletePayment: (id: string): void => {
     const payments = storage.getPayments().filter(p => p.id !== id);
-    localStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
+    billingStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify(payments));
   },
 
   getPaymentsByInvoice: (invoiceId: string): InvoicePayment[] => {
@@ -529,7 +530,7 @@ export const storage = {
     const amountPaid = storage.getInvoiceAmountPaid(invoiceId);
     const status = storage.computeInvoiceStatus(amountPaid, inv.grandTotal, inv.status === 'Draft');
     invoices[idx] = { ...inv, amountPaid, status, updatedAt: new Date().toISOString() };
-    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    billingStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
   },
 
   createStockMovement: (
@@ -560,7 +561,7 @@ export const storage = {
 
   getProductUsage: (): Record<string, { count: number; lastUsed: string }> => {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.PRODUCT_USAGE);
+      const data = billingStorage.getItem(STORAGE_KEYS.PRODUCT_USAGE);
       return data ? JSON.parse(data) : {};
     } catch { return {}; }
   },
@@ -574,7 +575,7 @@ export const storage = {
       count: existing.count + 1,
       lastUsed: new Date().toISOString(),
     };
-    localStorage.setItem(STORAGE_KEYS.PRODUCT_USAGE, JSON.stringify(usage));
+    billingStorage.setItem(STORAGE_KEYS.PRODUCT_USAGE, JSON.stringify(usage));
   },
 
   getRecentlyUsedProducts: (catalog: ProductCatalogItem[], limit = 10): ProductCatalogItem[] => {
@@ -676,8 +677,8 @@ export const bulkMarkInvoicesPaid = (ids: string[]): void => {
     return { ...inv, status: 'Paid' as InvoiceStatus, amountPaid: inv.grandTotal, updatedAt: now };
   });
 
-  localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(updated));
-  localStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify([...newPayments, ...existingPayments]));
+  billingStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(updated));
+  billingStorage.setItem(STORAGE_KEYS.INVOICE_PAYMENTS, JSON.stringify([...newPayments, ...existingPayments]));
 };
 
 export const convertQuotationToInvoice = (quotation: Quotation): Invoice => {
